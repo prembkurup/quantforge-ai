@@ -32,6 +32,7 @@
 - Convert calculations into standardized FeatureVector payloads.
 - Detect current market regime from FeatureVector payloads.
 - Add Research Knowledge Base to remember validated findings, failed setups, and research evidence before plugin and template selection.
+- Add Research Orchestrator to coordinate hypotheses, features, regimes, knowledge, constraints, and next experiment planning before Strategy Factory.
 - Discover strategy plugins.
 - Run parameter searches, optimization, backtests, and validation inside experiments.
 - Store experiment lineage, analytics, and final metrics.

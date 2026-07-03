@@ -56,6 +56,7 @@ docs/
   physical-postgresql-schema.md
   research-engine.md
   research-knowledge-base.md
+  research-orchestrator.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -97,6 +98,12 @@ Show the Research Knowledge Base demo report:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\knowledge_report.py --demo
+```
+
+Show the Research Orchestrator demo plan:
+
+```powershell
+.\.venv\Scripts\python .\scripts\orchestrate_research.py --pair EUR_USD --timeframe H1 --regime TRENDING --session London
 ```
 
 ## Foundation Setup

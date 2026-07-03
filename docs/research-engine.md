@@ -50,16 +50,17 @@ Calculations are derived inputs used inside features and templates. Indicators a
 6. Feature Store
 7. Market Regime Detection
 8. Research Knowledge Base Lookup
-9. Plugin Framework
-10. Strategy Template Selection
-11. Strategy Factory
-12. Parameter Generation
-13. Optimization
-14. Backtesting
-15. Validation
-16. Ranking
-17. Research Analytics
-18. Strategy Publishing
+9. Research Orchestration
+10. Plugin Framework
+11. Strategy Template Selection
+12. Strategy Factory
+13. Parameter Generation
+14. Optimization
+15. Backtesting
+16. Validation
+17. Ranking
+18. Research Analytics
+19. Strategy Publishing
 
 ## Engine Responsibilities
 
@@ -126,11 +127,36 @@ The Knowledge Base sits before plugin and strategy template selection:
 Feature Vector
   -> Market Regime Engine
   -> Research Knowledge Base
+  -> Research Orchestrator
   -> Plugin Framework
   -> Strategy Template Engine
 ```
 
 It should remember examples such as a trend-pullback setup working on `EUR_USD` `H1` during `TRENDING` London sessions, or `RSI < 30` failing on `USD_JPY` `M1`. These records guide future experiment selection and reduce wasted research cycles.
+
+### Research Orchestrator
+
+Coordinates hypothesis, market context, FeatureVector meaning, market regime, and Knowledge Base evidence before any strategy generation starts.
+
+The orchestrator is intentionally upstream of Strategy Factory:
+
+```text
+Hypothesis
+  -> Feature Context
+  -> Market Regime
+  -> Knowledge Base Lookup
+  -> Research Orchestrator
+  -> Plugin Framework
+  -> Strategy Template Engine
+```
+
+It returns a research plan containing the decision, recommended features, recommended plugins, recommended regimes, blocked plugins, Strategy Factory constraints, next experiments, and reasons.
+
+Run the demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\orchestrate_research.py --pair EUR_USD --timeframe H1 --regime TRENDING --session London
+```
 
 ### Strategy Template Engine
 

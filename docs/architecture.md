@@ -51,6 +51,7 @@ OHLCV
   -> Feature Engine
   -> Market Regime Engine
   -> Research Knowledge Base
+  -> Research Orchestrator
   -> Plugin Framework
   -> Strategy Templates
 ```
@@ -58,6 +59,8 @@ OHLCV
 The Knowledge Base stores durable research findings such as positive edges, failed setups, neutral results, and risk warnings. It links each finding to experiment lineage, instrument, timeframe, market regime, session, feature conditions, metrics, confidence, evidence count, and dependency versions.
 
 The platform should query this memory before launching expensive experiments or generating new strategy candidates.
+
+The Research Orchestrator turns that memory into an experiment plan. It decides whether to run a new experiment, refine the hypothesis, skip a known failure, or collect more evidence before strategy generation.
 
 ## Strategy Discovery
 

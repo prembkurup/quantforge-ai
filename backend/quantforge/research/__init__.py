@@ -47,6 +47,13 @@ from quantforge.research.market_regime import (
     RegimeSpec,
 )
 from quantforge.research.optimization import OptimizationEngine
+from quantforge.research.orchestrator import (
+    OrchestrationDecision,
+    ResearchContext,
+    ResearchExperimentPlan,
+    ResearchOrchestrationRequest,
+    ResearchOrchestrator,
+)
 from quantforge.research.parameters import ParameterGenerator
 from quantforge.research.pipeline import RESEARCH_PIPELINE, ResearchStage, ResearchStageResult
 from quantforge.research.ranking import StrategyRankingEngine
@@ -91,8 +98,13 @@ __all__ = [
     "RegimeResult",
     "RegimeSpec",
     "OptimizationEngine",
+    "OrchestrationDecision",
     "ParameterGenerator",
     "ParameterSearchPlan",
+    "ResearchContext",
+    "ResearchExperimentPlan",
+    "ResearchOrchestrationRequest",
+    "ResearchOrchestrator",
     "RESEARCH_PIPELINE",
     "ResearchAnalyticsEngine",
     "ResearchStage",

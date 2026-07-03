@@ -25,7 +25,7 @@ PostgreSQL is the source of truth for all durable records:
 - selected strategy candidates
 - live orders, positions, executions, and audit logs
 
-Raw OHLCV candles are stored permanently. Indicator values are not stored by default because they are derived data and can explode storage requirements. Indicators are calculated dynamically in Python when research or live signal evaluation needs them.
+Raw OHLCV candles are stored permanently. Calculation outputs are not stored by default because they are derived data and can explode storage requirements. Indicators, statistics, volatility measures, price action, patterns, market structure, sessions, liquidity, and custom plugin calculations are calculated dynamically in Python when research or live signal evaluation needs them.
 
 Redis is only for live cache:
 
@@ -48,7 +48,7 @@ A strategy plugin declares:
 
 - metadata
 - required candle granularities
-- required indicators
+- required calculations
 - parameter search space
 - signal generation logic
 - risk model hooks
@@ -64,7 +64,7 @@ The live engine flow is:
 
 1. Load approved strategy version.
 2. Read latest candles from PostgreSQL and live cache.
-3. Calculate indicators dynamically.
+3. Calculate derived values dynamically through the Calculation Engine.
 4. Generate signal.
 5. Apply risk checks.
 6. Send order through OANDA adapter.

@@ -28,7 +28,7 @@
 - Load historical candles from PostgreSQL.
 - Define experiments with dataset, feature set, strategy template, and objective.
 - Add experiment lifecycle, scheduling, resource tracking, comparison, and publication controls.
-- Calculate indicators dynamically.
+- Calculate derived values dynamically through the Calculation Engine.
 - Discover strategy plugins.
 - Run parameter searches, optimization, backtests, and validation inside experiments.
 - Store experiment lineage, analytics, and final metrics.

@@ -25,7 +25,7 @@ An experiment binds together the complete research record:
 - analytics
 - published strategy versions
 
-Indicators are derived inputs used inside features and templates. A research run is an execution attempt inside an experiment. The experiment is the durable unit used for reproducibility, comparison, audit, and publishing.
+Calculations are derived inputs used inside features and templates. Indicators are one calculator family inside the broader Calculation Engine. A research run is an execution attempt inside an experiment. The experiment is the durable unit used for reproducibility, comparison, audit, and publishing.
 
 ## Principles
 
@@ -34,7 +34,7 @@ Indicators are derived inputs used inside features and templates. A research run
 - Every strategy is explainable.
 - Every strategy must be statistically validated.
 - Research and production remain isolated.
-- Indicators are derived.
+- Calculation outputs are derived.
 - Features are standardized.
 - Strategies are assembled from reusable components.
 - Optimization is independent from strategy generation.
@@ -45,7 +45,7 @@ Indicators are derived inputs used inside features and templates. A research run
 1. Experiment Definition
 2. Dataset Selection
 3. Data Preparation
-4. Indicator Calculation
+4. Calculation
 5. Feature Engineering
 6. Feature Store
 7. Market Regime Detection
@@ -73,13 +73,15 @@ Creates and owns experiment definitions, attaches datasets and feature sets, rec
 
 Manages lifecycle, scheduling, priority, resource usage, reproducibility metadata, results, comparison, and controlled publication. Failed experiments retain metadata and results for future analysis.
 
-### Indicator Engine
+### Calculation Engine
 
-Calculates indicators on demand. It supports parameterized indicators, parallel computation, incremental calculation, and caching when beneficial. Indicator values are not stored permanently by default.
+Calculates derived market values on demand. It supports parameterized calculators, parallel computation, incremental calculation, and caching when beneficial. Calculation outputs are not stored permanently by default.
+
+The Indicator Calculator is one module inside the Calculation Engine. The engine also owns statistical, price action, pattern, market structure, volatility, session, liquidity, and custom plugin calculators.
 
 ### Feature Engineering Engine
 
-Transforms indicators into standardized market features such as trend direction, trend strength, pullback, breakout, momentum, volatility regime, support/resistance distance, candle structure, session, liquidity, and spread category.
+Transforms Calculation Engine outputs into standardized market features such as trend direction, trend strength, pullback, breakout, momentum, volatility regime, support/resistance distance, candle structure, session, liquidity, and spread category.
 
 ### Feature Store
 

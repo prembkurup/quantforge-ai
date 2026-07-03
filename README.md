@@ -8,7 +8,7 @@ QuantForge AI is designed around permanent raw market data, reproducible researc
 
 - PostgreSQL is the source of truth.
 - Raw OHLCV candles are stored permanently.
-- Indicator values are calculated dynamically in Python by default.
+- Derived calculation values are calculated dynamically in Python by default.
 - Redis is used only for live cache and short-lived runtime state.
 - Parquet is used for research cache and offline experiments.
 - Strategy discovery is template-based and plugin-driven.
@@ -29,8 +29,9 @@ backend/
     data/          Repository interfaces
     market_data/   OANDA candle ingestion and OHLCV storage
     instruments/   Tradable instruments, timeframes, broker mappings
-    indicators/    Dynamic indicator calculation
-    features/      Reusable market features derived from indicators
+    calculations/  Calculation Engine with indicator, statistical, volatility, and plugin calculators
+    indicators/    Compatibility exports for indicator calculations
+    features/      Reusable market features derived from Calculation Engine outputs
     plugins/       Plugin components and discovery
     experiments/   Experiment definitions and management models
     strategies/    Strategy templates, versions, deployments
@@ -67,7 +68,7 @@ The first milestone is a usable research loop:
 2. Load candle windows into Python.
 3. Define a reproducible experiment with dataset, feature set, and strategy template.
 4. Discover compatible strategy plugins from the registry.
-5. Calculate indicators dynamically inside the experiment pipeline.
+5. Calculate indicators, statistics, volatility, price action, patterns, and other derived values dynamically inside the experiment pipeline.
 6. Search parameters, backtest, validate, and score candidates.
 7. Publish approved strategies with full experiment lineage.
 

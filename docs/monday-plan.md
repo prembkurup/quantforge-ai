@@ -28,7 +28,7 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Create PostgreSQL schema for instruments, candles, experiments, research runs, and live orders.
 - Implement OANDA candle ingestion.
 - Add candle data quality report.
-- Implement dynamic indicator service.
+- Implement Calculation Engine with indicator, statistical, volatility, and custom calculator modules.
 - Implement strategy plugin discovery.
 - Implement experiment definition workflow.
 - Build first template strategy plugin.

@@ -7,7 +7,7 @@ class ResearchStage(StrEnum):
     EXPERIMENT_DEFINITION = "experiment_definition"
     DATASET_SELECTION = "dataset_selection"
     DATA_PREPARATION = "data_preparation"
-    INDICATOR_CALCULATION = "indicator_calculation"
+    CALCULATION = "calculation"
     FEATURE_ENGINEERING = "feature_engineering"
     FEATURE_STORE = "feature_store"
     MARKET_REGIME_DETECTION = "market_regime_detection"
@@ -26,7 +26,7 @@ RESEARCH_PIPELINE: tuple[ResearchStage, ...] = (
     ResearchStage.EXPERIMENT_DEFINITION,
     ResearchStage.DATASET_SELECTION,
     ResearchStage.DATA_PREPARATION,
-    ResearchStage.INDICATOR_CALCULATION,
+    ResearchStage.CALCULATION,
     ResearchStage.FEATURE_ENGINEERING,
     ResearchStage.FEATURE_STORE,
     ResearchStage.MARKET_REGIME_DETECTION,

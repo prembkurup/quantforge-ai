@@ -1,6 +1,5 @@
-"""Dynamic indicator calculations."""
+"""Compatibility exports for the indicator calculator module."""
 
-from quantforge.indicators.dynamic import atr, ema, rsi
+from quantforge.calculations.indicators import atr, ema, rsi
 
 __all__ = ["atr", "ema", "rsi"]
-

@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     oanda_account_id: str | None = None
     oanda_api_token: str | None = None
 
+    monday_api_url: str = Field(default="https://api.monday.com/v2")
+    monday_api_token: str | None = None
+    monday_board_id: str | None = None
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

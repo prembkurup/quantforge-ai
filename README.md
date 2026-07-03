@@ -124,3 +124,11 @@ Copy-Item .env.example .env
 # Fill QUANTFORGE_OANDA_API_TOKEN if using a real OANDA practice account.
 .\.venv\Scripts\python .\scripts\ingest_oanda_candles.py
 ```
+
+Check Monday.com integration:
+
+```powershell
+# Add QUANTFORGE_MONDAY_API_TOKEN to the local .env file. Do not commit it.
+.\.venv\Scripts\python .\scripts\check_monday.py
+.\.venv\Scripts\python .\scripts\list_monday_boards.py
+```

@@ -125,6 +125,12 @@ Run tests:
 .\.venv\Scripts\python -m pytest
 ```
 
+Run the Calculation Engine and Feature Platform coverage gate:
+
+```powershell
+.\.venv\Scripts\python -m pytest --cov=quantforge.calculations --cov=quantforge.features --cov-report=term-missing --cov-fail-under=95
+```
+
 Optional manual OANDA candle ingestion smoke test:
 
 ```powershell

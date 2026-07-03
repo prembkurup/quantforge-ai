@@ -35,10 +35,21 @@ class FeatureRegistry:
         self._features[key] = definition
 
     def get(self, feature_id: str, version: str = "1.0") -> FeatureDefinition:
-        return self._features[f"{feature_id}:{version}"]
+        key = f"{feature_id}:{version}"
+        try:
+            return self._features[key]
+        except KeyError as exc:
+            raise KeyError(f"Feature is not registered: {key}") from exc
 
     def list_definitions(self) -> list[FeatureDefinition]:
         return list(self._features.values())
+
+    def list_by_category(self, category: FeatureCategory) -> list[FeatureDefinition]:
+        return [
+            definition
+            for definition in self._features.values()
+            if definition.category == category
+        ]
 
 
 def default_feature_registry() -> FeatureRegistry:

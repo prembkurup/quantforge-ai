@@ -3,10 +3,16 @@
 from quantforge.features.engine import FeatureEngine
 from quantforge.features.feature_store import FeatureStore
 from quantforge.features.generators import FeatureVector, StandardFeatureVectorGenerator
-from quantforge.features.registry import FeatureDefinition, FeatureRegistry, default_feature_registry
+from quantforge.features.registry import (
+    FeatureCategory,
+    FeatureDefinition,
+    FeatureRegistry,
+    default_feature_registry,
+)
 from quantforge.features.validators import require_feature_keys
 
 __all__ = [
+    "FeatureCategory",
     "FeatureDefinition",
     "FeatureEngine",
     "FeatureRegistry",

@@ -38,8 +38,23 @@ The initial package is `quantforge.calculations`.
 - `calculations.market_structure` contains swing and structure calculations.
 - `calculations.sessions` contains session flags.
 - `calculations.volatility` starts true range and close-to-close volatility.
+- `features.registry` stores versioned, dependency-aware feature definitions.
+- `features.generators` creates standardized feature vectors for downstream systems.
 
 The legacy `quantforge.indicators` package remains as compatibility exports while newer code moves to the Calculation Engine.
+
+## Completion Gate
+
+Milestone 3 is gated by:
+
+- A live feature-vector command using CoreUI candles.
+- Unit tests for indicator, statistics, price action, market structure, session, feature registry, custom plugin, cache, and multi-timeframe paths.
+- Coverage target of at least 95% across `quantforge.calculations` and `quantforge.features`.
+
+```powershell
+.\.venv\Scripts\python .\scripts\generate_feature_vector.py --pair EUR_USD --timeframe H1 --candles 300
+.\.venv\Scripts\python -m pytest --cov=quantforge.calculations --cov=quantforge.features --cov-report=term-missing --cov-fail-under=95
+```
 
 ## Downstream Contract
 

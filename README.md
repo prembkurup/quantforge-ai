@@ -132,3 +132,9 @@ Check Monday.com integration:
 .\.venv\Scripts\python .\scripts\check_monday.py
 .\.venv\Scripts\python .\scripts\list_monday_boards.py
 ```
+
+Create or verify the initial QuantForge roadmap tasks:
+
+```powershell
+.\.venv\Scripts\python .\scripts\create_monday_roadmap.py
+```

@@ -67,6 +67,80 @@ class MondayClient:
         )
         return data["boards"]
 
+    def board(self, board_id: str) -> dict[str, Any]:
+        data = self.execute(
+            """
+            query ($ids: [ID!]!) {
+              boards(ids: $ids) {
+                id
+                name
+                groups {
+                  id
+                  title
+                }
+              }
+            }
+            """,
+            {"ids": [board_id]},
+        )
+        boards = data["boards"]
+        if not boards:
+            raise MondayApiError(f"Monday board not found: {board_id}")
+        return boards[0]
+
+    def board_items(self, board_id: str, limit: int = 500) -> list[dict[str, Any]]:
+        data = self.execute(
+            """
+            query ($ids: [ID!]!, $limit: Int!) {
+              boards(ids: $ids) {
+                items_page(limit: $limit) {
+                  items {
+                    id
+                    name
+                    group {
+                      id
+                      title
+                    }
+                  }
+                }
+              }
+            }
+            """,
+            {"ids": [board_id], "limit": limit},
+        )
+        boards = data["boards"]
+        if not boards:
+            raise MondayApiError(f"Monday board not found: {board_id}")
+        return boards[0]["items_page"]["items"]
+
+    def create_group(self, board_id: str, group_name: str) -> dict[str, Any]:
+        data = self.execute(
+            """
+            mutation ($board_id: ID!, $group_name: String!) {
+              create_group(board_id: $board_id, group_name: $group_name) {
+                id
+                title
+              }
+            }
+            """,
+            {"board_id": board_id, "group_name": group_name},
+        )
+        return data["create_group"]
+
+    def create_item(self, board_id: str, group_id: str, item_name: str) -> dict[str, Any]:
+        data = self.execute(
+            """
+            mutation ($board_id: ID!, $group_id: String!, $item_name: String!) {
+              create_item(board_id: $board_id, group_id: $group_id, item_name: $item_name) {
+                id
+                name
+              }
+            }
+            """,
+            {"board_id": board_id, "group_id": group_id, "item_name": item_name},
+        )
+        return data["create_item"]
+
 
 def get_monday_client() -> MondayClient:
     settings = get_settings()

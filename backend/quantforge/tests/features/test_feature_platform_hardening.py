@@ -7,8 +7,9 @@ from quantforge.calculations.cache import CalculationCache, CalculationCacheKey
 from quantforge.calculations.volatility import close_to_close_volatility, true_range
 from quantforge.features import (
     FeatureCategory,
-    FeatureDefinition,
     FeatureRegistry,
+    FeatureSpec,
+    FeatureValue,
     FeatureStore,
     StandardFeatureVectorGenerator,
     default_feature_registry,
@@ -59,25 +60,27 @@ def test_calculation_engine_supports_custom_plugin_registration() -> None:
 
 def test_feature_registry_enforces_versioned_unique_definitions() -> None:
     registry = FeatureRegistry()
-    definition = FeatureDefinition(
-        feature_id="trend",
+    definition = FeatureSpec(
+        feature_id="trend_direction",
         name="Trend",
-        description="Directional trend.",
+        category=FeatureCategory.TREND,
         version="1.0",
-        calculator="feature.generator",
         dependencies=("ema_fast", "ema_slow"),
         output_type="string",
-        category=FeatureCategory.TREND,
+        description="Directional trend.",
     )
 
     registry.register(definition)
 
-    assert registry.get("trend") == definition
+    assert registry.get("trend_direction") == definition
     assert registry.list_by_category(FeatureCategory.TREND) == [definition]
+    registry.validate_dependencies("trend_direction", {"ema_fast", "ema_slow"})
     with pytest.raises(ValueError, match="already registered"):
         registry.register(definition)
     with pytest.raises(KeyError, match="not registered"):
         registry.get("missing")
+    with pytest.raises(ValueError, match="missing dependencies"):
+        registry.validate_dependencies("trend_direction", {"ema_fast"})
 
 
 def test_default_feature_registry_documents_dependencies() -> None:
@@ -101,13 +104,50 @@ def test_feature_vector_schema_is_consistent_across_timeframes() -> None:
     assert h4_payload["timeframe"] == "H4"
     require_feature_keys(
         h1_payload["features"],
-        {"trend", "momentum", "volatility", "session", "bos", "choch"},
+        {"trend_direction", "momentum_state", "volatility_regime"},
     )
 
 
 def test_feature_vector_generator_rejects_empty_candles() -> None:
     with pytest.raises(ValueError, match="empty candle frame"):
         StandardFeatureVectorGenerator().generate(pd.DataFrame(), "EUR_USD", "H1")
+
+
+def test_feature_engine_generates_versioned_market_meaning_vector() -> None:
+    payload = FeatureEngine().generate(_candles(), "EUR_USD", "H1").to_dict()
+
+    assert payload["instrument"] == "EUR_USD"
+    assert payload["timeframe"] == "H1"
+    assert payload["timestamp"].endswith("Z")
+    assert set(payload["features"]) == {
+        "trend_direction",
+        "trend_strength",
+        "momentum_state",
+        "volatility_regime",
+        "candle_body_ratio",
+        "wick_ratio",
+        "range_expansion",
+        "ema_distance",
+        "pullback_state",
+        "breakout_state",
+    }
+    assert payload["feature_versions"]["trend_direction"] == "1.0"
+    assert isinstance(payload["features"]["pullback_state"], bool)
+
+
+def test_feature_engine_validates_required_candle_inputs() -> None:
+    with pytest.raises(ValueError, match="missing required columns"):
+        FeatureEngine().generate(pd.DataFrame({"close": [1.0]}), "EUR_USD", "H1")
+
+
+def test_feature_value_documents_spec_metadata() -> None:
+    spec = default_feature_registry().get("volatility_regime")
+    value = FeatureValue(spec=spec, value="medium").to_dict()
+
+    assert value["feature_id"] == "volatility_regime"
+    assert value["version"] == "1.0"
+    assert value["category"] == "volatility"
+    assert value["value"] == "medium"
 
 
 def test_feature_vector_helper_states_cover_unknown_flat_and_buckets() -> None:

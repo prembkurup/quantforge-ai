@@ -69,3 +69,28 @@ OHLCV
   -> Backtesting
   -> Validation
 ```
+
+## Feature Engine Boundary
+
+The Feature Engine turns raw Calculation Engine outputs into standardized market meaning. It owns feature naming, dependency validation, version metadata, and the final FeatureVector contract consumed by experiments.
+
+```text
+OHLCV
+  -> Calculation Engine
+  -> Feature Engine
+  -> Feature Vector
+  -> Experiment Runner
+```
+
+Initial versioned features:
+
+- `trend_direction`
+- `trend_strength`
+- `momentum_state`
+- `volatility_regime`
+- `candle_body_ratio`
+- `wick_ratio`
+- `range_expansion`
+- `ema_distance`
+- `pullback_state`
+- `breakout_state`

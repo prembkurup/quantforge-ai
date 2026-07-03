@@ -12,7 +12,7 @@ from quantforge.features import (
 def test_feature_registry_contains_versioned_defaults() -> None:
     registry = default_feature_registry()
 
-    definition = registry.get("trend")
+    definition = registry.get("trend_direction")
 
     assert definition.version == "1.0"
     assert definition.output_type == "string"
@@ -36,10 +36,10 @@ def test_feature_vector_generator_outputs_standard_payload() -> None:
     assert payload["instrument"] == "EUR_USD"
     assert payload["timeframe"] == "H1"
     assert {
-        "trend",
+        "trend_direction",
         "trend_strength",
-        "momentum",
-        "volatility",
+        "momentum_state",
+        "volatility_regime",
         "session",
         "bos",
         "choch",
@@ -48,4 +48,4 @@ def test_feature_vector_generator_outputs_standard_payload() -> None:
 
 def test_feature_validator_reports_missing_keys() -> None:
     with pytest.raises(ValueError, match="missing required keys"):
-        require_feature_keys({"trend": "bullish"}, {"trend", "session"})
+        require_feature_keys({"trend_direction": "bullish"}, {"trend_direction", "session"})

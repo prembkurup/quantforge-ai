@@ -7,6 +7,8 @@ from quantforge.features.registry import (
     FeatureCategory,
     FeatureDefinition,
     FeatureRegistry,
+    FeatureSpec,
+    FeatureValue,
     default_feature_registry,
 )
 from quantforge.features.validators import require_feature_keys
@@ -16,7 +18,9 @@ __all__ = [
     "FeatureDefinition",
     "FeatureEngine",
     "FeatureRegistry",
+    "FeatureSpec",
     "FeatureStore",
+    "FeatureValue",
     "FeatureVector",
     "StandardFeatureVectorGenerator",
     "default_feature_registry",

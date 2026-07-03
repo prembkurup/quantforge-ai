@@ -4,22 +4,30 @@ from typing import Any
 import pandas as pd
 
 from quantforge.calculations import CalculationEngine
+from quantforge.features.registry import FeatureValue
 
 
 @dataclass(frozen=True, slots=True)
 class FeatureVector:
     instrument: str
     timeframe: str
-    candle_time: str
+    timestamp: str
     features: dict[str, Any] = field(default_factory=dict)
+    values: tuple[FeatureValue, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "instrument": self.instrument,
             "timeframe": self.timeframe,
-            "candle_time": self.candle_time,
+            "timestamp": self.timestamp,
+            "candle_time": self.timestamp,
             "features": self.features,
         }
+        if self.values:
+            payload["feature_versions"] = {
+                value.spec.feature_id: value.spec.version for value in self.values
+            }
+        return payload
 
 
 class StandardFeatureVectorGenerator:
@@ -54,12 +62,12 @@ class StandardFeatureVectorGenerator:
         trend = _trend(latest["ema_fast"], latest["ema_slow"])
 
         features = {
-            "trend": trend,
+            "trend_direction": trend,
             "trend_strength": min(abs(ema_distance) * 100, 1.0),
-            "momentum": _momentum(frame["rsi"]),
-            "volatility": _volatility_bucket(atr_percent),
-            "pullback": bool(_is_pullback(trend, latest["close"], latest["ema_fast"])),
-            "breakout": bool(latest_structure["bos"]),
+            "momentum_state": _momentum(frame["rsi"]),
+            "volatility_regime": _volatility_bucket(atr_percent),
+            "pullback_state": bool(_is_pullback(trend, latest["close"], latest["ema_fast"])),
+            "breakout_state": bool(latest_structure["bos"]),
             "session": latest_session["session"],
             "ema_distance": ema_distance,
             "support_distance": _safe_float(latest_structure["support_distance"]),
@@ -76,7 +84,7 @@ class StandardFeatureVectorGenerator:
         return FeatureVector(
             instrument=instrument,
             timeframe=timeframe,
-            candle_time=str(latest["time"]),
+            timestamp=_iso_timestamp(latest["time"]),
             features=features,
         )
 
@@ -123,3 +131,12 @@ def _safe_float(value: Any) -> float | None:
     if pd.isna(value):
         return None
     return float(value)
+
+
+def _iso_timestamp(value: Any) -> str:
+    timestamp = pd.Timestamp(value)
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.tz_localize("UTC")
+    else:
+        timestamp = timestamp.tz_convert("UTC")
+    return timestamp.isoformat().replace("+00:00", "Z")

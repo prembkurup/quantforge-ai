@@ -78,6 +78,12 @@ Generate the first standardized feature vector from CoreUI candles:
 .\.venv\Scripts\python .\scripts\generate_feature_vector.py --pair EUR_USD --timeframe H1 --candles 300
 ```
 
+Generate a validated, versioned FeatureVector through the Feature Engine:
+
+```powershell
+.\.venv\Scripts\python .\scripts\generate_features.py --pair EUR_USD --timeframe H1 --lookback 300
+```
+
 ## Foundation Setup
 
 Create and activate the local Python environment:

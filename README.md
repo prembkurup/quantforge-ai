@@ -84,6 +84,12 @@ Generate a validated, versioned FeatureVector through the Feature Engine:
 .\.venv\Scripts\python .\scripts\generate_features.py --pair EUR_USD --timeframe H1 --lookback 300
 ```
 
+Detect the current rule-based market regime from the latest FeatureVector:
+
+```powershell
+.\.venv\Scripts\python .\scripts\detect_regime.py --pair EUR_USD --timeframe H1 --lookback 300
+```
+
 ## Foundation Setup
 
 Create and activate the local Python environment:

@@ -19,7 +19,15 @@ from quantforge.research.experiment import (
     ParameterSearchPlan,
 )
 from quantforge.research.feature_store import FeatureStore
-from quantforge.research.market_regime import MarketRegimeEngine
+from quantforge.research.market_regime import (
+    MarketRegime,
+    MarketRegimeEngine,
+    RegimeConfidenceScore,
+    RegimeDetector,
+    RegimeRegistry,
+    RegimeResult,
+    RegimeSpec,
+)
 from quantforge.research.optimization import OptimizationEngine
 from quantforge.research.parameters import ParameterGenerator
 from quantforge.research.pipeline import RESEARCH_PIPELINE, ResearchStage, ResearchStageResult
@@ -42,6 +50,12 @@ __all__ = [
     "ExperimentComparisonSpec",
     "FeatureStore",
     "MarketRegimeEngine",
+    "MarketRegime",
+    "RegimeConfidenceScore",
+    "RegimeDetector",
+    "RegimeRegistry",
+    "RegimeResult",
+    "RegimeSpec",
     "OptimizationEngine",
     "ParameterGenerator",
     "ParameterSearchPlan",

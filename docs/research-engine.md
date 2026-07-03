@@ -91,6 +91,29 @@ Provides standardized feature vectors for research consistency, live trading con
 
 Classifies market conditions such as trending, ranging, breakout, high volatility, low volatility, recovery, and no-trade. Every strategy declares compatible regimes.
 
+The first implementation is rule-based and consumes standardized FeatureVector payloads:
+
+```text
+Feature Vector
+  -> Market Regime Engine
+  -> Current market state
+```
+
+Supported V1 regimes:
+
+- `TRENDING`
+- `RANGING`
+- `HIGH_VOLATILITY`
+- `LOW_VOLATILITY`
+- `BREAKOUT`
+- `NO_TRADE`
+
+Run the current detector:
+
+```powershell
+.\.venv\Scripts\python .\scripts\detect_regime.py --pair EUR_USD --timeframe H1 --lookback 300
+```
+
 ### Strategy Template Engine
 
 Provides reusable blueprints such as trend pullback, breakout, mean reversion, volatility expansion, and momentum continuation.

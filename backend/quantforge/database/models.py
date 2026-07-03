@@ -3,6 +3,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     MetaData,
     Numeric,
@@ -65,6 +66,12 @@ candle = Table(
         "timeframe_id",
         "candle_time",
         name="uq_candle_instrument_timeframe_time",
+    ),
+    Index(
+        "idx_candle_instrument_timeframe_time",
+        "instrument_id",
+        "timeframe_id",
+        text("candle_time DESC"),
     ),
     schema="market",
 )

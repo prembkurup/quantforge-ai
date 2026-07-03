@@ -21,3 +21,15 @@ def test_candle_has_expected_ohlcv_columns() -> None:
         "source",
     }
     assert expected.issubset(set(candle.c.keys()))
+
+
+def test_candle_has_duplicate_prevention_constraint() -> None:
+    constraints = {constraint.name for constraint in candle.constraints}
+
+    assert "uq_candle_instrument_timeframe_time" in constraints
+
+
+def test_candle_has_lookup_index() -> None:
+    indexes = {index.name for index in candle.indexes}
+
+    assert "idx_candle_instrument_timeframe_time" in indexes

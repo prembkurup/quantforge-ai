@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from datetime import datetime
 
-from sqlalchemy import Connection, Select, and_, insert, select
+from sqlalchemy import Connection, Select, and_, func, insert, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from quantforge.database.models import candle, instrument, timeframe
@@ -47,7 +47,7 @@ class PostgresCandleRepository:
                 "close_price": statement.excluded.close_price,
                 "volume": statement.excluded.volume,
                 "is_complete": statement.excluded.is_complete,
-                "updated_at": statement.excluded.updated_at,
+                "updated_at": func.now(),
             },
         )
         result = self._connection.execute(upsert)
@@ -83,6 +83,55 @@ class PostgresCandleRepository:
             .order_by(candle.c.candle_time)
         )
         return [dict(row._mapping) for row in self._connection.execute(statement)]
+
+    def count_window(
+        self,
+        symbol: str,
+        granularity: str,
+        start: datetime,
+        end: datetime,
+    ) -> int:
+        statement = (
+            select(func.count())
+            .select_from(candle)
+            .join(instrument, candle.c.instrument_id == instrument.c.id)
+            .join(timeframe, candle.c.timeframe_id == timeframe.c.id)
+            .where(
+                and_(
+                    instrument.c.symbol == symbol,
+                    timeframe.c.code == granularity,
+                    candle.c.candle_time >= start,
+                    candle.c.candle_time < end,
+                )
+            )
+        )
+        return int(self._connection.execute(statement).scalar_one())
+
+    def duplicate_count(
+        self,
+        symbol: str,
+        granularity: str,
+        start: datetime,
+        end: datetime,
+    ) -> int:
+        grouped = (
+            select(candle.c.candle_time, func.count().label("row_count"))
+            .join(instrument, candle.c.instrument_id == instrument.c.id)
+            .join(timeframe, candle.c.timeframe_id == timeframe.c.id)
+            .where(
+                and_(
+                    instrument.c.symbol == symbol,
+                    timeframe.c.code == granularity,
+                    candle.c.candle_time >= start,
+                    candle.c.candle_time < end,
+                )
+            )
+            .group_by(candle.c.candle_time)
+            .having(func.count() > 1)
+            .subquery()
+        )
+        statement = select(func.coalesce(func.sum(grouped.c.row_count - 1), 0))
+        return int(self._connection.execute(statement).scalar_one())
 
     def _get_or_create_instrument(self, symbol: str):
         existing = self._connection.execute(

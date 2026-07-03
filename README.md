@@ -122,7 +122,7 @@ Optional OANDA candle ingestion smoke test:
 ```powershell
 Copy-Item .env.example .env
 # Fill QUANTFORGE_OANDA_API_TOKEN if using a real OANDA practice account.
-.\.venv\Scripts\python .\scripts\ingest_oanda_candles.py
+.\.venv\Scripts\python .\scripts\ingest_oanda_candles.py --pair EUR_USD --timeframe H1 --from 2025-01-01 --to 2025-12-31
 ```
 
 Check Monday.com integration:

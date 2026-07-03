@@ -29,6 +29,9 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Implement OANDA candle ingestion.
 - Add candle data quality report.
 - Implement Calculation Engine with indicator, statistical, volatility, and custom calculator modules.
+- Implement Feature Engine and Feature Registry.
+- Implement Market Regime Engine.
+- Build Research Knowledge Base for validated findings, failed setups, and experiment evidence.
 - Implement strategy plugin discovery.
 - Implement experiment definition workflow.
 - Build first template strategy plugin.

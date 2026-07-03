@@ -49,15 +49,17 @@ Calculations are derived inputs used inside features and templates. Indicators a
 5. Feature Engineering
 6. Feature Store
 7. Market Regime Detection
-8. Strategy Template Selection
-9. Strategy Factory
-10. Parameter Generation
-11. Optimization
-12. Backtesting
-13. Validation
-14. Ranking
-15. Research Analytics
-16. Strategy Publishing
+8. Research Knowledge Base Lookup
+9. Plugin Framework
+10. Strategy Template Selection
+11. Strategy Factory
+12. Parameter Generation
+13. Optimization
+14. Backtesting
+15. Validation
+16. Ranking
+17. Research Analytics
+18. Strategy Publishing
 
 ## Engine Responsibilities
 
@@ -113,6 +115,22 @@ Run the current detector:
 ```powershell
 .\.venv\Scripts\python .\scripts\detect_regime.py --pair EUR_USD --timeframe H1 --lookback 300
 ```
+
+### Research Knowledge Base
+
+Stores durable research findings so QuantForge AI can accumulate knowledge across experiments. It records what worked, what failed, where it worked, under which feature conditions, in which market regime, and how much evidence supports the conclusion.
+
+The Knowledge Base sits before plugin and strategy template selection:
+
+```text
+Feature Vector
+  -> Market Regime Engine
+  -> Research Knowledge Base
+  -> Plugin Framework
+  -> Strategy Template Engine
+```
+
+It should remember examples such as a trend-pullback setup working on `EUR_USD` `H1` during `TRENDING` London sessions, or `RSI < 30` failing on `USD_JPY` `M1`. These records guide future experiment selection and reduce wasted research cycles.
 
 ### Strategy Template Engine
 

@@ -21,6 +21,7 @@ PostgreSQL is the source of truth for all durable records:
 - instruments
 - strategy definitions
 - experiments and research runs
+- research knowledge findings
 - backtest results
 - selected strategy candidates
 - live orders, positions, executions, and audit logs
@@ -39,6 +40,24 @@ Parquet is only for research cache:
 - local experiment datasets
 - feature matrices for repeatable research
 - large intermediate outputs that can be regenerated from PostgreSQL
+
+## Research Memory
+
+QuantForge AI includes a Research Knowledge Base between market regime detection and plugin/template selection:
+
+```text
+OHLCV
+  -> Calculation Engine
+  -> Feature Engine
+  -> Market Regime Engine
+  -> Research Knowledge Base
+  -> Plugin Framework
+  -> Strategy Templates
+```
+
+The Knowledge Base stores durable research findings such as positive edges, failed setups, neutral results, and risk warnings. It links each finding to experiment lineage, instrument, timeframe, market regime, session, feature conditions, metrics, confidence, evidence count, and dependency versions.
+
+The platform should query this memory before launching expensive experiments or generating new strategy candidates.
 
 ## Strategy Discovery
 

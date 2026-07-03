@@ -29,6 +29,9 @@
 - Define experiments with dataset, feature set, strategy template, and objective.
 - Add experiment lifecycle, scheduling, resource tracking, comparison, and publication controls.
 - Calculate derived values dynamically through the Calculation Engine.
+- Convert calculations into standardized FeatureVector payloads.
+- Detect current market regime from FeatureVector payloads.
+- Add Research Knowledge Base to remember validated findings, failed setups, and research evidence before plugin and template selection.
 - Discover strategy plugins.
 - Run parameter searches, optimization, backtests, and validation inside experiments.
 - Store experiment lineage, analytics, and final metrics.

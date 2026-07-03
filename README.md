@@ -55,6 +55,7 @@ docs/
   logical-database-model.md
   physical-postgresql-schema.md
   research-engine.md
+  research-knowledge-base.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -67,10 +68,12 @@ The first milestone is a usable research loop:
 1. Ingest and verify OANDA OHLCV candles into PostgreSQL.
 2. Load candle windows into Python.
 3. Define a reproducible experiment with dataset, feature set, and strategy template.
-4. Discover compatible strategy plugins from the registry.
-5. Calculate indicators, statistics, volatility, price action, patterns, and other derived values dynamically inside the experiment pipeline.
-6. Search parameters, backtest, validate, and score candidates.
-7. Publish approved strategies with full experiment lineage.
+4. Calculate indicators, statistics, volatility, price action, patterns, and other derived values dynamically inside the experiment pipeline.
+5. Convert calculations into FeatureVector payloads and detect the current market regime.
+6. Query the Research Knowledge Base so known winners, failures, and risk warnings guide what gets tested next.
+7. Discover compatible strategy plugins from the registry.
+8. Search parameters, backtest, validate, and score candidates.
+9. Publish approved strategies with full experiment lineage.
 
 Generate the first standardized feature vector from CoreUI candles:
 

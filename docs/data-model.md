@@ -151,6 +151,72 @@ Key fields:
 - `published_strategy_version_id`
 - `status`
 
+### hypotheses
+
+Stores testable research hypotheses and their evolving evidence state.
+
+Key fields:
+
+- `hypothesis_key`
+- `statement`
+- `supported_count`
+- `rejected_count`
+- `confidence`
+- `evidence_json`
+- `status`
+
+### knowledge_records
+
+Stores atomic evidence learned from experiments for features, plugins, parameters, templates, regimes, instruments, and experiments.
+
+Key fields:
+
+- `object_type`
+- `object_key`
+- `outcome`
+- `experiment_key`
+- `hypothesis_key`
+- `instrument`
+- `timeframe`
+- `market_regime`
+- `session`
+- `metric_name`
+- `metric_value`
+- `stability`
+- `importance`
+- `sample_size`
+- `lessons_json`
+- `context_json`
+
+### knowledge_scores
+
+Stores calculated knowledge scores for strategy generation and research prioritization.
+
+Key fields:
+
+- `object_type`
+- `object_key`
+- `success_rate`
+- `stability`
+- `evidence_count`
+- `score`
+- `recommendation`
+- `calculated_at`
+
+### knowledge_recommendations
+
+Stores generated recommendations for future experiments and strategy factory constraints.
+
+Key fields:
+
+- `recommendation_key`
+- `recommendation_type`
+- `recommendation_text`
+- `source_object_type`
+- `source_object_key`
+- `confidence`
+- `status`
+
 ### datasets
 
 Stores reproducible dataset definitions for experiments.

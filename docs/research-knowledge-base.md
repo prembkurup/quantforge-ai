@@ -48,6 +48,15 @@ A knowledge record captures one durable research finding:
 - tags
 - version
 
+Milestone 6 adds the first implementation layer:
+
+- `KnowledgeEngine`: collects experiment results, updates knowledge, updates hypotheses, and produces report payloads.
+- `KnowledgeRepository`: stores records and hypotheses, with JSON persistence for local reports and a PostgreSQL schema for durable storage.
+- `KnowledgeStatisticsEngine`: calculates success rate, stability, average importance, and context coverage.
+- `KnowledgeScoringEngine`: converts statistics into recommendation scores.
+- `RecommendationEngine`: shows best features, best plugins, unstable parameters, best regimes, and next experiments.
+- `KnowledgeReport`: dashboard/report DTO used by scripts and future APIs.
+
 Example:
 
 ```json
@@ -100,6 +109,46 @@ The Knowledge Base is written after experiments and validation:
 - backtest and validation results become evidence
 - repeated results increase or decrease confidence
 - contradictory evidence lowers confidence instead of deleting history
+
+## Hypothesis Management
+
+Every serious experiment should begin with a hypothesis. The Knowledge Base tracks:
+
+- hypothesis statement
+- experiments that tested it
+- supported evidence count
+- rejected evidence count
+- confidence over time
+- current status: proposed, supported, rejected, or mixed
+
+Example:
+
+```text
+Hypothesis:
+Trend pullbacks outperform breakouts during London sessions on major pairs.
+
+Evidence:
+exp_eurusd_h1_trend_pullback_001 -> supported
+exp_eurusd_h1_trend_pullback_002 -> supported
+
+Status:
+supported, confidence 1.0
+```
+
+Run a local demo report:
+
+```powershell
+.\.venv\Scripts\python .\scripts\knowledge_report.py --demo
+```
+
+The report returns:
+
+- best features
+- best plugins
+- unstable parameters
+- best regimes
+- recommended next experiments
+- hypothesis states
 
 ## Design Rules
 

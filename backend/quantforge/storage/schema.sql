@@ -360,6 +360,74 @@ CREATE INDEX IF NOT EXISTS idx_experiment_dataset_id ON research.experiment (dat
 CREATE INDEX IF NOT EXISTS idx_experiment_template_id ON research.experiment (strategy_template_id);
 CREATE INDEX IF NOT EXISTS idx_experiment_status_priority ON research.experiment (status, priority);
 
+CREATE TABLE IF NOT EXISTS research.hypothesis (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    hypothesis_key VARCHAR(160) NOT NULL,
+    statement TEXT NOT NULL,
+    supported_count INTEGER NOT NULL DEFAULT 0,
+    rejected_count INTEGER NOT NULL DEFAULT 0,
+    confidence NUMERIC(8, 4) NOT NULL DEFAULT 0,
+    evidence_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    version INTEGER NOT NULL DEFAULT 1,
+    status VARCHAR(40) NOT NULL DEFAULT 'proposed',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_hypothesis_key_version UNIQUE (hypothesis_key, version)
+);
+
+CREATE TABLE IF NOT EXISTS research.knowledge_record (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    object_type VARCHAR(40) NOT NULL,
+    object_key VARCHAR(180) NOT NULL,
+    outcome VARCHAR(40) NOT NULL,
+    experiment_key VARCHAR(160) NOT NULL,
+    hypothesis_key VARCHAR(160),
+    instrument VARCHAR(32),
+    timeframe VARCHAR(20),
+    market_regime VARCHAR(80),
+    session VARCHAR(80),
+    metric_name VARCHAR(80) NOT NULL DEFAULT 'success_rate',
+    metric_value NUMERIC(12, 6),
+    stability NUMERIC(8, 4),
+    importance NUMERIC(8, 4),
+    sample_size INTEGER NOT NULL DEFAULT 1,
+    lessons_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    context_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_record_object ON research.knowledge_record (object_type, object_key);
+CREATE INDEX IF NOT EXISTS idx_knowledge_record_context ON research.knowledge_record (instrument, timeframe, market_regime, session);
+
+CREATE TABLE IF NOT EXISTS research.knowledge_score (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    object_type VARCHAR(40) NOT NULL,
+    object_key VARCHAR(180) NOT NULL,
+    success_rate NUMERIC(8, 4) NOT NULL,
+    stability NUMERIC(8, 4) NOT NULL,
+    evidence_count INTEGER NOT NULL,
+    score NUMERIC(8, 4) NOT NULL,
+    recommendation VARCHAR(20) NOT NULL,
+    calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    version INTEGER NOT NULL DEFAULT 1,
+    CONSTRAINT uq_knowledge_score_object_version UNIQUE (object_type, object_key, version)
+);
+
+CREATE TABLE IF NOT EXISTS research.knowledge_recommendation (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recommendation_key VARCHAR(180) NOT NULL,
+    recommendation_type VARCHAR(60) NOT NULL,
+    recommendation_text TEXT NOT NULL,
+    source_object_type VARCHAR(40),
+    source_object_key VARCHAR(180),
+    confidence NUMERIC(8, 4) NOT NULL DEFAULT 0,
+    status VARCHAR(40) NOT NULL DEFAULT 'open',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ,
+    CONSTRAINT uq_knowledge_recommendation_key UNIQUE (recommendation_key)
+);
+
 CREATE TABLE IF NOT EXISTS research.experiment_plugin_config (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     experiment_id UUID NOT NULL REFERENCES research.experiment(id),

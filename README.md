@@ -93,6 +93,12 @@ Detect the current rule-based market regime from the latest FeatureVector:
 .\.venv\Scripts\python .\scripts\detect_regime.py --pair EUR_USD --timeframe H1 --lookback 300
 ```
 
+Show the Research Knowledge Base demo report:
+
+```powershell
+.\.venv\Scripts\python .\scripts\knowledge_report.py --demo
+```
+
 ## Foundation Setup
 
 Create and activate the local Python environment:

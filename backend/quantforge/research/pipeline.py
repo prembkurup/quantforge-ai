@@ -11,6 +11,7 @@ class ResearchStage(StrEnum):
     FEATURE_ENGINEERING = "feature_engineering"
     FEATURE_STORE = "feature_store"
     MARKET_REGIME_DETECTION = "market_regime_detection"
+    KNOWLEDGE_BASE_LOOKUP = "knowledge_base_lookup"
     STRATEGY_TEMPLATE_SELECTION = "strategy_template_selection"
     STRATEGY_FACTORY = "strategy_factory"
     PARAMETER_GENERATION = "parameter_generation"
@@ -30,6 +31,7 @@ RESEARCH_PIPELINE: tuple[ResearchStage, ...] = (
     ResearchStage.FEATURE_ENGINEERING,
     ResearchStage.FEATURE_STORE,
     ResearchStage.MARKET_REGIME_DETECTION,
+    ResearchStage.KNOWLEDGE_BASE_LOOKUP,
     ResearchStage.STRATEGY_TEMPLATE_SELECTION,
     ResearchStage.STRATEGY_FACTORY,
     ResearchStage.PARAMETER_GENERATION,

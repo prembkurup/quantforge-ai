@@ -32,8 +32,25 @@ The initial package is `quantforge.calculations`.
 - `CalculationEngine` provides registry-backed execution.
 - `CalculationCategory` defines calculator families.
 - `CalculationSpec` defines a registered calculation.
-- `calculations.indicators` contains EMA, RSI, and ATR.
-- `calculations.statistical` starts rolling mean, rolling standard deviation, and z-score.
+- `calculations.indicators` contains Version 1 indicator calculators.
+- `calculations.statistics` contains rolling and return statistics.
+- `calculations.price_action` contains candle anatomy and candle patterns.
+- `calculations.market_structure` contains swing and structure calculations.
+- `calculations.sessions` contains session flags.
 - `calculations.volatility` starts true range and close-to-close volatility.
 
 The legacy `quantforge.indicators` package remains as compatibility exports while newer code moves to the Calculation Engine.
+
+## Downstream Contract
+
+Strategy, experiment, backtesting, and validation modules should consume standardized feature vectors instead of calling individual indicator plugins directly.
+
+```text
+OHLCV
+  -> Calculation Engine
+  -> Feature Vector
+  -> Experiment Engine
+  -> Strategy Factory
+  -> Backtesting
+  -> Validation
+```

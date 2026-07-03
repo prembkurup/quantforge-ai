@@ -1,6 +1,18 @@
-"""Feature engine for reusable market features."""
+"""Feature platform for reusable market features and vectors."""
 
 from quantforge.features.engine import FeatureEngine
+from quantforge.features.feature_store import FeatureStore
+from quantforge.features.generators import FeatureVector, StandardFeatureVectorGenerator
+from quantforge.features.registry import FeatureDefinition, FeatureRegistry, default_feature_registry
+from quantforge.features.validators import require_feature_keys
 
-__all__ = ["FeatureEngine"]
-
+__all__ = [
+    "FeatureDefinition",
+    "FeatureEngine",
+    "FeatureRegistry",
+    "FeatureStore",
+    "FeatureVector",
+    "StandardFeatureVectorGenerator",
+    "default_feature_registry",
+    "require_feature_keys",
+]

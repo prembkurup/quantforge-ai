@@ -2,7 +2,11 @@ import pandas as pd
 
 
 class FeatureEngine:
-    """Converts dynamic indicators into reusable market features."""
+    """Compatibility helper for tabular features.
+
+    New downstream modules should consume standardized FeatureVector payloads from
+    StandardFeatureVectorGenerator instead of calling individual indicators.
+    """
 
     def add_trend_features(self, candles: pd.DataFrame) -> pd.DataFrame:
         frame = candles.copy()
@@ -17,4 +21,3 @@ class FeatureEngine:
         if "atr" in frame and "close" in frame:
             frame["atr_percent"] = frame["atr"] / frame["close"]
         return frame
-

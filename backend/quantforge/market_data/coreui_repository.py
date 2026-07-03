@@ -72,6 +72,41 @@ class CoreUiCandleRepository:
             statement = statement.where(self._table.c.complete.is_(True))
         return self._connection.execute(statement).scalar_one_or_none()
 
+    def load_latest(
+        self,
+        pair_name: str,
+        granularity: str,
+        *,
+        complete_only: bool = True,
+        limit: int = 300,
+    ) -> list[dict[str, Any]]:
+        statement = (
+            select(
+                self._table.c.time,
+                self._table.c.pair_name,
+                self._table.c.granularity,
+                self._table.c.volume,
+                self._table.c.mid_o,
+                self._table.c.mid_h,
+                self._table.c.mid_l,
+                self._table.c.mid_c,
+                self._table.c.complete,
+            )
+            .where(
+                and_(
+                    self._table.c.pair_name == pair_name,
+                    self._table.c.granularity == granularity,
+                )
+            )
+            .order_by(self._table.c.time.desc())
+            .limit(limit)
+        )
+        if complete_only:
+            statement = statement.where(self._table.c.complete.is_(True))
+
+        rows = [_normalize_row(row._mapping) for row in self._connection.execute(statement)]
+        return sorted(rows, key=lambda row: row["time"])
+
     def count_window(
         self,
         pair_name: str,

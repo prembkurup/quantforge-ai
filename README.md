@@ -72,6 +72,12 @@ The first milestone is a usable research loop:
 6. Search parameters, backtest, validate, and score candidates.
 7. Publish approved strategies with full experiment lineage.
 
+Generate the first standardized feature vector from CoreUI candles:
+
+```powershell
+.\.venv\Scripts\python .\scripts\generate_feature_vector.py --pair EUR_USD --timeframe H1 --candles 300
+```
+
 ## Foundation Setup
 
 Create and activate the local Python environment:

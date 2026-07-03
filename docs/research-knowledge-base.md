@@ -10,8 +10,10 @@ OHLCV
   -> Feature Engine
   -> Market Regime Engine
   -> Research Knowledge Base
+  -> Research Orchestrator
   -> Plugin Framework
   -> Strategy Templates
+  -> Strategy Composer
 ```
 
 ## Purpose

@@ -53,7 +53,7 @@ Calculations are derived inputs used inside features and templates. Indicators a
 9. Research Orchestration
 10. Plugin Framework
 11. Strategy Template Selection
-12. Strategy Factory
+12. Strategy Composer
 13. Parameter Generation
 14. Optimization
 15. Backtesting
@@ -138,19 +138,22 @@ It should remember examples such as a trend-pullback setup working on `EUR_USD` 
 
 Coordinates hypothesis, market context, FeatureVector meaning, market regime, and Knowledge Base evidence before any strategy generation starts.
 
-The orchestrator is intentionally upstream of Strategy Factory:
+The orchestrator is intentionally upstream of Strategy Composer:
 
 ```text
 Hypothesis
-  -> Feature Context
-  -> Market Regime
+  -> Dataset Planner
+  -> Feature Planner
+  -> Market Regime Context
   -> Knowledge Base Lookup
   -> Research Orchestrator
+  -> Experiment Queue
   -> Plugin Framework
   -> Strategy Template Engine
+  -> Strategy Composer
 ```
 
-It returns a research plan containing the decision, recommended features, recommended plugins, recommended regimes, blocked plugins, Strategy Factory constraints, next experiments, and reasons.
+It returns a research plan containing the decision, dataset plan, recommended features, recommended plugins, recommended regimes, selected templates, blocked plugins, Strategy Composer constraints, narrowed parameter search, scheduled jobs, progress snapshot, next experiments, and reasons.
 
 Run the demo:
 
@@ -158,13 +161,19 @@ Run the demo:
 .\.venv\Scripts\python .\scripts\orchestrate_research.py --pair EUR_USD --timeframe H1 --regime TRENDING --session London
 ```
 
+Run the full research-loop queue demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\run_research.py
+```
+
 ### Strategy Template Engine
 
 Provides reusable blueprints such as trend pullback, breakout, mean reversion, volatility expansion, and momentum continuation.
 
-### Strategy Factory
+### Strategy Composer
 
-Generates candidate strategies by selecting a template, selecting compatible plugins, and generating candidate structure. It never performs optimization.
+Assembles candidate strategies by selecting a template and compatible market-regime, entry, confirmation, exit, risk, and trade-management plugins. It never performs optimization. The orchestrator decides what should be built; the composer decides how the reusable parts fit together.
 
 ### Parameter Generator
 

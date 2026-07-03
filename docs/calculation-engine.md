@@ -65,7 +65,7 @@ OHLCV
   -> Calculation Engine
   -> Feature Vector
   -> Experiment Engine
-  -> Strategy Factory
+  -> Strategy Composer
   -> Backtesting
   -> Validation
 ```

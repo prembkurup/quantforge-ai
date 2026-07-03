@@ -72,9 +72,11 @@ The first milestone is a usable research loop:
 4. Calculate indicators, statistics, volatility, price action, patterns, and other derived values dynamically inside the experiment pipeline.
 5. Convert calculations into FeatureVector payloads and detect the current market regime.
 6. Query the Research Knowledge Base so known winners, failures, and risk warnings guide what gets tested next.
-7. Discover compatible strategy plugins from the registry.
-8. Search parameters, backtest, validate, and score candidates.
-9. Publish approved strategies with full experiment lineage.
+7. Use the Research Orchestrator to choose datasets, features, templates, parameters, jobs, and next experiments.
+8. Discover compatible strategy plugins from the registry.
+9. Assemble candidates through the Strategy Composer.
+10. Search parameters, backtest, validate, and score candidates.
+11. Publish approved strategies with full experiment lineage.
 
 Generate the first standardized feature vector from CoreUI candles:
 
@@ -104,6 +106,12 @@ Show the Research Orchestrator demo plan:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\orchestrate_research.py --pair EUR_USD --timeframe H1 --regime TRENDING --session London
+```
+
+Run the full research-loop queue demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\run_research.py
 ```
 
 ## Foundation Setup

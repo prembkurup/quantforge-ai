@@ -32,9 +32,10 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Implement Feature Engine and Feature Registry.
 - Implement Market Regime Engine.
 - Build Research Knowledge Base for validated findings, failed setups, and experiment evidence.
-- Build Research Orchestrator to coordinate hypotheses, regimes, knowledge, and experiment planning.
+- Build Research Orchestrator to coordinate hypotheses, datasets, regimes, knowledge, experiment planning, job scheduling, result collection, and progress monitoring.
 - Implement strategy plugin discovery.
 - Implement experiment definition workflow.
+- Build Strategy Composer to assemble candidates from market-regime, entry, confirmation, exit, risk, and trade-management plugins.
 - Build first template strategy plugin.
 - Implement basic backtest runner.
 - Store experiment lineage, research run metrics, validation results, and analytics.

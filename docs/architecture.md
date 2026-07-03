@@ -54,17 +54,20 @@ OHLCV
   -> Research Orchestrator
   -> Plugin Framework
   -> Strategy Templates
+  -> Strategy Composer
 ```
 
 The Knowledge Base stores durable research findings such as positive edges, failed setups, neutral results, and risk warnings. It links each finding to experiment lineage, instrument, timeframe, market regime, session, feature conditions, metrics, confidence, evidence count, and dependency versions.
 
 The platform should query this memory before launching expensive experiments or generating new strategy candidates.
 
-The Research Orchestrator turns that memory into an experiment plan. It decides whether to run a new experiment, refine the hypothesis, skip a known failure, or collect more evidence before strategy generation.
+The Research Orchestrator turns that memory into an experiment plan. It chooses the dataset, features, templates, parameters, job queue, and result update path. It decides whether to run a new experiment, refine the hypothesis, skip a known failure, or collect more evidence before strategy generation.
 
 ## Strategy Discovery
 
 Strategies are template-based and plugin-driven. Research is organized around experiments, not indicators. An experiment binds the dataset, feature set, strategy template, plugin versions, parameter search, validation results, analytics, and any published strategy versions.
+
+The Strategy Composer is the assembly layer that replaces the old Strategy Factory name. The orchestrator decides what should be built; the composer assembles a candidate from reusable market-regime, entry, confirmation, exit, risk, and trade-management plugins.
 
 A strategy plugin declares:
 

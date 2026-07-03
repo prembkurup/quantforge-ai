@@ -7,6 +7,7 @@ from quantforge.research import (
 from quantforge.research.orchestrator import (
     OrchestrationDecision,
     ResearchContext,
+    ResearchJobType,
     ResearchOrchestrationRequest,
     ResearchOrchestrator,
 )
@@ -34,7 +35,13 @@ def test_orchestrator_builds_knowledge_guided_research_plan() -> None:
     assert "ema_pullback" in plan.recommended_plugins
     assert "TRENDING" in plan.recommended_regimes
     assert plan.constraints["avoid_plugins"] == ()
+    assert plan.constraints["templates"]
+    assert plan.constraints["parameter_search"]["ema_fast"] == [20, 30, 40, 50]
     assert plan.next_experiments
+    assert plan.research_run is not None
+    assert plan.research_run.experiment_count == 14
+    assert plan.research_run.dataset.training_period == "first_18_months"
+    assert plan.research_run.progress.queued == 57
 
 
 def test_orchestrator_registers_new_hypothesis_and_requests_refinement() -> None:
@@ -93,3 +100,29 @@ def test_orchestrator_dashboard_payload_is_json_ready() -> None:
     assert payload["recommended_features"]
     assert payload["recommended_plugins"]
     assert payload["next_experiments"]
+    assert payload["research_run"]["progress"]["total"] == 57
+
+
+def test_orchestrator_schedules_full_research_loop() -> None:
+    orchestrator = ResearchOrchestrator(build_demo_knowledge_engine())
+
+    run = orchestrator.run_research(
+        ResearchOrchestrationRequest(
+            hypothesis_id="hyp_trend_pullback_london",
+            hypothesis_statement="Trend pullbacks outperform breakouts during London sessions on major pairs.",
+            context=ResearchContext(
+                instrument="EUR_USD",
+                timeframe="H1",
+                market_regime="TRENDING",
+                session="London",
+            ),
+            required_features=("trend_strength", "pullback_state"),
+        )
+    )
+
+    assert run.research_goal == "Improve Trend Pullback"
+    assert run.dataset.instruments == ("EUR_USD",)
+    assert "trend_pullback" in run.templates.selected_templates
+    assert "ema_pullback" in run.templates.selected_plugins
+    assert run.parameters.narrowed_by_knowledge["ema_fast"].startswith("Knowledge-guided")
+    assert run.jobs[-1].job_type == ResearchJobType.KNOWLEDGE_UPDATE

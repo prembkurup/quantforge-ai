@@ -103,6 +103,7 @@ Copy-Item .env.example .env
 # Set QUANTFORGE_COREUI_HISTORY_DATABASE_URL to CoreUI_backend\.env HISTORY_DATABASE_URL.
 # QuantForge reads the CoreUI oanda_candles table and does not migrate or write to it.
 .\.venv\Scripts\python .\scripts\check_coreui_candles.py
+.\.venv\Scripts\python .\scripts\validate_coreui_candles.py --pair EUR_USD --timeframe H1 --from 2025-01-01 --to 2025-12-31
 ```
 
 Apply the first database migration:
@@ -117,11 +118,12 @@ Run tests:
 .\.venv\Scripts\python -m pytest
 ```
 
-Optional OANDA candle ingestion smoke test:
+Optional manual OANDA candle ingestion smoke test:
 
 ```powershell
 Copy-Item .env.example .env
 # Fill QUANTFORGE_OANDA_API_TOKEN if using a real OANDA practice account.
+# CoreUI already runs the 24/7 OANDA collector; QuantForge should not run another collector service.
 .\.venv\Scripts\python .\scripts\ingest_oanda_candles.py --pair EUR_USD --timeframe H1 --from 2025-01-01 --to 2025-12-31
 ```
 

@@ -44,7 +44,7 @@ class CoreUiCandleRepository:
                     self._table.c.pair_name == pair_name,
                     self._table.c.granularity == granularity,
                     self._table.c.time >= start,
-                    self._table.c.time <= end,
+                    self._table.c.time < end,
                 )
             )
             .order_by(self._table.c.time.asc())
@@ -71,6 +71,63 @@ class CoreUiCandleRepository:
         if complete_only:
             statement = statement.where(self._table.c.complete.is_(True))
         return self._connection.execute(statement).scalar_one_or_none()
+
+    def count_window(
+        self,
+        pair_name: str,
+        granularity: str,
+        start: datetime,
+        end: datetime,
+        *,
+        complete_only: bool = True,
+    ) -> int:
+        start = _normalize_datetime_for_coreui(start)
+        end = _normalize_datetime_for_coreui(end)
+        statement = (
+            select(func.count())
+            .select_from(self._table)
+            .where(
+                and_(
+                    self._table.c.pair_name == pair_name,
+                    self._table.c.granularity == granularity,
+                    self._table.c.time >= start,
+                    self._table.c.time < end,
+                )
+            )
+        )
+        if complete_only:
+            statement = statement.where(self._table.c.complete.is_(True))
+        return int(self._connection.execute(statement).scalar_one())
+
+    def duplicate_count(
+        self,
+        pair_name: str,
+        granularity: str,
+        start: datetime,
+        end: datetime,
+        *,
+        complete_only: bool = True,
+    ) -> int:
+        start = _normalize_datetime_for_coreui(start)
+        end = _normalize_datetime_for_coreui(end)
+        grouped = (
+            select(self._table.c.time, func.count().label("row_count"))
+            .where(
+                and_(
+                    self._table.c.pair_name == pair_name,
+                    self._table.c.granularity == granularity,
+                    self._table.c.time >= start,
+                    self._table.c.time < end,
+                )
+            )
+            .group_by(self._table.c.time)
+            .having(func.count() > 1)
+        )
+        if complete_only:
+            grouped = grouped.where(self._table.c.complete.is_(True))
+        grouped_subquery = grouped.subquery()
+        statement = select(func.coalesce(func.sum(grouped_subquery.c.row_count - 1), 0))
+        return int(self._connection.execute(statement).scalar_one())
 
 
 def get_coreui_history_engine():

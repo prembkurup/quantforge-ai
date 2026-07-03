@@ -1,0 +1,675 @@
+--- Page 1 ---
+QuantForge AI
+Chapter 4 – Enterprise Domain Model
+Version: 1.0
+Status: Draft
+Applies To: PostgreSQL Design, Python Services, Plugin Framework, Research Engine, Live Trading Engine
+4.1 Purpose
+The purpose of the Enterprise Domain Model is to define the major business concepts, entities,
+relationships, and boundaries within QuantForge AI before creating the PostgreSQL database schema.
+This chapter does not define physical database tables yet. Instead, it defines the conceptual model that the
+database, Python services, APIs, and documentation will be built from.
+4.2 Domain Model Overview
+QuantForge AI is divided into the following domains:
+QuantForge AI
+│
+├── Market Data Domain
+├── Instrument Domain
+├── Research Domain
+├── Plugin Domain
+├── Strategy Domain
+├── Backtesting Domain
+├── Validation Domain
+├── Live Trading Domain
+├── Risk Management Domain
+├── Reporting Domain
+├── Administration Domain
+└── Infrastructure Domain
+Each domain owns a specific part of the platform.
+1
+
+--- Page 2 ---
+4.3 Market Data Domain
+Purpose
+The Market Data Domain manages historical and live market data.
+Main Entities
+Market Data Domain
+│
+├── Candle
+├── Tick
+├── Spread
+├── Market Session
+├── Data Source
+├── Data Import Job
+├── Data Quality Check
+└── Missing Data Record
+Entity: Candle
+Represents one completed OHLCV candle.
+Attributes:
+Instrument
+Timeframe
+Timestamp
+Open
+High
+Low
+Close
+Volume
+Source
+Quality Status
+Rules:
+Candles are immutable after validation.
+Duplicate candles are not allowed.
+Only completed candles are used for trading decisions.
+Candle timestamps must be normalized to UTC.
+• 
+• 
+• 
+• 
+2
+
+--- Page 3 ---
+Entity: Tick
+Represents raw bid/ask price updates.
+Version 1 may not store all ticks permanently unless required.
+Attributes:
+Instrument
+Timestamp
+Bid
+Ask
+Mid Price
+Source
+Entity: Spread
+Represents bid/ask spread.
+Attributes:
+Instrument
+Timestamp
+Bid
+Ask
+Spread
+Spread data is important for realistic backtesting.
+Entity: Data Import Job
+Represents a historical or live data import process.
+Attributes:
+Job ID
+Instrument
+Timeframe
+Start Time
+3
+
+--- Page 4 ---
+End Time
+Status
+Records Imported
+Errors
+Created At
+Completed At
+4.4 Instrument Domain
+Purpose
+The Instrument Domain defines tradable markets.
+Main Entities
+Instrument Domain
+│
+├── Asset Class
+├── Instrument
+├── Currency
+├── Currency Pair
+├── Timeframe
+├── Pip Configuration
+└── Trading Schedule
+Entity: Asset Class
+Examples:
+Forex
+Crypto
+Stocks
+Indices
+Commodities
+Futures
+Version 1 supports Forex only, but the model supports future expansion.
+4
+
+--- Page 5 ---
+Entity: Instrument
+Represents a tradable symbol.
+Examples:
+EUR_USD
+GBP_USD
+USD_JPY
+AUD_CAD
+Attributes:
+Instrument ID
+Symbol
+Display Name
+Asset Class
+Base Currency
+Quote Currency
+Pip Size
+Minimum Trade Size
+Maximum Trade Size
+Status
+Entity: Timeframe
+Represents candle granularity.
+Examples:
+M1
+M5
+M15
+M30
+H1
+H4
+D1
+W1
+MN1
+Attributes:
+5
+
+--- Page 6 ---
+Timeframe Code
+Duration Seconds
+Display Name
+Is Active
+4.5 Plugin Domain
+Purpose
+The Plugin Domain defines reusable trading logic components.
+Main Entities
+Plugin Domain
+│
+├── Plugin
+├── Plugin Type
+├── Plugin Version
+├── Plugin Parameter
+├── Plugin Compatibility Rule
+└── Plugin Execution Result
+Plugin Types
+Indicator Plugin
+Feature Plugin
+Market Regime Plugin
+Entry Plugin
+Confirmation Plugin
+Exit Plugin
+Risk Plugin
+Trade Management Plugin
+Validation Plugin
+Ranking Plugin
+Entity: Plugin
+Represents one reusable component.
+6
+
+--- Page 7 ---
+Attributes:
+Plugin ID
+Plugin Name
+Plugin Type
+Description
+Version
+Status
+Required Inputs
+Output Type
+Author
+Created Date
+Updated Date
+Rules:
+Every plugin must have a unique ID.
+Every plugin must declare its input requirements.
+Every plugin must declare compatible timeframes and regimes.
+Disabled plugins cannot be used in new strategy discovery runs.
+Entity: Plugin Parameter
+Defines configurable values for a plugin.
+Example:
+EMA Fast Period
+EMA Slow Period
+ADX Minimum
+ATR Multiplier
+Risk Percent
+Attributes:
+Parameter Name
+Data Type
+Default Value
+Minimum Value
+Maximum Value
+• 
+• 
+• 
+• 
+7
+
+--- Page 8 ---
+Allowed Values
+Optimization Range
+4.6 Research Domain
+Purpose
+The Research Domain manages experiments, feature generation, optimization, and strategy discovery.
+Main Entities
+Research Domain
+│
+├── Research Project
+├── Research Run
+├── Experiment
+├── Feature Set
+├── Parameter Set
+├── Optimization Run
+├── Research Cache
+└── Research Result
+Entity: Research Run
+Represents one execution of the research pipeline.
+Attributes:
+Run ID
+Name
+Instrument Group
+Timeframe Group
+Date Range
+Status
+Started At
+Completed At
+Configuration
+Result Summary
+8
+
+--- Page 9 ---
+Entity: Feature Set
+Represents a group of generated features.
+Examples:
+Trend Features
+Volatility Features
+Momentum Features
+Session Features
+Price Action Features
+Entity: Optimization Run
+Represents parameter optimization.
+Attributes:
+Optimization ID
+Strategy Template
+Search Method
+Parameter Space
+Objective Metric
+Trial Count
+Best Result
+Status
+Search methods may include:
+Grid Search
+Random Search
+Bayesian Optimization
+Genetic Algorithm
+4.7 Strategy Domain
+Purpose
+The Strategy Domain represents validated trading strategies and their components.
+9
+
+--- Page 10 ---
+Main Entities
+Strategy Domain
+│
+├── Strategy Template
+├── Strategy
+├── Strategy Version
+├── Strategy Component
+├── Strategy Parameter
+├── Strategy Status
+└── Strategy Deployment
+Entity: Strategy Template
+Represents a reusable strategy structure.
+Example:
+Trend Pullback Strategy
+Breakout Strategy
+Mean Reversion Strategy
+Volatility Expansion Strategy
+A template defines the required component types but not necessarily exact parameter values.
+Entity: Strategy
+Represents one concrete trading strategy.
+Example:
+EURUSD_H1_TrendPullback_001
+Attributes:
+Strategy ID
+Strategy Name
+Instrument
+Timeframe
+10
+
+--- Page 11 ---
+Market Regime
+Entry Model
+Confirmation Models
+Exit Model
+Risk Model
+Trade Management Model
+Parameters
+Status
+Created At
+Updated At
+Entity: Strategy Version
+Represents a version of a strategy.
+Rules:
+A strategy cannot be modified directly after approval.
+Any change creates a new version.
+Live trading uses only approved strategy versions.
+Entity: Strategy Deployment
+Represents live deployment status.
+Attributes:
+Strategy
+Version
+Environment
+Deployment Status
+Activated At
+Deactivated At
+Reason
+• 
+• 
+• 
+11
+
+--- Page 12 ---
+4.8 Backtesting Domain
+Purpose
+The Backtesting Domain simulates historical trading.
+Main Entities
+Backtesting Domain
+│
+├── Backtest Run
+├── Backtest Trade
+├── Backtest Order
+├── Backtest Position
+├── Backtest Equity Curve
+├── Backtest Metric
+└── Backtest Configuration
+Entity: Backtest Run
+Represents one historical simulation.
+Attributes:
+Backtest ID
+Strategy Version
+Instrument
+Timeframe
+Date Range
+Initial Balance
+Spread Model
+Slippage Model
+Commission Model
+Status
+Started At
+Completed At
+Entity: Backtest Trade
+Represents one simulated trade.
+12
+
+--- Page 13 ---
+Attributes:
+Entry Time
+Exit Time
+Direction
+Entry Price
+Exit Price
+Stop Loss
+Take Profit
+Profit Loss
+R Multiple
+Exit Reason
+4.9 Validation Domain
+Purpose
+The Validation Domain verifies whether strategies are robust enough for production.
+Main Entities
+Validation Domain
+│
+├── Validation Run
+├── Walk Forward Test
+├── Out-of-Sample Test
+├── Monte Carlo Test
+├── Cross Pair Test
+├── Robustness Score
+└── Validation Decision
+Validation Decision
+Possible decisions:
+Approved
+Rejected
+Needs Review
+Paper Trade Only
+13
+
+--- Page 14 ---
+Live Eligible
+Disabled
+Rules:
+A strategy cannot trade live unless validation status is approved.
+Validation results must be stored permanently.
+Failed validation must include rejection reason.
+4.10 Live Trading Domain
+Purpose
+The Live Trading Domain controls real-time trading.
+Main Entities
+Live Trading Domain
+│
+├── Live Signal
+├── Order
+├── Execution
+├── Position
+├── Trade
+├── Account Snapshot
+├── Broker Account
+└── Broker Connection
+Entity: Live Signal
+Represents a trading signal generated by the system.
+Attributes:
+Signal ID
+Strategy Version
+Instrument
+Timeframe
+Signal Time
+Direction
+Confidence Score
+• 
+• 
+• 
+14
+
+--- Page 15 ---
+Market Regime
+Status
+Reason
+Possible signal decisions:
+Buy
+Sell
+Hold
+No Trade
+Entity: Order
+Represents an order submitted to OANDA.
+Attributes:
+Broker Order ID
+Instrument
+Direction
+Order Type
+Units
+Price
+Stop Loss
+Take Profit
+Status
+Created At
+Updated At
+Entity: Position
+Represents an open or closed market position.
+Attributes:
+Instrument
+Direction
+Units
+Entry Price
+Current Price
+15
+
+--- Page 16 ---
+Stop Loss
+Take Profit
+Unrealized Profit Loss
+Status
+4.11 Risk Management Domain
+Purpose
+The Risk Management Domain protects the trading account.
+Main Entities
+Risk Management Domain
+│
+├── Risk Profile
+├── Risk Rule
+├── Exposure
+├── Drawdown Limit
+├── Position Sizing Rule
+├── Kill Switch
+└── Risk Event
+Entity: Risk Rule
+Examples:
+Maximum Risk Per Trade
+Maximum Daily Loss
+Maximum Weekly Loss
+Maximum Open Trades
+Maximum Currency Exposure
+Maximum Strategy Exposure
+Maximum Correlated Pair Exposure
+Entity: Kill Switch
+Represents an emergency trading shutdown.
+16
+
+--- Page 17 ---
+Trigger examples:
+Daily Loss Limit Hit
+Broker Connection Lost
+Unexpected Drawdown
+Execution Error
+Manual Shutdown
+4.12 Reporting Domain
+Purpose
+The Reporting Domain provides analytics and performance visibility.
+Main Entities
+Reporting Domain
+│
+├── Report
+├── Report Schedule
+├── Performance Snapshot
+├── Strategy Performance
+├── Trade Analysis
+├── Risk Report
+└── Audit Report
+Reports may be generated:
+Daily
+Weekly
+Monthly
+Quarterly
+Yearly
+On Demand
+17
+
+--- Page 18 ---
+4.13 Administration Domain
+Purpose
+The Administration Domain manages users, roles, permissions, and system configuration.
+Main Entities
+Administration Domain
+│
+├── User
+├── Role
+├── Permission
+├── API Credential
+├── System Configuration
+├── Audit Log
+└── Notification Rule
+Entity: API Credential
+Stores encrypted references to external credentials.
+Examples:
+OANDA API Token
+Database Password
+SMTP Credential
+Notification Webhook
+Rules:
+Plain text credentials must never be stored.
+Credentials must be encrypted.
+Access must be audited.
+• 
+• 
+• 
+18
+
+--- Page 19 ---
+4.14 Infrastructure Domain
+Purpose
+The Infrastructure Domain monitors servers, services, jobs, and operational health.
+Main Entities
+Infrastructure Domain
+│
+├── Server
+├── Service Instance
+├── Job
+├── Scheduler Task
+├── Health Check
+├── System Event
+└── Error Log
+4.15 Domain Relationships
+High-level relationships:
+Instrument has many Candles
+Strategy uses many Plugins
+Strategy has many Versions
+Strategy Version has many Backtests
+Backtest has many Backtest Trades
+Strategy Version has many Validation Runs
+Approved Strategy Version can generate Live Signals
+Live Signal can create Orders
+Orders create Executions
+Executions create or update Positions
+19
+
+--- Page 20 ---
+Positions create Trades
+Trades update Performance Reports
+Risk Rules control Orders and Positions
+4.16 Domain Ownership by Service
+Data Service
+- Market Data Domain
+- Instrument Domain
+Research Service
+- Research Domain
+- Backtesting Domain
+- Validation Domain
+Strategy Service
+- Strategy Domain
+- Plugin Domain
+Trading Service
+- Live Trading Domain
+Risk Service
+- Risk Management Domain
+Reporting Service
+- Reporting Domain
+API Service
+- Administration Domain
+- Infrastructure Domain
+4.17 Core Domain Rules
+Rule 1
+Raw OHLCV data is the permanent source of truth.
+20
+
+--- Page 21 ---
+Rule 2
+Indicators are derived and not permanently stored by default.
+Rule 3
+Strategies are composed of reusable plugins.
+Rule 4
+A strategy must be versioned after approval.
+Rule 5
+Only approved strategy versions can be used for live trading.
+Rule 6
+Live trading must always pass through the Risk Management Domain.
+Rule 7
+Every trade decision must be auditable.
+Rule 8
+Research and live trading must remain operationally separated.
+Rule 9
+All OANDA communication must be logged.
+Rule 10
+No strategy can bypass the kill switch.
+4.18 Domain Model Summary
+QuantForge AI is not a single trading bot. It is a modular quantitative trading platform made of separate
+but connected domains.
+21
+
+--- Page 22 ---
+The most important design decisions are:
+Market data is permanent.
+Indicators are derived.
+Strategies are plugin-based.
+Research is reproducible.
+Validation controls deployment.
+Risk controls execution.
+Every action is auditable.
+This domain model will be used as the foundation for the PostgreSQL database design in the next chapter .
+End of Chapter 4 – Enterprise Domain Model
+22

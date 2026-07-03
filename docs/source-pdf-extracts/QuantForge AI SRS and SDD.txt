@@ -1,0 +1,542 @@
+--- Page 1 ---
+QuantForge AI
+AI-Powered Quantitative Forex Strategy Discovery, Validation and
+Automated Trading Platform
+Document Type: Software Requirements Specification (SRS) + Software Design Document (SDD)
+Version: 1.0
+Project Owner: Prem Kurup
+Status: Draft
+1. Introduction
+1.1 Project Overview
+QuantForge AI is an enterprise-grade quantitative trading platform designed to automatically discover ,
+validate, manage, and execute profitable Forex trading strategies using historical market data and live
+market analysis.
+Unlike traditional trading bots that execute predefined rules, QuantForge AI continuously researches
+historical data to identify statistically robust strategies, validates them using rigorous testing methods, and
+selects the most appropriate strategy for current market conditions before executing live trades.
+The platform is designed to operate entirely on in-house Linux servers while using the OANDA API for live
+market data and trade execution.
+2. Vision Statement
+To build a self-improving quantitative trading platform capable of:
+Discovering profitable trading strategies automatically.
+Detecting current market conditions.
+Selecting the best strategy for each market regime.
+Executing trades with disciplined risk management.
+Continuously evaluating strategy performance.
+Supporting future expansion into stocks, cryptocurrencies, indices, commodities, and futures.
+• 
+• 
+• 
+• 
+• 
+• 
+1
+
+--- Page 2 ---
+3. Project Objectives
+The system shall:
+Store more than ten years of historical Forex data.
+Support all available Forex currency pairs.
+Support multiple timeframes from M1 to Monthly.
+Discover profitable strategies automatically.
+Validate strategies before deployment.
+Detect real-time market regimes.
+Select the optimal strategy dynamically.
+Execute trades automatically through OANDA.
+Manage trading risk.
+Produce comprehensive analytical reports.
+Operate continuously with minimal manual intervention.
+4. Project Scope
+Included
+Historical data management
+Candle storage
+Indicator calculation
+Feature engineering
+Strategy generation
+Backtesting
+Walk-forward testing
+Monte Carlo testing
+Cross-pair validation
+Strategy ranking
+Strategy library
+Market regime detection
+Strategy selection
+Live trading
+Risk management
+Performance monitoring
+Reporting
+Administration dashboard
+Excluded (Version 1)
+Options trading
+Portfolio optimization across asset classes
+Social trading
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+7. 
+8. 
+9. 
+10. 
+11. 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+2
+
+--- Page 3 ---
+Copy trading
+Reinforcement learning
+High-frequency trading
+5. Technology Stack
+Operating System
+Ubuntu Server LTS
+Programming Language
+Python 3.13+
+Backend Framework
+FastAPI
+Database
+PostgreSQL
+ORM
+SQLAlchemy
+Migration
+Alembic
+Data Processing
+NumPy
+pandas
+Polars
+Technical Analysis
+TA-Lib
+pandas-ta
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+3
+
+--- Page 4 ---
+Machine Learning
+scikit-learn
+XGBoost
+LightGBM
+Optuna
+Broker Integration
+OANDA REST API
+Background Processing
+Celery
+Cache
+Redis
+Deployment
+Docker
+Monitoring
+Prometheus
+Grafana
+Version Control
+GitHub (Private Repository)
+Project Management
+Monday.com
+6. High-Level System Architecture
+                     OANDA API
+                         │
+• 
+• 
+• 
+• 
+4
+
+--- Page 5 ---
+▼
+                Live Market Data
+                         │
+                         ▼
+              Market Data Manager
+                         │
+                         ▼
+                  PostgreSQL
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+        ▼                ▼                ▼
+ Indicator Engine   Feature Engine   Strategy Library
+        │                │                │
+        └──────────────┬─────────────────┘
+                       ▼
+          Strategy Discovery Engine
+                       ▼
+             Backtesting Engine
+                       ▼
+        Validation & Performance Analysis
+                       ▼
+         Approved Strategy Repository
+                       ▼
+          Market Regime Detection
+                       ▼
+          Strategy Selection Engine
+                       ▼
+              Risk Management
+                       ▼
+             Trade Execution Engine
+                       ▼
+                  OANDA API
+7. Core System Modules
+Module 1
+Historical Data Manager
+Responsibilities
+Import historical candles• 
+5
+
+--- Page 6 ---
+Validate candle integrity
+Update new candles
+Detect missing candles
+Synchronize database
+Inputs
+OANDA Historical Data
+Outputs
+Validated candle database
+Module 2
+Indicator Engine
+Responsibilities
+Calculate technical indicators
+Store calculated values
+Support recalculation
+Support incremental updates
+Examples
+EMA
+SMA
+RSI
+ATR
+ADX
+MACD
+Bollinger Bands
+Supertrend
+Module 3
+Feature Engineering
+Responsibilities
+Convert raw indicators into meaningful market features.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+6
+
+--- Page 7 ---
+Examples
+EMA20 above EMA50
+RSI rising
+ATR above average
+Trend strength
+Higher high
+Lower low
+Candle body ratio
+Wick ratio
+Distance from support
+Distance from resistance
+Module 4
+Strategy Discovery Engine
+Purpose
+Automatically generate and evaluate thousands of candidate trading strategies.
+Workflow
+Generate candidate rules.
+Apply parameters.
+Run historical simulation.
+Calculate performance metrics.
+Reject poor strategies.
+Save qualified strategies.
+Module 5
+Backtesting Engine
+Responsibilities
+Simulate historical trading under realistic conditions.
+Must support
+Spread
+Slippage
+Commission
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+• 
+• 
+• 
+7
+
+--- Page 8 ---
+Position sizing
+Stop loss
+Take profit
+Trailing stop
+Multiple simultaneous positions
+Outputs
+Profit
+Drawdown
+Win rate
+Profit factor
+Sharpe ratio
+Trade log
+Module 6
+Strategy Validation
+Validation techniques
+Walk-forward testing
+Out-of-sample testing
+Monte Carlo simulation
+Cross-pair validation
+Only validated strategies become eligible for live trading.
+Module 7
+Strategy Library
+Stores
+Strategy definition
+Parameters
+Applicable pairs
+Timeframes
+Market regime
+Historical performance
+Validation results
+Version history
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+8
+
+--- Page 9 ---
+Module 8
+Market Regime Detection
+Possible market states
+Trending
+Ranging
+High volatility
+Low volatility
+Breakout
+Recovery
+No-trade
+The detector classifies the current market before any trading decision is made.
+Module 9
+Strategy Selection Engine
+Responsibilities
+Read current market regime.
+Load compatible strategies.
+Rank strategies by confidence.
+Select the highest-scoring strategy.
+Reject trading if confidence is insufficient.
+Module 10
+Risk Management
+Controls
+Maximum account risk per trade
+Maximum daily loss
+Maximum weekly loss
+Maximum monthly drawdown
+Maximum open trades
+Currency exposure
+Correlation limits
+Emergency shutdown
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+9
+
+--- Page 10 ---
+Module 11
+Execution Engine
+Responsibilities
+Connect to OANDA.
+Submit market orders.
+Submit pending orders.
+Modify stop-loss and take-profit.
+Close positions.
+Handle execution failures.
+Retry where appropriate.
+Log every transaction.
+Module 12
+Monitoring & Reporting
+Real-time monitoring
+Equity
+Balance
+Drawdown
+Open positions
+Strategy performance
+Server health
+API status
+Error logs
+Reports
+Daily
+Weekly
+Monthly
+Yearly
+Strategy performance
+Risk analysis
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+10
+
+--- Page 11 ---
+8. Non-Functional Requirements
+Performance
+Process new candles with minimal latency.
+Support concurrent analysis across multiple pairs.
+Reliability
+Automatic recovery after unexpected failures.
+Scheduled database backups.
+Audit logging for all critical operations.
+Security
+Secure API credentials.
+Role-based authentication.
+Encrypted communication where applicable.
+Maintainability
+Modular architecture.
+Version-controlled documentation and code.
+Independent deployment of services.
+Scalability
+The platform must support additional asset classes and increased workloads without requiring major
+architectural changes.
+9. Development Philosophy
+Development will follow these phases:
+Requirements
+Architecture
+Database Design
+Historical Data Management
+Indicator Engine
+Feature Engineering
+Backtesting Engine
+Strategy Discovery
+Strategy Validation
+Strategy Library
+Live Trading
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+7. 
+8. 
+9. 
+10. 
+11. 
+11
+
+--- Page 12 ---
+Monitoring
+Optimization
+Production Deployment
+No implementation should begin before the corresponding design has been documented and reviewed.
+12. 
+13. 
+14. 
+12

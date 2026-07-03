@@ -1,0 +1,312 @@
+--- Page 1 ---
+QuantForge AI
+Architecture Update – Strategy Template and Plugin-Based
+Research Framework
+Document Version: 2.1
+Status: Approved
+Applies To: Chapter 3, Chapter 4, Strategy Discovery Engine, Research Engine, Database Design
+1. Architecture Decision AD-002
+Strategy Discovery Shall Be Template-Based and Plugin-Driven
+QuantForge AI shall not generate random indicator combinations as its main discovery method.
+Instead, the platform shall use a structured strategy template framework where strategies are assembled
+from reusable components.
+2. Reason for Change
+Random strategy generation creates many low-quality strategies and increases the risk of overfitting.
+Example of weak random discovery:
+EMA20 > EMA50
+AND RSI > 60
+AND MACD > 0
+This may work historically by chance, but it may not represent a real market behaviour .
+QuantForge AI shall instead build strategies from professional trading components:
+Market Regime
++
+Entry Model
++
+Confirmation Model
++
+1
+
+--- Page 2 ---
+Exit Model
++
+Risk Model
++
+Trade Management Model
+3. New Strategy Structure
+Every strategy shall be composed of the following blocks:
+Strategy
+│
+├── Market Regime
+├── Entry Model
+├── Confirmation Model
+├── Exit Model
+├── Risk Model
+└── Trade Management Model
+4. Strategy Component Types
+4.1 Market Regime Plugins
+Purpose:
+Detect when a strategy is allowed to trade.
+Examples:
+Trending Market
+Ranging Market
+High Volatility
+Low Volatility
+Breakout Market
+London Session
+New York Session
+No-Trade Condition
+2
+
+--- Page 3 ---
+4.2 Entry Model Plugins
+Purpose:
+Define how a trade starts.
+Examples:
+EMA Pullback Entry
+Moving Average Crossover Entry
+Bollinger Band Reversal Entry
+Donchian Breakout Entry
+Support/Resistance Bounce Entry
+Candle Pattern Entry
+4.3 Confirmation Plugins
+Purpose:
+Filter weak trade setups.
+Examples:
+ADX Trend Strength Filter
+RSI Momentum Filter
+MACD Histogram Filter
+Higher Timeframe Trend Filter
+ATR Volatility Filter
+Session Filter
+4.4 Exit Model Plugins
+Purpose:
+Define how a trade exits.
+Examples:
+3
+
+--- Page 4 ---
+Fixed Take Profit
+ATR Take Profit
+Trailing Stop
+EMA Exit
+Time-Based Exit
+Opposite Signal Exit
+4.5 Risk Model Plugins
+Purpose:
+Calculate position size and risk exposure.
+Examples:
+Fixed Risk Percentage
+Fixed Lot Size
+ATR-Based Position Size
+Volatility Adjusted Risk
+Drawdown Adjusted Risk
+4.6 Trade Management Plugins
+Purpose:
+Manage open trades after entry.
+Examples:
+Move Stop Loss to Break Even
+Partial Close
+Trailing Stop
+Scale In
+Scale Out
+Time Stop
+4
+
+--- Page 5 ---
+5. Plugin-Based Architecture
+Each component shall be implemented as a plugin.
+A plugin is a self-contained Python class that follows a standard interface.
+Example:
+classEntryPlugin:
+name= "EMA Pullback Entry"
+plugin_type= "entry"
+defgenerate_signal(self, candles, indicators, params):
+pass
+This allows QuantForge AI to add new strategy logic without changing the core research engine.
+6. Standard Plugin Interface
+Every plugin shall define:
+plugin_id
+plugin_name
+plugin_type
+description
+required_inputs
+parameters
+default_parameters
+compatible_regimes
+compatible_timeframes
+compatible_pairs
+version
+status
+7. Strategy Assembly Workflow
+The Strategy Discovery Engine shall assemble strategies using this workflow:
+5
+
+--- Page 6 ---
+Select Market Regime Plugin
+        ↓
+Select Entry Plugin
+        ↓
+Select Confirmation Plugin
+        ↓
+Select Exit Plugin
+        ↓
+Select Risk Plugin
+        ↓
+Select Trade Management Plugin
+        ↓
+Generate Parameter Sets
+        ↓
+Backtest Strategy
+        ↓
+Validate Strategy
+        ↓
+Rank Strategy
+        ↓
+Save Approved Strategy
+8. Example Strategy
+{
+"strategy_name": "EURUSD_H1_TrendPullback_001",
+"pair": "EURUSD",
+"timeframe": "H1",
+"market_regime": "TRENDING",
+"entry_plugin": "EMA_PULLBACK",
+"confirmation_plugins": ["ADX_FILTER", "HTF_TREND_FILTER"],
+"exit_plugin": "ATR_EXIT",
+"risk_plugin": "FIXED_PERCENT_RISK",
+"trade_management_plugin": "BREAK_EVEN_MANAGER",
+"parameters": {
+"ema_fast": 20,
+"ema_slow": 50,
+"adx_min": 25,
+"atr_sl_multiplier": 2.0,
+"atr_tp_multiplier": 3.0,
+"risk_percent": 1.0
+6
+
+--- Page 7 ---
+}
+}
+9. Benefits of the New Design
+Better Strategy Quality
+Strategies are based on meaningful trading logic, not random combinations.
+Lower Overfitting Risk
+Each strategy has a clear market purpose.
+Easier Debugging
+If a strategy fails, we can identify whether the issue is entry, confirmation, exit, or risk.
+Easier Expansion
+New indicators, entries, exits, and risk models can be added as plugins.
+Better Documentation
+Each strategy becomes explainable.
+Better Strategy Library
+Strategies can be grouped by regime, entry type, exit type, and risk model.
+10. Updated Research Engine Architecture
+Research Engine
+│
+├── Plugin Registry
+│
+├── Indicator Engine
+│
+├── Feature Engine
+│
+7
+
+--- Page 8 ---
+├── Market Regime Engine
+│
+├── Strategy Template Engine
+│
+├── Parameter Generator
+│
+├── Backtesting Engine
+│
+├── Validation Engine
+│
+├── Ranking Engine
+│
+└── Strategy Library
+11. Plugin Registry
+The Plugin Registry shall maintain a list of all available plugins.
+It shall store:
+Plugin ID
+Plugin Name
+Plugin Type
+Version
+Status
+Required Inputs
+Allowed Parameters
+Compatible Regimes
+Compatible Timeframes
+Created Date
+Updated Date
+12. Strategy Template Engine
+The Strategy Template Engine shall combine compatible plugins.
+Example:
+8
+
+--- Page 9 ---
+Regime: Trending
+Entry: EMA Pullback
+Confirmation: ADX Filter
+Exit: ATR Exit
+Risk: Fixed Percent
+Management: Break Even
+The engine shall reject incompatible combinations.
+Example:
+Ranging Market
++
+Trend Breakout Entry
+This may be rejected unless explicitly allowed.
+13. Parameter Generator
+The Parameter Generator shall create parameter combinations for each plugin.
+Example:
+EMA Fast: 10, 20, 30
+EMA Slow: 50, 100, 200
+ADX Minimum: 20, 25, 30
+ATR SL: 1.5, 2.0, 2.5
+ATR TP: 2.0, 3.0, 4.0
+The engine shall avoid invalid combinations.
+Example:
+EMA Fast >= EMA Slow
+This shall be rejected.
+9
+
+--- Page 10 ---
+14. Updated Database Impact
+The database shall support:
+plugins
+strategy_templates
+strategy_components
+strategy_parameters
+strategy_versions
+strategy_validation_results
+This will be fully defined in Chapter 4 – Database Design.
+15. Updated Architecture Principle
+QuantForge AI shall follow this principle:
+Raw market data is permanent.
+Indicators are derived.
+Strategies are component-based.
+Trading logic is plugin-driven.
+Research outputs are reproducible.
+Live trading uses only validated strategies.
+16. Final Approved Strategy Discovery Model
+QuantForge AI shall use the following discovery model:
+Template-Based Discovery
++
+Plugin-Based Components
++
+Parameter Optimization
++
+Backtesting
++
+Walk-Forward Validation
++
+Monte Carlo Testing
+10
+
+--- Page 11 ---
++
+Strategy Ranking
++
+Live Deployment Approval
+End of Architecture Update – Version 2.1
+11

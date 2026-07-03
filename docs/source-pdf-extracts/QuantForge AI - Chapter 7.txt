@@ -1,0 +1,478 @@
+--- Page 1 ---
+QuantForge AI
+Chapter 7 – Research Engine
+Version: 3.0
+Module: Research Service
+Status: Approved
+7.1 Purpose
+The Research Engine is the intelligence core of QuantForge AI.
+Its purpose is to transform historical market data into validated, production-ready trading strategies
+through a structured quantitative research pipeline.
+Unlike traditional trading systems that rely on manually created strategies, the Research Engine
+automatically:
+Understands market behaviour
+Creates candidate strategies
+Optimizes parameters
+Validates robustness
+Ranks strategies
+Publishes approved strategies for production
+The Research Engine never executes live trades.
+Its responsibility ends when an approved strategy is published.
+7.2 Design Principles
+The Research Engine follows these principles:
+Research must be reproducible.
+Every experiment is traceable.
+Every strategy is explainable.
+Every strategy must be statistically validated.
+Research and production remain isolated.
+• 
+• 
+• 
+• 
+• 
+• 
+1. 
+2. 
+3. 
+4. 
+5. 
+1
+
+--- Page 2 ---
+Indicators are derived.
+Features are standardized.
+Strategies are assembled from reusable components.
+Optimization is independent of strategy generation.
+Validation is mandatory before deployment.
+7.3 High-Level Architecture
+                         Research Engine
+                                │
+ ┌──────────────────────────────────────────────────────────┐
+ │                                                          │
+ │  Data Preparation Engine                                 │
+ │          │                                               │
+ │          ▼                                               │
+ │  Indicator Engine                                        │
+ │          │                                               │
+ │          ▼                                               │
+ │  Feature Engineering Engine                              │
+ │          │                                               │
+ │          ▼                                               │
+ │      Feature Store                                       │
+ │          │                                               │
+ │          ▼                                               │
+ │  Market Regime Engine                                    │
+ │          │                                               │
+ │          ▼                                               │
+ │  Strategy Template Engine                               │
+ │          │                                               │
+ │          ▼                                               │
+ │     Strategy Factory                                     │
+ │          │                                               │
+ │          ▼                                               │
+ │   Parameter Generator                                    │
+ │          │                                               │
+ │          ▼                                               │
+ │   Optimization Engine                                    │
+ │          │                                               │
+ │          ▼                                               │
+ │   Backtesting Engine                                     │
+ │          │                                               │
+ │          ▼                                               │
+ │   Validation Engine                                      │
+ │          │                                               │
+6. 
+7. 
+8. 
+9. 
+10. 
+2
+
+--- Page 3 ---
+│          ▼                                               │
+ │ Strategy Ranking Engine                                  │
+ │          │                                               │
+ │          ▼                                               │
+ │ Research Analytics Engine                                │
+ │          │                                               │
+ │          ▼                                               │
+ │ Strategy Repository                                      │
+ └──────────────────────────────────────────────────────────┘
+7.4 Data Preparation Engine
+Purpose
+Prepare historical market data for quantitative research.
+Responsibilities
+Load historical OHLCV data
+Verify data quality
+Remove duplicate records
+Detect missing candles
+Normalize timestamps to UTC
+Apply trading session calendars
+Prepare research datasets
+Inputs
+Market Data Schema
+Instrument Schema
+Trading Calendar
+Outputs
+Validated research datasets.
+7.5 Indicator Engine
+Purpose
+Calculate technical indicators from raw market data.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+3
+
+--- Page 4 ---
+Responsibilities
+Calculate indicators on demand
+Support parameterized indicators
+Parallel computation
+Incremental calculation
+Cache results when beneficial
+Supported Categories
+Trend
+Momentum
+Volatility
+Volume
+Price Action
+Statistical
+Custom Plugins
+The Indicator Engine never stores indicator values permanently by default.
+7.6 Feature Engineering Engine
+Purpose
+Transform indicators into standardized market features.
+Indicators describe calculations.
+Features describe market conditions.
+Example
+Indicator
+EMA20
+Feature
+Trend Direction = Bullish
+Examples
+Trend Direction
+Trend Strength
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+4
+
+--- Page 5 ---
+Pullback
+Breakout
+Momentum
+Volatility Regime
+Support Distance
+Resistance Distance
+Candle Structure
+Session
+Liquidity
+Spread Category
+Features become the language used throughout the research platform.
+7.7 Feature Store
+Purpose
+Provide a standardized repository of engineered feature vectors.
+The Feature Store ensures:
+Research consistency
+Live trading consistency
+Feature reuse
+Reproducibility
+The Feature Store may use:
+Memory
+Redis
+Parquet
+PostgreSQL cache
+depending on workload.
+Feature definitions remain version-controlled.
+7.8 Market Regime Engine
+Purpose
+Determine the current market environment.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+5
+
+--- Page 6 ---
+Supported regimes
+Trending
+Ranging
+Breakout
+High Volatility
+Low Volatility
+Recovery
+No Trade
+Every strategy declares compatible market regimes.
+The engine filters strategies before signal generation.
+7.9 Strategy Template Engine
+Purpose
+Provide reusable trading strategy blueprints.
+Example templates
+Trend Pullback
+Breakout
+Mean Reversion
+Volatility Expansion
+Momentum Continuation
+Templates define structure rather than parameter values.
+7.10 Strategy Factory
+Purpose
+Generate candidate strategies.
+Workflow
+Select template.
+Select compatible plugins.
+Generate candidate structure.
+Submit to parameter generation.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+1. 
+2. 
+3. 
+4. 
+6
+
+--- Page 7 ---
+The Strategy Factory never performs optimization.
+7.11 Parameter Generator
+Purpose
+Generate valid parameter combinations.
+Examples
+EMA periods
+ATR multipliers
+ADX thresholds
+Risk percentages
+The generator rejects invalid parameter combinations before optimization.
+7.12 Optimization Engine
+Purpose
+Search parameter space efficiently.
+Supported algorithms
+Grid Search
+Random Search
+Bayesian Optimization
+Genetic Algorithm
+Optuna
+Optimization objective is configurable.
+Examples
+Profit Factor
+Sharpe Ratio
+Expectancy
+Drawdown
+Composite Score
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+7
+
+--- Page 8 ---
+7.13 Backtesting Engine
+Purpose
+Evaluate historical performance.
+Supports
+Spread
+Slippage
+Commission
+Position sizing
+Partial close
+Trailing stop
+Multiple positions
+Realistic execution rules
+Produces complete trade histories and performance statistics.
+7.14 Validation Engine
+Purpose
+Ensure strategy robustness.
+Validation methods
+Walk-Forward Testing
+Out-of-Sample Testing
+Monte Carlo Simulation
+Cross-Pair Testing
+Cross-Timeframe Testing
+Stability Analysis
+Validation determines deployment eligibility.
+7.15 Strategy Ranking Engine
+Purpose
+Rank validated strategies.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+8
+
+--- Page 9 ---
+Example weighted score
+Metric Weight
+Profit Factor 25%
+Sharpe Ratio 20%
+Maximum Drawdown20%
+Walk-Forward Score 15%
+Monte Carlo Score 10%
+Trade Count 5%
+Cross-Pair Stability 5%
+Only strategies exceeding a configurable threshold become production candidates.
+7.16 Research Analytics Engine
+Purpose
+Analyze research outcomes across experiments.
+Responsibilities
+Compare templates
+Compare plugins
+Compare feature importance
+Identify robust parameter ranges
+Detect overfitting
+Recommend future experiments
+The engine improves the efficiency of future research.
+7.17 Strategy Repository
+Purpose
+Store approved strategy versions.
+• 
+• 
+• 
+• 
+• 
+• 
+9
+
+--- Page 10 ---
+Each strategy contains
+Template
+Plugins
+Parameters
+Validation results
+Ranking score
+Deployment status
+Only approved versions are published.
+7.18 Research Workflow
+Historical Data
+        │
+        ▼
+Data Preparation
+        │
+        ▼
+Indicator Calculation
+        │
+        ▼
+Feature Engineering
+        │
+        ▼
+Feature Store
+        │
+        ▼
+Market Regime Detection
+        │
+        ▼
+Strategy Factory
+        │
+        ▼
+Parameter Generation
+        │
+        ▼
+Optimization
+        │
+        ▼
+Backtesting
+        │
+        ▼
+Validation
+• 
+• 
+• 
+• 
+• 
+• 
+10
+
+--- Page 11 ---
+│
+        ▼
+Ranking
+        │
+        ▼
+Research Analytics
+        │
+        ▼
+Approved Strategy Repository
+7.19 Outputs
+The Research Engine produces:
+Approved strategies
+Validation reports
+Backtest reports
+Optimization summaries
+Strategy rankings
+Research analytics
+Deployment candidates
+These outputs are consumed by the Strategy Service and, after approval, made available to the Live Trading
+platform.
+7.20 Guiding Principle
+The Research Engine does not attempt to predict the future.
+Its purpose is to discover statistically robust trading behaviour from historical data, validate that behaviour
+under multiple conditions, and produce explainable strategies that can be monitored, improved, and safely
+deployed.
+End of Chapter 7 – Research Engine
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+11

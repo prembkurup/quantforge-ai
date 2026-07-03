@@ -1,0 +1,444 @@
+--- Page 1 ---
+QuantForge AI
+Chapter 6 – Physical PostgreSQL Database Schema
+Version: 1.0
+Database: PostgreSQL 17+
+Status: Draft
+6.1 Purpose
+This chapter defines the physical PostgreSQL database architecture for QuantForge AI.
+The database is designed to support:
+Historical market data
+Quantitative research
+Strategy discovery
+Backtesting
+Validation
+Live trading
+Risk management
+Reporting
+Administration
+The design emphasizes:
+High performance
+Data integrity
+Scalability
+Auditability
+Maintainability
+6.2 Database Architecture
+QuantForge AI uses PostgreSQL as the primary data store.
+The platform separates logical workloads into dedicated schemas.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+1
+
+--- Page 2 ---
+PostgreSQL
+│
+├── market
+├── instrument
+├── plugin
+├── research
+├── strategy
+├── validation
+├── trading
+├── risk
+├── reporting
+├── admin
+└── infrastructure
+Each schema has a clearly defined ownership boundary.
+6.3 Why Schemas Instead of Separate Databases?
+Version 1 uses one PostgreSQL cluster with multiple schemas.
+Advantages
+Single backup strategy
+Easier joins
+Simpler administration
+Lower operational complexity
+Easier local development
+Future versions can move schemas to dedicated databases if required.
+6.4 Schema Ownership
+Schema Owner Service
+market Data Service
+instrument Data Service
+plugin Strategy Service
+research Research Service
+strategy Strategy Service
+• 
+• 
+• 
+• 
+• 
+2
+
+--- Page 3 ---
+Schema Owner Service
+validation Research Service
+trading Trading Service
+risk Risk Service
+reporting Reporting Service
+admin API Service
+infrastructureAPI Service
+Only the owning service is allowed to modify data within its schema.
+6.5 PostgreSQL Extensions
+The following extensions shall be enabled.
+pgcrypto
+Purpose
+UUID generation
+Example
+gen_random_uuid()
+pg_stat_statements
+Purpose
+Performance monitoring
+btree_gin
+Purpose
+Advanced indexing
+3
+
+--- Page 4 ---
+pg_trgm
+Purpose
+Fast text searching
+Used for
+Plugin search
+Strategy search
+Log analysis
+6.6 Naming Standards
+Schemas
+Lowercase
+Example
+market
+strategy
+risk
+Tables
+Lowercase
+Singular nouns
+Example
+instrument
+strategy
+trade
+Columns
+Snake case
+Example
+• 
+• 
+• 
+4
+
+--- Page 5 ---
+created_at
+updated_at
+instrument_id
+strategy_version_id
+Indexes
+idx_<table>_<column>
+Example
+idx_candle_time
+idx_trade_strategy
+Primary Keys
+pk_<table>
+Example
+pk_strategy
+Foreign Keys
+fk_<table>_<referenced_table>
+Example
+fk_trade_strategy
+Unique Constraints
+uq_<table>_<column>
+Example
+uq_instrument_symbol
+5
+
+--- Page 6 ---
+6.7 Primary Key Strategy
+Every business entity shall use UUID as its primary key.
+Example
+idUUIDPRIMARYKEY
+Reasons
+Globally unique
+Easy replication
+Easier future microservices
+Safer imports
+No sequence conflicts
+6.8 Foreign Key Strategy
+Every relationship shall use explicit foreign keys.
+Example
+strategy_version
+        │
+        ▼
+strategy
+Foreign keys shall always be indexed.
+6.9 Audit Columns
+Every table shall contain:
+id
+created_at
+updated_at
+• 
+• 
+• 
+• 
+• 
+6
+
+--- Page 7 ---
+created_by
+updated_by
+Business tables shall additionally include
+version
+status
+Soft-delete capable tables shall include
+deleted_at
+deleted_by
+6.10 Timestamp Standard
+All timestamps
+UTC
+timestamptz
+Never store local time.
+6.11 Numeric Standards
+Prices
+NUMERIC(18,8)
+Lots
+NUMERIC(18,4)
+Percentages
+• 
+• 
+7
+
+--- Page 8 ---
+NUMERIC(8,4)
+Money
+NUMERIC(20,8)
+Avoid floating point types for financial values.
+6.12 Boolean Standards
+Use
+BOOLEAN
+Examples
+is_active
+is_live
+is_deleted
+is_valid
+6.13 Enum Strategy
+Use lookup tables instead of PostgreSQL ENUM types.
+Example
+Instead of
+MarketRegime ENUM
+Use
+8
+
+--- Page 9 ---
+market_regime_type
+Benefits
+Easier upgrades
+Easier reporting
+More flexible
+6.14 JSON Usage
+Use JSONB only for flexible metadata.
+Allowed examples
+Plugin Parameters
+Optimization Results
+Research Metadata
+Configuration
+Do not store relational data inside JSON.
+6.15 Large Objects
+Do not store
+Images
+Documents
+Reports
+Backups
+inside PostgreSQL.
+Store them in the filesystem or object storage.
+Save only metadata in PostgreSQL.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+9
+
+--- Page 10 ---
+6.16 Index Strategy
+Every table shall define
+Primary Key
+Unique Keys
+Foreign Keys
+Search Indexes
+Composite Indexes
+Example
+instrument_id
+timeframe_id
+candle_time DESC
+Indexes must support actual query patterns.
+6.17 Partition Strategy
+Only very large tables shall be partitioned.
+Examples
+market.candle
+market.tick
+research.backtest_trade
+trading.execution
+infrastructure.log
+Partition by
+10
+
+--- Page 11 ---
+Time
+Example
+2025
+2026
+2027
+6.18 Storage Classes
+Hot
+Frequently updated
+Examples
+Live Orders
+Positions
+Signals
+Warm
+Frequently queried
+Examples
+Strategies
+Research
+Validation
+11
+
+--- Page 12 ---
+Cold
+Historical
+Examples
+Candles
+Trades
+Backtests
+Archive
+Rarely accessed
+Examples
+Old Logs
+Archived Strategies
+Old Reports
+6.19 Data Retention
+Market Data
+Permanent
+Strategies
+Permanent
+Trades
+Permanent
+Validation
+12
+
+--- Page 13 ---
+Permanent
+Research Cache
+Configurable
+System Logs
+365 Days
+Audit Logs
+Permanent
+6.20 Transaction Rules
+Every business transaction shall use ACID transactions.
+Examples
+Strategy approval
+Trade execution
+Risk approval
+Order creation
+Rollback on failure is mandatory.
+6.21 Concurrency Rules
+Optimistic locking shall be used for
+Strategies
+Configurations
+Plugins
+Research Runs
+13
+
+--- Page 14 ---
+Pessimistic locking shall be limited to
+Live trade execution where necessary.
+6.22 CQRS Rules
+Write models
+Owned by service responsible for the entity.
+Read models
+Optimized for dashboards and analytics.
+Research writes never update production trading records.
+6.23 Security Standards
+Sensitive columns
+Encrypted
+Examples
+API Tokens
+Passwords
+Secrets
+Least privilege shall be applied to database roles.
+6.24 Backup Strategy
+Full Backup
+Daily
+Incremental Backup
+14
+
+--- Page 15 ---
+Hourly
+WAL Archiving
+Enabled
+Point-in-Time Recovery
+Enabled
+6.25 Performance Guidelines
+Target database size
+10+ years of market history
+Millions of trades
+Millions of backtests
+Performance objectives
+Fast historical queries
+Fast strategy lookup
+Low-latency live trading
+Efficient backups
+6.26 Database Design Rules
+Raw OHLCV is immutable.
+Indicators are not permanently stored by default.
+Every entity has one owner .
+Every table has audit fields.
+UUID is the standard primary key.
+UTC timestamps only.
+Financial values use NUMERIC.
+JSONB only for metadata.
+Large tables are partitioned.
+Critical actions are transactional and auditable.
+• 
+• 
+• 
+• 
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+7. 
+8. 
+9. 
+10. 
+15
+
+--- Page 16 ---
+6.27 Chapter Summary
+This chapter establishes the physical database standards that every schema and table in QuantForge AI
+must follow.
+Subsequent sections of Chapter 6 will define the actual schemas and tables in detail:
+6A – Market & Instrument Schema
+6B – Plugin & Research Schema
+6C – Strategy & Validation Schema
+6D – Trading & Risk Schema
+6E – Reporting, Administration & Infrastructure
+These sections will include complete table definitions, relationships, indexes, constraints, partitioning
+strategies, and access patterns.
+End of Chapter 6 – Physical PostgreSQL Database Schema (Standards & Architecture)
+• 
+• 
+• 
+• 
+• 
+16

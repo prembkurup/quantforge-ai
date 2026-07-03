@@ -1,0 +1,429 @@
+--- Page 1 ---
+QuantForge AI
+Chapter 5 – Logical Database Model
+Version: 1.0
+Status: Draft
+Prerequisites
+Chapter 1 – Introduction
+Chapter 2 – Software Requirements Specification
+Chapter 3 – System Architecture
+Chapter 4 – Enterprise Domain Model
+5.1 Purpose
+The purpose of this chapter is to define the Logical Database Model (LDM) for QuantForge AI.
+The Logical Database Model describes:
+Business entities
+Relationships
+Ownership
+Lifecycle
+Data classification
+Access patterns
+This chapter is independent of PostgreSQL.
+No SQL tables are defined here.
+The Physical Database Schema will be designed in Chapter 6.
+5.2 Design Principles
+The database shall follow these principles.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+1
+
+--- Page 2 ---
+Principle 1
+Raw market data is immutable.
+Historical candles shall never be modified after validation.
+Principle 2
+Indicators are derived data.
+Indicators shall be calculated by the Research Engine and cached only when necessary.
+Principle 3
+Every business entity has one owner .
+No two services may own the same entity.
+Principle 4
+Every change must be auditable.
+Critical entities must maintain version history.
+Principle 5
+Research and Production are isolated.
+Research data must never directly drive live trading.
+Only validated strategies are promoted to production.
+5.3 Data Domains
+The logical model consists of the following domains.
+2
+
+--- Page 3 ---
+Market Data
+Instrument
+Plugin
+Research
+Strategy
+Backtesting
+Validation
+Trading
+Risk
+Reporting
+Administration
+Infrastructure
+Each domain owns its own entities.
+5.4 Aggregate Roots
+Aggregate Roots define ownership boundaries.
+Instrument Aggregate
+Instrument
+│
+├── Candle
+├── Tick
+├── Spread
+├── Trading Session
+└── Market Calendar
+Instrument owns all market data.
+3
+
+--- Page 4 ---
+Strategy Aggregate
+Strategy
+│
+├── Version
+├── Parameters
+├── Components
+├── Deployment
+└── Approval
+A Strategy is the root entity.
+Research Aggregate
+Research Run
+│
+├── Experiment
+├── Optimization
+├── Feature Set
+├── Backtest
+└── Validation
+Everything belongs to a Research Run.
+Trading Aggregate
+Signal
+│
+├── Order
+├── Execution
+├── Position
+└── Trade
+Signals create Orders.
+Orders create Executions.
+Executions update Positions.
+Positions become completed Trades.
+4
+
+--- Page 5 ---
+5.5 Entity Ownership
+Every entity belongs to one service.
+Service Owns
+Data Service Candles, Ticks, Spread, Instruments
+Research ServiceFeatures, Research Runs, Optimization, Backtests
+Strategy ServiceStrategy Templates, Strategies, Versions
+Trading Service Signals, Orders, Executions, Positions
+Risk Service Risk Rules, Exposure, Limits
+Reporting ServiceReports, Statistics
+API Service Users, Roles, Configuration
+Only the owning service may modify an entity.
+Other services have read-only access where appropriate.
+5.6 Entity Relationships
+Instrument
+Instrument
+1
+↓
+Many
+Candles
+5
+
+--- Page 6 ---
+Timeframe
+Timeframe
+1
+↓
+Many
+Candles
+Research Run
+Research Run
+1
+↓
+Many
+Experiments
+Experiment
+Experiment
+1
+↓
+Many
+Backtests
+6
+
+--- Page 7 ---
+Strategy Template
+Strategy Template
+1
+↓
+Many
+Strategies
+Strategy
+Strategy
+1
+↓
+Many
+Versions
+Strategy Version
+Strategy Version
+1
+↓
+Many
+Backtests
+↓
+Many
+7
+
+--- Page 8 ---
+Validation Runs
+↓
+One
+Deployment Status
+Live Signal
+Signal
+1
+↓
+Many
+Orders
+Order
+Order
+1
+↓
+Many
+Executions
+Position
+Position
+1
+8
+
+--- Page 9 ---
+↓
+One
+Trade
+5.7 Strategy Lifecycle
+Every strategy follows a lifecycle.
+Draft
+↓
+Generated
+↓
+Optimized
+↓
+Backtested
+↓
+Validated
+↓
+Paper Trading
+↓
+Approved
+↓
+Production
+↓
+Retired
+9
+
+--- Page 10 ---
+↓
+Archived
+A strategy cannot skip lifecycle stages.
+5.8 Research Lifecycle
+Research Project
+↓
+Research Run
+↓
+Experiment
+↓
+Optimization
+↓
+Backtesting
+↓
+Validation
+↓
+Ranking
+↓
+Candidate Strategy
+↓
+Approved Strategy
+10
+
+--- Page 11 ---
+5.9 Data Classification
+Permanent Data
+Examples
+Instruments
+Candles
+Strategies
+Strategy Versions
+Trades
+Executions
+Reports
+Configurations
+Audit Logs
+Permanent data is backed up regularly.
+Cached Data
+Examples
+Indicator Results
+Feature Vectors
+Market Regime
+Latest Signals
+Cache may be regenerated.
+11
+
+--- Page 12 ---
+Temporary Data
+Examples
+Optimization Trials
+Research Sessions
+Import Buffers
+Calculation Buffers
+Temporary data may be deleted automatically.
+Archive Data
+Examples
+Old Backtests
+Old Research Runs
+Archived Reports
+Old Logs
+Archive data is retained for historical analysis.
+5.10 Read / Write Responsibilities
+The system follows CQRS principles.
+Write Side
+Market Data Service
+Research Service
+Strategy Service
+12
+
+--- Page 13 ---
+Trading Service
+Risk Service
+These services create and update data.
+Read Side
+Dashboard
+Reporting
+Live Trading
+Analytics
+Monitoring
+These services primarily read optimized views of the data.
+5.11 Strategy Promotion Workflow
+Research cannot deploy directly.
+Workflow:
+Research
+↓
+Backtest
+↓
+Validation
+↓
+Approval
+↓
+13
+
+--- Page 14 ---
+Strategy Publisher
+↓
+Production Strategy Store
+↓
+Live Trading
+This ensures only approved strategies reach production.
+5.12 Data Access Rules
+Rule 1
+Research cannot modify production trades.
+Rule 2
+Trading cannot modify research results.
+Rule 3
+Risk Engine can reject any order .
+Rule 4
+Execution Engine never bypasses Risk Engine.
+Rule 5
+Production Strategy Store contains only approved strategy versions.
+14
+
+--- Page 15 ---
+5.13 Storage Classes
+Class Description
+Hot Live trading data requiring fast access
+Warm Frequently accessed research data
+Cold Historical research and completed backtests
+Archive Long-term storage
+This classification will guide partitioning and indexing in Chapter 6.
+5.14 Versioning Rules
+The following entities are version-controlled:
+Plugins
+Strategy Templates
+Strategies
+Strategy Parameters
+Risk Profiles
+Configurations
+Historical versions are never overwritten.
+5.15 Audit Requirements
+The following actions must be logged:
+Strategy approval
+Strategy deployment
+Strategy retirement
+Configuration changes
+User authentication
+Trade execution
+Risk events
+Kill switch activation
+Audit records are immutable.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+15
+
+--- Page 16 ---
+5.16 Naming Standards
+Entity names use singular form.
+Examples:
+Instrument
+Strategy
+Backtest
+Trade
+Attributes use descriptive names.
+Examples:
+created_at
+updated_at
+strategy_version
+risk_profile
+All timestamps are stored in UTC.
+5.17 Logical Database Summary
+The Logical Database Model defines the ownership, lifecycle, and relationships of all business entities
+before any physical database implementation.
+The model establishes the following architectural rules:
+Raw OHLCV is the permanent source of truth.
+Indicators are derived rather than permanently stored.
+Research and production remain isolated.
+Every entity has a single owner .
+Strategies are version-controlled.
+Risk management is mandatory for every live trade.
+Only validated strategies can enter production.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+16
+
+--- Page 17 ---
+Every critical action is auditable.
+This logical model forms the foundation for the PostgreSQL Physical Database Schema defined in Chapter
+6.
+End of Chapter 5 – Logical Database Model
+• 
+17

@@ -1,0 +1,464 @@
+--- Page 1 ---
+QuantForge AI
+Chapter 2 – Software Requirements Specification
+(SRS)
+Version 1.0
+2.1 Purpose
+The purpose of this document is to define all functional and non-functional requirements for QuantForge
+AI.
+This document serves as the primary reference for:
+System Architecture
+Database Design
+API Development
+Module Development
+Testing
+Deployment
+Future Enhancements
+Every feature implemented in QuantForge AI must be traceable to one or more requirements defined in this
+specification.
+2.2 Business Goals
+The system shall provide a complete automated quantitative trading platform capable of:
+Managing historical market data.
+Discovering profitable trading strategies.
+Validating strategies using statistical techniques.
+Selecting the optimal strategy in real time.
+Executing trades automatically.
+Monitoring performance continuously.
+Operating with minimal human intervention.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+1
+
+--- Page 2 ---
+2.3 Stakeholders
+Primary Stakeholder
+Project Owner
+Prem Kurup
+Responsibilities
+Define business requirements.
+Approve designs.
+Approve deployments.
+System Administrator
+Responsibilities
+Install servers.
+Configure PostgreSQL.
+Configure Linux.
+Monitor services.
+Backup databases.
+Developer
+Responsibilities
+Implement modules.
+Fix bugs.
+Improve performance.
+Maintain documentation.
+Trading Researcher
+Responsibilities
+Design new indicators.
+Evaluate strategies.
+Improve discovery algorithms.
+Analyze reports.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+2
+
+--- Page 3 ---
+2.4 Functional Requirements
+Every requirement receives a unique ID.
+FR-001
+Historical Candle Storage
+Priority
+Critical
+Description
+The system shall store historical OHLC candle data for every supported currency pair and timeframe.
+Inputs
+OANDA historical candles.
+Outputs
+Validated candle records stored in PostgreSQL.
+Acceptance Criteria
+No duplicate candles.
+Missing candles detected.
+Time ordering maintained.
+FR-002
+Incremental Candle Updates
+Priority
+Critical
+Description
+The system shall download only missing candles.
+• 
+• 
+• 
+3
+
+--- Page 4 ---
+Acceptance Criteria
+Duplicate downloads prevented.
+Updates complete within configured schedule.
+FR-003
+Indicator Calculation
+Priority
+Critical
+Description
+The system shall calculate all configured technical indicators.
+Supported indicators (Version 1)
+EMA
+SMA
+RSI
+ATR
+ADX
+MACD
+Bollinger Bands
+Supertrend
+Donchian Channel
+Stochastic
+Acceptance Criteria
+Indicators updated after every completed candle.
+Historical recalculation supported.
+FR-004
+Feature Engineering
+Priority
+Critical
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+4
+
+--- Page 5 ---
+Description
+The system shall convert indicators into reusable market features.
+Examples
+EMA crossover
+Trend strength
+Candle body ratio
+Wick ratio
+Support distance
+Resistance distance
+Higher High
+Lower Low
+Session classification
+Acceptance Criteria
+Features available for both research and live trading.
+FR-005
+Strategy Generation
+Priority
+Critical
+Description
+The system shall automatically generate candidate trading strategies.
+Generation Inputs
+Indicators
+Parameters
+Logical operators
+Timeframes
+Market regimes
+Acceptance Criteria
+Thousands of strategies generated automatically.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+5
+
+--- Page 6 ---
+FR-006
+Backtesting
+Priority
+Critical
+Description
+Every candidate strategy shall be tested using historical data.
+Backtesting must support
+Spread
+Slippage
+Commission
+Position sizing
+Risk percentage
+Stop Loss
+Take Profit
+Trailing Stop
+Acceptance Criteria
+Results reproducible.
+FR-007
+Strategy Evaluation
+Performance metrics
+Net Profit
+Profit Factor
+Win Rate
+Maximum Drawdown
+Sharpe Ratio
+Sortino Ratio
+Recovery Factor
+Average Trade
+Consecutive Losses
+Expectancy
+Strategies failing configured thresholds shall be rejected.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+6
+
+--- Page 7 ---
+FR-008
+Walk Forward Validation
+Description
+The system shall validate strategies using walk-forward testing.
+Acceptance Criteria
+Strategies must remain profitable on unseen data.
+FR-009
+Monte Carlo Validation
+The system shall perform randomized robustness testing.
+Variables
+Spread
+Slippage
+Trade order
+Execution delay
+FR-010
+Cross Pair Validation
+Strategies shall be evaluated on additional currency pairs when applicable.
+FR-011
+Strategy Library
+Approved strategies shall be stored.
+Stored Information
+Parameters
+• 
+• 
+• 
+• 
+• 
+7
+
+--- Page 8 ---
+Pair
+Timeframe
+Market Regime
+Performance
+Validation Results
+Version
+FR-012
+Market Regime Detection
+The system shall classify markets into
+Trending
+Ranging
+High Volatility
+Low Volatility
+Breakout
+No Trade
+FR-013
+Strategy Selection
+The system shall automatically select the highest-ranked strategy compatible with the current market
+regime.
+FR-014
+Signal Generation
+The selected strategy shall produce
+Buy
+Sell
+Hold
+signals.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+8
+
+--- Page 9 ---
+FR-015
+Trade Execution
+The system shall execute orders using OANDA REST API.
+Supported
+Market Order
+Limit Order
+Stop Order
+Close Position
+Modify SL
+Modify TP
+FR-016
+Risk Management
+The system shall enforce
+Maximum Risk Per Trade
+Maximum Daily Loss
+Maximum Weekly Loss
+Maximum Drawdown
+Maximum Open Positions
+Currency Exposure Limits
+FR-017
+Performance Monitoring
+The system shall monitor
+Equity
+Balance
+Floating Profit
+Daily Return
+Strategy Performance
+Server Health
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+9
+
+--- Page 10 ---
+FR-018
+Reporting
+Reports
+Daily
+Weekly
+Monthly
+Annual
+Strategy Performance
+Trade Analysis
+2.5 Non-Functional Requirements
+Performance
+Candle processing < 1 second after close.
+Multiple pairs processed concurrently.
+Database optimized for large historical datasets.
+Availability
+Target uptime
+99.9%
+Security
+Encrypted credentials.
+Authentication for administrative access.
+Audit logging.
+Scalability
+The system shall support additional asset classes without architectural redesign.
+Maintainability
+Modules must remain independently deployable and testable.
+Reliability
+Automatic recovery from recoverable failures.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+10
+
+--- Page 11 ---
+2.6 Assumptions
+OANDA API remains available.
+PostgreSQL database remains accessible.
+Historical data quality is sufficient for research.
+Linux servers remain operational.
+Internet connectivity is stable during live trading.
+2.7 Constraints
+Initial version limited to Forex.
+Initial deployment limited to OANDA.
+No high-frequency trading.
+Only completed candles are used for signal generation.
+Live trading disabled until strategy validation requirements are satisfied.
+2.8 Success Criteria
+The project will be considered successful when it can:
+Store and maintain historical market data.
+Discover profitable candidate strategies.
+Validate strategies through multiple testing stages.
+Select strategies automatically according to current market conditions.
+Execute trades through OANDA with defined risk controls.
+Produce detailed performance reports.
+Operate continuously on in-house Linux servers.
+End of Chapter 2
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+11

@@ -1,0 +1,420 @@
+--- Page 1 ---
+QuantForge AI
+Chapter 8 – Experiment Management System
+Version: 3.0
+Module: Research Service
+Status: Approved
+8.1 Purpose
+The Experiment Management System (EMS) is responsible for planning, executing, monitoring, tracking,
+comparing, and reproducing quantitative trading research.
+Every research activity inside QuantForge AI shall be performed as an Experiment.
+Strategies are outputs of experiments.
+Experiments are first-class business entities.
+8.2 Why an Experiment-Centric Design?
+Traditional trading software focuses on strategies.
+Professional quantitative research focuses on experiments.
+Instead of asking:
+"Is this strategy profitable?"
+QuantForge AI asks:
+Which hypothesis is being tested?
+Which data was used?
+Which features were used?
+Which parameters were explored?
+Which validation methods were applied?
+Is the result reproducible?
+• 
+• 
+• 
+• 
+• 
+• 
+1
+
+--- Page 2 ---
+Is the result statistically significant?
+8.3 Experiment Lifecycle
+Every experiment follows the same lifecycle.
+Draft
+        │
+        ▼
+Configured
+        │
+        ▼
+Queued
+        │
+        ▼
+Running
+        │
+        ▼
+Completed
+        │
+        ▼
+Validated
+        │
+        ▼
+Published
+        │
+        ▼
+Archived
+Failed experiments retain their metadata and results for future analysis.
+8.4 Experiment Components
+Each experiment contains the following components.
+Experiment
+│
+├── Objective
+├── Dataset
+├── Feature Set
+├── Market Regime
+• 
+2
+
+--- Page 3 ---
+├── Strategy Template
+├── Plugin Configuration
+├── Parameter Space
+├── Optimization Configuration
+├── Validation Configuration
+├── Ranking Configuration
+└── Results
+8.5 Experiment Definition
+Each experiment defines:
+Name
+Description
+Owner
+Creation Date
+Objective
+Instruments
+Timeframes
+Date Range
+Strategy Templates
+Plugin Set
+Feature Set
+Validation Rules
+Success Criteria
+Example:
+Experiment Name
+Trend Pullback Study
+Objective
+Evaluate trend pullback strategies on major Forex pairs.
+Pairs
+EUR/USD
+GBP/USD
+USD/JPY
+Timeframe
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+3
+
+--- Page 4 ---
+H1
+Dataset
+2015–2025
+8.6 Research Hypothesis
+Every experiment begins with a hypothesis.
+Examples:
+Trend pullbacks outperform breakouts in trending markets.
+ATR exits outperform fixed take-profit.
+RSI confirmation improves expectancy.
+Mean reversion works better during low volatility.
+London session produces higher-quality signals than Asian session.
+A hypothesis provides purpose and prevents random research.
+8.7 Dataset Definition
+Each experiment references one or more datasets.
+Dataset properties:
+Instruments
+Timeframes
+Date Range
+Data Quality
+Trading Sessions
+Spread Model
+Corporate Actions (future)
+Missing Data Policy
+Datasets are immutable once an experiment starts.
+8.8 Feature Set
+Experiments use named Feature Sets.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+4
+
+--- Page 5 ---
+Examples:
+Trend Features
+Momentum Features
+Volatility Features
+Price Action Features
+Session Features
+Feature Sets are version-controlled.
+8.9 Strategy Template Selection
+Experiments select one or more Strategy Templates.
+Examples:
+Trend Pullback
+Breakout
+Mean Reversion
+Momentum Continuation
+Volatility Expansion
+Templates are combined with plugins during execution.
+8.10 Plugin Configuration
+Experiments specify the plugin versions to use.
+Examples:
+Entry Plugin v2.1
+Exit Plugin v1.4
+Risk Plugin v3.0
+Using explicit versions guarantees reproducibility.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+5
+
+--- Page 6 ---
+8.11 Parameter Space
+Each experiment defines the optimization search space.
+Example:
+EMA Fast
+10
+20
+30
+EMA Slow
+50
+100
+200
+ATR Multiplier
+1.5
+2.0
+2.5
+Risk
+0.5%
+1.0%
+2.0%
+The Parameter Generator explores only valid combinations.
+8.12 Experiment Scheduler
+Experiments may run:
+Immediately
+Scheduled
+Sequentially
+In parallel
+• 
+• 
+• 
+• 
+6
+
+--- Page 7 ---
+Priority levels:
+Critical
+High
+Normal
+Low
+The scheduler manages research resources efficiently.
+8.13 Experiment Execution Pipeline
+Experiment
+        │
+        ▼
+Dataset Preparation
+        │
+        ▼
+Feature Generation
+        │
+        ▼
+Strategy Assembly
+        │
+        ▼
+Parameter Generation
+        │
+        ▼
+Optimization
+        │
+        ▼
+Backtesting
+        │
+        ▼
+Validation
+        │
+        ▼
+Ranking
+        │
+        ▼
+Analytics
+        │
+        ▼
+Results
+• 
+• 
+• 
+• 
+7
+
+--- Page 8 ---
+8.14 Experiment Results
+Each experiment stores:
+Strategies Generated
+Strategies Rejected
+Validation Summary
+Best Strategy
+Ranking Distribution
+Feature Importance
+Parameter Importance
+Execution Time
+Resource Usage
+No result is overwritten.
+8.15 Experiment Comparison
+Experiments can be compared by:
+Net Profit
+Profit Factor
+Sharpe Ratio
+Drawdown
+Robustness
+Trade Count
+Feature Importance
+Execution Time
+Comparison allows researchers to identify the most effective approaches.
+8.16 Experiment Reproducibility
+Every experiment must be reproducible.
+The system records:
+Dataset version
+Plugin versions
+Feature Set version
+Parameter Space
+Optimization algorithm
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+8
+
+--- Page 9 ---
+Random seed
+Software version
+Running the same experiment again with the same inputs should produce equivalent results.
+8.17 Resource Management
+The Experiment Manager monitors:
+CPU usage
+Memory usage
+Queue length
+Worker status
+Estimated completion time
+This prevents research jobs from affecting live trading.
+8.18 Experiment Analytics
+The Analytics Engine provides:
+Success rate by template
+Success rate by market regime
+Feature importance trends
+Plugin performance
+Optimization efficiency
+Validation pass rate
+Strategy publication rate
+These analytics guide future research priorities.
+8.19 Publication Workflow
+Only experiments that produce validated strategies can publish to the Strategy Repository.
+Workflow:
+Completed
+        │
+        ▼
+Validation Passed
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+9
+
+--- Page 10 ---
+        │
+        ▼
+Strategy Ranked
+        │
+        ▼
+Approved
+        │
+        ▼
+Published
+Publication is a controlled process and does not occur automatically.
+8.20 Guiding Principles
+Every research activity is an Experiment.
+Every experiment starts with a hypothesis.
+Every experiment is reproducible.
+Every result is traceable.
+Failed experiments are valuable learning data.
+Strategies are outputs—not the primary object.
+Research quality is more important than research speed.
+Experiment metadata is never discarded.
+8.21 Chapter Summary
+The Experiment Management System transforms QuantForge AI from a conventional trading application
+into a quantitative research platform.
+It provides:
+Scientific research workflow
+Repeatable experimentation
+Structured hypothesis testing
+Controlled strategy generation
+Complete traceability
+Long-term knowledge accumulation
+This chapter establishes the foundation for all future research conducted by QuantForge AI.
+End of Chapter 8 – Experiment Management System
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+7. 
+8. 
+• 
+• 
+• 
+• 
+• 
+• 
+10

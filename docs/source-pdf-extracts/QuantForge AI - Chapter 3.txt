@@ -1,0 +1,487 @@
+--- Page 1 ---
+QuantForge AI
+Chapter 3 – System Architecture
+Version: 1.0
+3.1 Architecture Overview
+QuantForge AI follows a modular , service-oriented architecture. Each service has a single responsibility and
+communicates through well-defined interfaces. This makes the platform easier to maintain, test, and scale.
+The platform consists of four logical layers:
+Data Layer
+Research Layer
+Trading Layer
+Presentation Layer
+3.2 High-Level Architecture
+                        OANDA API
+                            │
+                            ▼
+                 Market Data Service
+                            │
+                            ▼
+                     PostgreSQL Database
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+        ▼                   ▼                   ▼
+ Indicator Engine     Feature Engine     Data Validation
+        │                   │
+        └──────────────┬────┘
+                       ▼
+           Strategy Discovery Engine
+                       │
+                       ▼
+              Backtesting Engine
+1. 
+2. 
+3. 
+4. 
+1
+
+--- Page 2 ---
+│
+                       ▼
+             Validation Engine
+                       │
+                       ▼
+              Strategy Repository
+                       │
+                       ▼
+          Market Regime Detection
+                       │
+                       ▼
+          Strategy Selection Engine
+                       │
+                       ▼
+               Risk Management
+                       │
+                       ▼
+             Trade Execution Engine
+                       │
+                       ▼
+                   OANDA API
+3.3 Architectural Principles
+The platform follows these principles:
+Single Responsibility Principle
+Loose Coupling
+High Cohesion
+Event-driven processing where appropriate
+Modular development
+Independent testing
+Horizontal scalability
+Fault isolation
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+2
+
+--- Page 3 ---
+3.4 System Layers
+Layer 1 – Data Layer
+Responsibilities
+Historical candles
+Live candles
+Indicator storage
+Feature storage
+Strategy storage
+Trade history
+Performance metrics
+Technology
+PostgreSQL
+Layer 2 – Research Layer
+Responsibilities
+Indicator calculation
+Feature engineering
+Strategy generation
+Backtesting
+Validation
+Optimization
+Technology
+Python
+Layer 3 – Trading Layer
+Responsibilities
+Market regime detection
+Strategy selection
+Risk management
+Signal generation
+Trade execution
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+3
+
+--- Page 4 ---
+Technology
+Python
+Layer 4 – Presentation Layer
+Responsibilities
+Dashboard
+Reports
+Monitoring
+Configuration
+Administration
+Technology
+FastAPI
+Web frontend (future phase)
+3.5 Service Architecture
+The system will initially be divided into the following services.
+Service 1
+Market Data Service
+Responsibilities
+Connect to OANDA
+Download historical data
+Download new candles
+Validate data
+Store data
+Service 2
+Indicator Service
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+4
+
+--- Page 5 ---
+Responsibilities
+Calculate indicators
+Update indicators
+Recalculate history
+Store values
+Service 3
+Feature Service
+Responsibilities
+Generate market features
+Normalize features
+Store engineered features
+Service 4
+Strategy Discovery Service
+Responsibilities
+Generate candidate strategies
+Apply parameters
+Submit jobs for testing
+Service 5
+Backtesting Service
+Responsibilities
+Historical simulation
+Position management
+Statistics generation
+Trade logging
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+5
+
+--- Page 6 ---
+Service 6
+Validation Service
+Responsibilities
+Walk-forward testing
+Monte Carlo simulation
+Out-of-sample validation
+Cross-pair validation
+Service 7
+Strategy Repository Service
+Responsibilities
+Store approved strategies
+Version strategies
+Activate/deactivate strategies
+Service 8
+Market Regime Service
+Responsibilities
+Detect market state
+Score confidence
+Publish current regime
+Service 9
+Strategy Selection Service
+Responsibilities
+Match strategies
+Score candidates
+Select best strategy
+Reject low-confidence setups
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+6
+
+--- Page 7 ---
+Service 10
+Risk Management Service
+Responsibilities
+Position sizing
+Exposure calculation
+Daily limits
+Portfolio limits
+Emergency shutdown
+Service 11
+Execution Service
+Responsibilities
+Connect to OANDA
+Place orders
+Modify orders
+Close orders
+Record execution results
+Service 12
+Reporting Service
+Responsibilities
+Generate reports
+Strategy analytics
+Equity analysis
+Performance dashboards
+3.6 Service Communication
+Version 1 architecture:
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+7
+
+--- Page 8 ---
+Service
+↓
+PostgreSQL
+↓
+Next Service
+Each service reads from and writes to PostgreSQL using well-defined data models.
+Future versions may introduce a message broker if required by performance needs.
+3.7 Server Architecture
+Research Server
+Responsibilities
+Indicator calculations
+Feature engineering
+Strategy discovery
+Backtesting
+Machine learning
+Database Server
+Responsibilities
+PostgreSQL
+Backups
+Index maintenance
+Data integrity
+Live Trading Server
+Responsibilities
+Live market monitoring
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+8
+
+--- Page 9 ---
+Market regime detection
+Strategy selection
+Risk management
+Trade execution
+Dashboard Server
+Responsibilities
+FastAPI
+Authentication
+Reporting
+Administration
+Monitoring
+3.8 Folder Structure
+quantforge-ai/
+docs/
+backend/
+    config/
+    common/
+    market_data/
+    indicators/
+    features/
+    strategy_discovery/
+    backtesting/
+    validation/
+    strategy_repository/
+    market_regime/
+    strategy_selection/
+    risk_management/
+    execution/
+    reporting/
+database/
+docker/
+scripts/
+tests/
+logs/
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+9
+
+--- Page 10 ---
+3.9 Configuration Management
+All configuration shall be externalized.
+Examples:
+Database connection
+OANDA credentials
+Risk parameters
+Trading hours
+Indicator parameters
+Logging level
+No secrets shall be hard-coded.
+3.10 Logging Strategy
+Every service shall maintain structured logs.
+Log levels:
+DEBUG
+INFO
+WARNING
+ERROR
+CRITICAL
+Logs shall include:
+Timestamp
+Service name
+Event
+Error details
+Execution time
+3.11 Error Handling
+The system shall:
+Retry transient failures.
+Log all failures.
+Prevent corrupted data from propagating.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+10
+
+--- Page 11 ---
+Continue operating when non-critical services fail.
+Notify administrators of critical failures.
+3.12 Scalability
+The architecture shall support future expansion to:
+Stocks
+Cryptocurrencies
+Commodities
+Indices
+Futures
+without requiring major redesign.
+3.13 Design Principles
+The platform shall be designed to satisfy:
+Reliability
+Maintainability
+Scalability
+Testability
+Extensibility
+Security
+Performance
+These principles take precedence over implementation convenience.
+3.14 Architecture Decisions
+For Version 1:
+Python is the primary implementation language.
+PostgreSQL is the single source of truth.
+OANDA is the only broker integration.
+Ubuntu Server is the production operating system.
+Deployment is entirely on in-house infrastructure.
+Research and live trading execute on separate servers to prevent heavy computation from affecting
+live order execution.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+11
+
+--- Page 12 ---
+End of Chapter 3
+12

@@ -1,0 +1,385 @@
+--- Page 1 ---
+QuantForge AI
+Architecture Update – Version 2.0
+Document Version: 2.0
+Status: Approved
+Architecture Decision AD-001
+Raw Market Data is the Single Source of Truth
+Decision
+The QuantForge AI platform shall permanently store only raw market data and business data in
+PostgreSQL.
+Technical indicators shall not be permanently stored for every historical candle.
+Instead, indicators will be calculated dynamically by the Python Research Engine and cached only when
+there is a measurable performance benefit.
+Rationale
+Technical indicators are derived data, not primary data.
+Examples include:
+EMA
+SMA
+RSI
+ATR
+ADX
+MACD
+Bollinger Bands
+SuperTrend
+Donchian Channel
+Stochastic
+Since these values can always be recalculated from OHLCV data, permanently storing every indicator value
+for every candle introduces unnecessary storage, maintenance, and complexity.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+1
+
+--- Page 2 ---
+Benefits
+Reduced Storage
+The database stores only essential information.
+Expected storage reduction:
+70–90% compared to storing every indicator value.
+Easier Maintenance
+Adding a new indicator requires no database schema changes.
+Only the calculation engine is updated.
+Improved Flexibility
+Changing an indicator formula or parameter does not require modifying historical database records.
+The engine simply recalculates the values.
+Better Performance
+Historical research uses in-memory calculations.
+Modern Python libraries such as:
+NumPy
+Polars
+pandas
+TA-Lib
+can calculate indicators significantly faster than repeated database reads.
+Permanent Database Objects
+The PostgreSQL database shall permanently store:
+• 
+• 
+• 
+• 
+• 
+2
+
+--- Page 3 ---
+Market Data
+Currency pairs
+Timeframes
+OHLCV candles
+Trading sessions
+Economic calendar (future)
+Strategy Data
+Strategy definitions
+Parameters
+Validation results
+Performance statistics
+Version history
+Trading Data
+Orders
+Positions
+Executions
+Trade history
+Account balance history
+Research Data
+Backtest summaries
+Walk-forward summaries
+Monte Carlo summaries
+Optimization results
+Administration
+Users
+Roles
+Configuration
+Audit logs
+System logs
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+3
+
+--- Page 4 ---
+Dynamic Calculation Layer
+Indicators shall be calculated inside the Python engine.
+Example workflow:
+Load OHLCV candles
+        │
+        ▼
+Calculate Indicators
+        │
+        ▼
+Generate Features
+        │
+        ▼
+Generate Signals
+No permanent indicator records are created unless caching is required.
+Feature Engineering Layer
+The Feature Engine converts raw indicators into reusable market features.
+Examples:
+EMA20 > EMA50
+EMA Slope
+ATR Percentile
+RSI Momentum
+MACD Histogram Direction
+Trend Strength
+Distance from Support
+Distance from Resistance
+Higher High
+Lower Low
+Candle Body Ratio
+Wick Ratio
+Features are generated dynamically during research and live trading.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+4
+
+--- Page 5 ---
+Intelligent Caching Strategy
+QuantForge AI introduces three cache levels.
+Level 1 — Research Cache
+Purpose
+Accelerate repeated historical research.
+Storage
+Parquet files.
+Contains
+Calculated indicators
+Engineered features
+Intermediate datasets
+The cache can be regenerated at any time.
+Level 2 — Live Cache
+Purpose
+Serve the live trading engine with minimal latency.
+Technology
+Redis
+Contains only recent values required for active trading.
+Examples
+Latest EMA
+Latest RSI
+Latest ATR
+Current market regime
+Active strategy
+This cache is temporary.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+5
+
+--- Page 6 ---
+Level 3 — Strategy Cache
+Purpose
+Store only the features required by approved production strategies.
+Storage
+PostgreSQL
+Example
+pair
+timeframe
+candle_time
+strategy_id
+feature_vector
+Only production strategies populate this cache.
+Updated System Architecture
+                   OANDA API
+                       │
+                       ▼
+              Market Data Service
+                       │
+                       ▼
+                 PostgreSQL Database
+                       │
+                       ▼
+              Python Research Engine
+                       │
+             ┌─────────┴──────────┐
+             │                    │
+             ▼                    ▼
+      Indicator Engine     Feature Engine
+             │                    │
+             └─────────┬──────────┘
+                       ▼
+          Strategy Discovery Engine
+                       ▼
+6
+
+--- Page 7 ---
+Backtesting Engine
+                       ▼
+            Validation Engine
+                       ▼
+            Strategy Repository
+                       ▼
+          Market Regime Detection
+                       ▼
+          Strategy Selection Engine
+                       ▼
+              Risk Management
+                       ▼
+             Trade Execution Engine
+                       ▼
+                  OANDA API
+Updated Service Architecture
+Version 2.0 consolidates the platform into seven core services.
+Service 1
+Data Service
+Responsibilities
+Historical data
+Live data
+Data validation
+Database management
+Service 2
+Research Service
+Responsibilities
+Indicator calculation
+Feature engineering
+Strategy discovery
+Backtesting
+Optimization
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+7
+
+--- Page 8 ---
+Machine learning
+Service 3
+Strategy Service
+Responsibilities
+Strategy repository
+Strategy versioning
+Strategy activation
+Strategy evaluation
+Service 4
+Trading Service
+Responsibilities
+Market regime detection
+Strategy selection
+Signal generation
+Trade execution
+Service 5
+Risk Service
+Responsibilities
+Position sizing
+Exposure management
+Drawdown protection
+Emergency controls
+Service 6
+Reporting Service
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+8
+
+--- Page 9 ---
+Responsibilities
+Performance reports
+Strategy analytics
+Dashboard data
+Audit reporting
+Service 7
+API Service
+Responsibilities
+REST API
+Authentication
+Configuration
+Administration
+Architecture Principles
+QuantForge AI follows these core principles.
+Raw data is immutable.
+Indicators are derived, not stored by default.
+Features are generated dynamically.
+Research is independent of live trading.
+Every service has a single responsibility.
+PostgreSQL is the single source of truth.
+Redis is used only for transient live data.
+Research caches are disposable and reproducible.
+Every strategy must pass validation before production.
+The platform must remain extensible to additional asset classes without architectural redesign.
+Architecture Decision Summary
+Decision Status
+Store raw OHLCV permanentlyApproved
+Calculate indicators dynamicallyApproved
+Cache only when beneficial Approved
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+7. 
+8. 
+9. 
+10. 
+9
+
+--- Page 10 ---
+Decision Status
+Separate research from live tradingApproved
+Seven-service architecture Approved
+PostgreSQL as the source of truthApproved
+Redis for live cache Approved
+Parquet for research cache Approved
+End of Architecture Update – Version 2.0
+10

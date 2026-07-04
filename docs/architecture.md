@@ -105,6 +105,10 @@ The live engine flow is:
 6. Send order through OANDA adapter.
 7. Persist order, execution, and audit records in PostgreSQL.
 
+Live Trading Engine 2.0 is event-driven. Market stream events flow through a Live Event Bus, live feature generation, market regime detection, Strategy Selector, Trade Decision Engine, Signal Generator, Live Risk Controller, Execution Manager, Position Monitor, State Store, Recovery Manager, and Synchronization Manager.
+
+The Trade Decision Engine sits between strategy selection and signal generation. It asks whether QuantForge should trade right now based on spread, news windows, portfolio exposure, correlated positions, daily loss limits, market quality, broker health, and connection status. This keeps strategy logic clean while centralizing production trading permissions.
+
 ## Safety Rules
 
 - Research code must not place live orders.

@@ -235,6 +235,12 @@ Autonomous Research Validation runs the full research lifecycle as one reproduci
 
 This stage measures platform process quality rather than trading profitability. It proves that QuantForge AI can complete at least 100 experiments without manual intervention, reject invalid or statistically weak candidates, preserve every decision trace, and publish only fully validated Strategy Assets to the catalog.
 
+### Live Trading Engine
+
+The Live Trading Engine consumes approved Strategy Assets from production management. It is event-driven around market, session, price, order, position, heartbeat, connection, spread, recovery, and synchronization events.
+
+Live execution uses a Trade Decision Engine before signal generation. The decision engine checks spread, news windows, portfolio exposure, daily loss, broker health, and connection status so strategy code only expresses market logic while production trading permissions remain centralized.
+
 ### Strategy Ranking Engine
 
 Ranks validated strategies with configurable weighted metrics such as profit factor, Sharpe ratio, max drawdown, walk-forward score, Monte Carlo score, trade count, and cross-pair stability.

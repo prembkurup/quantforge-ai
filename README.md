@@ -63,6 +63,7 @@ docs/
   strategy-validation-platform.md
   production-strategy-management.md
   autonomous-research-validation.md
+  live-trading-engine.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -155,6 +156,12 @@ Run the Autonomous Research Validation demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\autonomous_research.py
+```
+
+Run the Live Trading Engine demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\live_trading.py
 ```
 
 ## Foundation Setup

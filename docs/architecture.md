@@ -87,6 +87,8 @@ The research engine defines experiments, discovers plugins, expands parameter te
 
 QuantForge AI treats promoted strategies as immutable Strategy Assets. A Strategy Asset includes the definition, plugin versions, parameters, feature versions, decision trace, optimization report, validation report, Strategy Passport, deployment history, and live performance history.
 
+Production Strategy Management is the bridge from research to live trading. Approved Strategy Assets enter a Strategy Catalog, move through the Strategy Registry and Deployment Manager, are assembled into portfolios, receive capital allocations and schedules, then progress from paper trading to production. Live performance is compared with research performance to detect drift, update the Knowledge Base, and retire degraded strategies automatically.
+
 ## Live Execution
 
 OANDA is the execution adapter for live orders.

@@ -53,6 +53,7 @@
 ## Phase 5: Live Engine
 
 - Load approved strategy candidates only.
+- Add Production Strategy Management Platform with Strategy Catalog, Strategy Registry, Deployment Manager, Portfolio Manager, Capital Allocator, Scheduler, Drift Detector, Live Performance Monitor, Retirement Manager, Strategy Marketplace, and Production Dashboard.
 - Use Redis for latest live cache.
 - Evaluate signals on completed candles.
 - Enforce risk checks before execution.

@@ -222,6 +222,12 @@ The Strategy Validation Platform is the QA department for QuantForge AI. It runs
 
 Validated strategies receive a permanent Strategy Passport and become immutable Strategy Assets containing the strategy definition, plugin versions, parameters, feature versions, decision trace, optimization report, validation report, passport, deployment history, and live performance history.
 
+### Production Strategy Management
+
+Production treats Strategy Assets like installable apps. The Strategy Catalog stores every asset and version; the Strategy Registry tracks active, inactive, paper, production, deprecated, and retired states; the Deployment Manager installs, upgrades, rolls back, disables, promotes, and archives assets.
+
+The Portfolio Manager activates groups of strategies, the Capital Allocator assigns portfolio weights, the Strategy Scheduler controls sessions and timeframes, the Live Performance Monitor compares research versus live behavior, and the Retirement Manager removes degraded strategies automatically.
+
 ### Strategy Ranking Engine
 
 Ranks validated strategies with configurable weighted metrics such as profit factor, Sharpe ratio, max drawdown, walk-forward score, Monte Carlo score, trade count, and cross-pair stability.

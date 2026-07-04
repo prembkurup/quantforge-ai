@@ -61,6 +61,7 @@ docs/
   optimization-laboratory.md
   backtesting-engine.md
   strategy-validation-platform.md
+  production-strategy-management.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -140,6 +141,12 @@ Run the Strategy Validation Platform demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\validate_strategy.py
+```
+
+Run the Production Strategy Management demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\deploy_strategy.py
 ```
 
 ## Foundation Setup

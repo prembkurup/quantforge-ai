@@ -77,6 +77,24 @@ def test_pipeline_snapshot_combines_page_payload_for_fast_loading() -> None:
     assert snapshot["tasks"]
     assert snapshot["engines"]
     assert len(snapshot["workload"]) == len(snapshot["engines"])
+    assert snapshot["full_history"]["planned_jobs"] >= 1
+    assert snapshot["full_history"]["jobs"]
+
+
+def test_full_history_research_lists_configured_pairs_timeframes_and_jobs() -> None:
+    response = client.get("/api/full-history/research")
+
+    assert response.status_code == 200
+    payload = response.json()
+    symbols = {row["symbol"] for row in payload["pairs"]}
+    timeframes = {row["timeframe"] for row in payload["timeframes"]}
+    assert {"EUR_USD", "GBP_USD", "USD_JPY", "NAS100_USD", "SPX500_USD"} <= symbols
+    assert {"M15", "H1", "H4"} <= timeframes
+    assert payload["pair_count"] == 5
+    assert payload["timeframe_count"] == 3
+    assert payload["pair_timeframe_count"] == 15
+    assert payload["scheduler"]["jobs"]
+    assert payload["coverage"]
 
 
 def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:

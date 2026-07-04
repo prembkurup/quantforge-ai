@@ -10,6 +10,10 @@ from typing import Protocol
 from quantforge.research.database_library import DatabaseResearchScope, ResearchCandleRepository
 from quantforge.research.workstream_pipeline import Workstream1PipelineRunner, WorkstreamPipelineResult
 
+FULL_HISTORY_RESEARCH_PAIRS = ("EUR_USD", "GBP_USD", "USD_JPY", "NAS100_USD", "SPX500_USD")
+FULL_HISTORY_RESEARCH_TIMEFRAMES = ("M15", "H1", "H4")
+FULL_HISTORY_RESEARCH_START = datetime(2016, 1, 4, tzinfo=timezone.utc)
+
 
 class FullHistoryStage(StrEnum):
     COVERAGE = "COVERAGE"

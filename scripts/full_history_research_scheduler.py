@@ -7,6 +7,8 @@ from pathlib import Path
 from quantforge.config.settings import get_settings
 from quantforge.market_data.coreui_repository import CoreUiCandleRepository, get_coreui_history_engine
 from quantforge.research.full_history_scheduler import (
+    FULL_HISTORY_RESEARCH_PAIRS,
+    FULL_HISTORY_RESEARCH_TIMEFRAMES,
     FullHistoryResearchScheduler,
     FullHistorySchedulerConfig,
 )
@@ -16,8 +18,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run resumable staged research over the full CoreUI/OANDA candle history."
     )
-    parser.add_argument("--pairs", default="EUR_USD,GBP_USD,USD_JPY")
-    parser.add_argument("--timeframes", default="M15,H1,H4")
+    parser.add_argument("--pairs", default=",".join(FULL_HISTORY_RESEARCH_PAIRS))
+    parser.add_argument("--timeframes", default=",".join(FULL_HISTORY_RESEARCH_TIMEFRAMES))
     parser.add_argument("--from", dest="start", default="2016-01-04")
     parser.add_argument("--to", dest="end", default=date.today().isoformat())
     parser.add_argument("--state-file", default="var/full_history_research_state.json")

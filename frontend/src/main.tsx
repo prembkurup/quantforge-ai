@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
-import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, HeartPulse, Library, LineChart, ListChecks, ScrollText, ShieldCheck } from "lucide-react";
+import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, HeartPulse, Library, LineChart, ListChecks, ScrollText, ShieldCheck } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
 import "./styles.css";
@@ -45,6 +45,7 @@ function App() {
               <Route path="/" element={<Overview />} />
               <Route path="/research" element={<Research />} />
               <Route path="/pipeline" element={<Pipeline />} />
+              <Route path="/full-history" element={<FullHistoryResearch />} />
               <Route path="/strategies" element={<Strategies />} />
               <Route path="/strategies/:id" element={<StrategyDetail />} />
               <Route path="/indicators" element={<Indicators />} />
@@ -67,6 +68,7 @@ function Sidebar() {
     ["/", "Overview", Activity],
     ["/research", "Research", LineChart],
     ["/pipeline", "Pipeline", ListChecks],
+    ["/full-history", "Full History", Database],
     ["/strategies", "Strategies", Library],
     ["/indicators", "Indicators", BookOpen],
     ["/portfolio", "Portfolio", ShieldCheck],
@@ -176,8 +178,16 @@ function Research() {
 
 function Pipeline() {
   const snapshot = useApi<any>("/api/pipeline/snapshot");
+  const [fullHistoryPage, setFullHistoryPage] = React.useState(1);
   if (!snapshot) return <Loading />;
   const { summary, current_task: current, tasks, engines, workload, full_history } = snapshot;
+  const fullHistoryJobs = full_history?.jobs ?? [];
+  const fullHistoryPageSize = 30;
+  const fullHistoryTotalPages = Math.max(1, Math.ceil(fullHistoryJobs.length / fullHistoryPageSize));
+  const fullHistoryRows = fullHistoryJobs.slice(
+    (fullHistoryPage - 1) * fullHistoryPageSize,
+    fullHistoryPage * fullHistoryPageSize
+  );
   return (
     <Page title="Pipeline / Engine Monitor">
       <div className="kpi-grid">
@@ -243,7 +253,18 @@ function Pipeline() {
         <DataTable title="Current Status of All Engines" rows={engines} />
       </div>
       <DataTable title="Tasks in the Pipeline" rows={tasks} />
-      {full_history?.jobs?.length ? <DataTable title="Recent Full History Scheduler Jobs" rows={full_history.jobs} /> : null}
+      {fullHistoryJobs.length ? (
+        <>
+          <DataTable title={`Full History Scheduler Jobs (${fullHistoryJobs.length})`} rows={fullHistoryRows} />
+          <PaginationControls
+            page={fullHistoryPage}
+            totalPages={fullHistoryTotalPages}
+            pageSize={fullHistoryPageSize}
+            totalRows={fullHistoryJobs.length}
+            onPageChange={setFullHistoryPage}
+          />
+        </>
+      ) : null}
     </Page>
   );
 }
@@ -303,6 +324,35 @@ function Indicators() {
       </div>
       <input className="input" placeholder="Filter by indicator, category, purpose, or engine usage..." value={query} onChange={(event) => setQuery(event.target.value)} />
       <DataTable title={`Indicator / Calculator Reference (${filtered.length})`} rows={filtered} />
+    </Page>
+  );
+}
+
+function FullHistoryResearch() {
+  const data = useApi<any>("/api/full-history/research");
+  if (!data) return <Loading />;
+  const scheduler = data.scheduler ?? {};
+  const coverage = data.coverage ?? [];
+  const pairs = data.pairs ?? [];
+  const timeframes = data.timeframes ?? [];
+  return (
+    <Page title="Full History Research">
+      <div className="kpi-grid">
+        <KpiCard title="Pairs / Instruments" value={data.pair_count} tone="good" />
+        <KpiCard title="Timeframes" value={data.timeframe_count} />
+        <KpiCard title="Pair-Timeframe Tests" value={data.pair_timeframe_count} />
+        <KpiCard title="Scheduler Jobs" value={scheduler.planned_jobs ?? 0} />
+        <KpiCard title="Completed Jobs" value={scheduler.completed_jobs ?? 0} tone="good" />
+        <KpiCard title="Failed Jobs" value={scheduler.failed_jobs ?? 0} tone={scheduler.failed_jobs ? "warn" : "good"} />
+        <KpiCard title="Pending Jobs" value={scheduler.pending_jobs ?? 0} />
+        <KpiCard title="Progress" value={`${scheduler.progress_percent ?? 0}%`} />
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <DataTable title={`Pairs / Instruments (${pairs.length})`} rows={pairs} />
+        <DataTable title={`Timeframes (${timeframes.length})`} rows={timeframes} />
+      </div>
+      <DataTable title={`Full History Candle Coverage (${coverage.length})`} rows={coverage} />
+      <JsonPanel title="Scheduler Status" data={{ status: scheduler.status, latest_job: scheduler.latest_job, state_file: scheduler.state_file, database_status: data.database_status }} />
     </Page>
   );
 }

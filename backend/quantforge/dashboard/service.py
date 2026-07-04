@@ -1,13 +1,24 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import text
+
+from quantforge.config.settings import get_settings
 from quantforge.infrastructure.operations import AutonomousOperationsManager
 from quantforge.live.shadow import ShadowTradingPlatform
+from quantforge.market_data.coreui_repository import get_coreui_history_engine
 from quantforge.research.campaign import ResearchProgramFamily
+from quantforge.research.full_history_scheduler import (
+    FULL_HISTORY_RESEARCH_PAIRS,
+    FULL_HISTORY_RESEARCH_START,
+    FULL_HISTORY_RESEARCH_TIMEFRAMES,
+    FullHistoryResearchScheduler,
+    FullHistorySchedulerConfig,
+)
 from quantforge.research.library import InstitutionalStrategyLibraryBuilder, StrategyLibraryAsset
 
 
@@ -229,31 +240,34 @@ class DashboardService:
         ]
 
     def full_history_scheduler_status(self) -> dict[str, Any]:
-        state_file = Path(__file__).resolve().parents[3] / "var" / "full_history_research_state.json"
-        planned_jobs = 126
+        state_file = _full_history_state_file()
+        planned_jobs = _planned_full_history_jobs(state_file)
         if not state_file.exists():
             return {
                 "status": "PENDING",
-                "planned_jobs": planned_jobs,
+                "planned_jobs": len(planned_jobs),
                 "completed_jobs": 0,
                 "failed_jobs": 0,
-                "pending_jobs": planned_jobs,
+                "pending_jobs": len(planned_jobs),
                 "progress_percent": 0,
                 "latest_job": "No scheduler state yet",
                 "latest_recorded_at": "",
                 "state_file": str(state_file),
-                "jobs": [],
+                "jobs": _full_history_job_rows(planned_jobs, {}, set(), set()),
             }
         state = json.loads(state_file.read_text(encoding="utf-8"))
-        completed = len(state.get("completed", []))
-        failed = len(state.get("failed", []))
+        completed_ids = set(state.get("completed", []))
+        failed_ids = set(state.get("failed", []))
         history = list(state.get("history", []))
+        history_by_id = {str(item.get("job_id", "")): item for item in history}
         latest = history[-1] if history else {}
-        pending = max(0, planned_jobs - completed - failed)
-        progress = round(((completed + failed) / planned_jobs) * 100) if planned_jobs else 0
+        completed = sum(1 for job in planned_jobs if job.job_id in completed_ids)
+        failed = sum(1 for job in planned_jobs if job.job_id in failed_ids)
+        pending = max(0, len(planned_jobs) - completed - failed)
+        progress = round(((completed + failed) / len(planned_jobs)) * 100) if planned_jobs else 0
         return {
             "status": "RUNNING" if pending else "COMPLETE",
-            "planned_jobs": planned_jobs,
+            "planned_jobs": len(planned_jobs),
             "completed_jobs": completed,
             "failed_jobs": failed,
             "pending_jobs": pending,
@@ -261,19 +275,28 @@ class DashboardService:
             "latest_job": latest.get("job_id", "No completed job yet"),
             "latest_recorded_at": latest.get("recorded_at", ""),
             "state_file": str(state_file),
-            "jobs": [
-                {
-                    "stage": item.get("stage", ""),
-                    "pair": item.get("pair", ""),
-                    "timeframe": item.get("timeframe", ""),
-                    "status": item.get("status", ""),
-                    "start": item.get("start", ""),
-                    "end": item.get("end", ""),
-                    "evidence": item.get("evidence", ""),
-                    "recorded_at": item.get("recorded_at", ""),
-                }
-                for item in reversed(history[-10:])
+            "jobs": _full_history_job_rows(planned_jobs, history_by_id, completed_ids, failed_ids),
+        }
+
+    def full_history_research(self) -> dict[str, Any]:
+        status = self.full_history_scheduler_status()
+        coverage_rows, database_status, error = _full_history_coverage_rows()
+        return {
+            "pair_count": len(FULL_HISTORY_RESEARCH_PAIRS),
+            "timeframe_count": len(FULL_HISTORY_RESEARCH_TIMEFRAMES),
+            "pair_timeframe_count": len(FULL_HISTORY_RESEARCH_PAIRS)
+            * len(FULL_HISTORY_RESEARCH_TIMEFRAMES),
+            "pairs": [
+                {"pair": _display_pair(pair), "symbol": pair, "type": _instrument_type(pair)}
+                for pair in FULL_HISTORY_RESEARCH_PAIRS
             ],
+            "timeframes": [{"timeframe": timeframe} for timeframe in FULL_HISTORY_RESEARCH_TIMEFRAMES],
+            "scheduler": status,
+            "coverage": coverage_rows,
+            "database_status": database_status,
+            "error": error,
+            "source": "FullHistoryResearchScheduler + CoreUI/OANDA candle database",
+            "timestamp": self._timestamp,
         }
 
     def engine_status(self) -> list[dict[str, Any]]:
@@ -639,6 +662,129 @@ class DashboardService:
             if asset.asset_id == strategy_id:
                 return asset
         raise KeyError(strategy_id)
+
+
+def _full_history_state_file() -> Path:
+    return Path(__file__).resolve().parents[3] / "var" / "full_history_research_state.json"
+
+
+def _full_history_config() -> FullHistorySchedulerConfig:
+    today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    return FullHistorySchedulerConfig(
+        pairs=FULL_HISTORY_RESEARCH_PAIRS,
+        timeframes=FULL_HISTORY_RESEARCH_TIMEFRAMES,
+        start=FULL_HISTORY_RESEARCH_START,
+        end=today_start + timedelta(days=1),
+    )
+
+
+def _planned_full_history_jobs(state_file: Path) -> tuple[Any, ...]:
+    scheduler = FullHistoryResearchScheduler(
+        config=_full_history_config(),
+        state_file=state_file,
+        repository_factory=lambda: None,  # type: ignore[arg-type]
+    )
+    return scheduler.plan()
+
+
+def _full_history_job_rows(
+    planned_jobs: tuple[Any, ...],
+    history_by_id: dict[str, Any],
+    completed_ids: set[str],
+    failed_ids: set[str],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for job in planned_jobs:
+        history = history_by_id.get(job.job_id, {})
+        if job.job_id in completed_ids:
+            status = "COMPLETE"
+        elif job.job_id in failed_ids:
+            status = "FAILED"
+        else:
+            status = "PENDING"
+        rows.append(
+            {
+                "job_id": job.job_id,
+                "stage": job.stage.value,
+                "pair": _display_pair(job.pair),
+                "timeframe": job.timeframe,
+                "status": status,
+                "start": job.start.date().isoformat(),
+                "end": job.end.date().isoformat(),
+                "max_batches": job.max_batches,
+                "evidence": history.get("evidence", ""),
+                "recorded_at": history.get("recorded_at", ""),
+            }
+        )
+    return rows
+
+
+def _full_history_coverage_rows() -> tuple[list[dict[str, Any]], str, str]:
+    rows_by_key: dict[tuple[str, str], Any] = {}
+    try:
+        settings = get_settings()
+        pair_values = ", ".join(f"'{pair}'" for pair in FULL_HISTORY_RESEARCH_PAIRS)
+        timeframe_values = ", ".join(f"'{timeframe}'" for timeframe in FULL_HISTORY_RESEARCH_TIMEFRAMES)
+        sql = text(
+            f"""
+            SELECT pair_name, granularity, COUNT(*) AS candles, MIN(time) AS first_time, MAX(time) AS last_time
+            FROM {settings.coreui_candle_table}
+            WHERE complete = true
+              AND pair_name IN ({pair_values})
+              AND granularity IN ({timeframe_values})
+            GROUP BY pair_name, granularity
+            ORDER BY pair_name, granularity
+            """
+        )
+        with get_coreui_history_engine().connect() as connection:
+            for row in connection.execute(sql).mappings():
+                rows_by_key[(str(row["pair_name"]), str(row["granularity"]))] = row
+        database_status = "available"
+        error = ""
+    except Exception as exc:
+        database_status = "unavailable"
+        error = str(exc)
+
+    rows: list[dict[str, Any]] = []
+    for pair in FULL_HISTORY_RESEARCH_PAIRS:
+        for timeframe in FULL_HISTORY_RESEARCH_TIMEFRAMES:
+            item = rows_by_key.get((pair, timeframe), {})
+            first_time = item.get("first_time")
+            last_time = item.get("last_time")
+            rows.append(
+                {
+                    "pair": _display_pair(pair),
+                    "symbol": pair,
+                    "timeframe": timeframe,
+                    "candles": int(item.get("candles", 0) or 0),
+                    "first_candle": _date_string(first_time),
+                    "last_candle": _date_string(last_time),
+                    "years": _years_between(first_time, last_time),
+                    "scheduler_start": FULL_HISTORY_RESEARCH_START.date().isoformat(),
+                    "status": "CONFIGURED" if item else "CONFIGURED_NO_DB_COUNT",
+                }
+            )
+    return rows, database_status, error
+
+
+def _display_pair(pair: str) -> str:
+    return {"NAS100_USD": "NAS100", "SPX500_USD": "SPX500"}.get(pair, pair)
+
+
+def _instrument_type(pair: str) -> str:
+    return "index" if pair in {"NAS100_USD", "SPX500_USD"} else "fx"
+
+
+def _date_string(value: Any) -> str:
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    return str(value)[:10] if value else ""
+
+
+def _years_between(first_time: Any, last_time: Any) -> float:
+    if not isinstance(first_time, datetime) or not isinstance(last_time, datetime):
+        return 0.0
+    return round((last_time - first_time).days / 365.25, 2)
 
 
 def _strategy_row(asset: StrategyLibraryAsset) -> dict[str, Any]:

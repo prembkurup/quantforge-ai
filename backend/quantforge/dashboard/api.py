@@ -74,6 +74,10 @@ def create_app() -> FastAPI:
     def pipeline_workload() -> list[dict[str, Any]]:
         return service.engine_workload()
 
+    @app.get("/api/full-history/research")
+    def full_history_research() -> dict[str, Any]:
+        return service.full_history_research()
+
     @app.get("/api/strategies")
     def strategies() -> list[dict[str, Any]]:
         return service.strategies()

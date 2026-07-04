@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
-import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, HeartPulse, Library, LineChart, ListChecks, ScrollText, ShieldCheck } from "lucide-react";
+import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, HeartPulse, Library, LineChart, ListChecks, Menu, ScrollText, ShieldCheck, X } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
 import "./styles.css";
@@ -34,11 +34,21 @@ function useApi<T>(path: string): T | null {
 }
 
 function App() {
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   return (
     <BrowserRouter>
-      <div className="app-wrapper dashboard-shell sidebar-expand-lg min-h-screen bg-slate-950 text-slate-100" data-bs-theme="dark">
-        <Sidebar />
-        <Header />
+      <div
+        className={`app-wrapper dashboard-shell sidebar-expand-lg min-h-screen bg-slate-950 text-slate-100 ${mobileNavOpen ? "mobile-nav-open" : ""}`}
+        data-bs-theme="dark"
+      >
+        <Sidebar isOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+        <button
+          aria-label="Close navigation"
+          className="mobile-nav-backdrop"
+          onClick={() => setMobileNavOpen(false)}
+          type="button"
+        />
+        <Header onOpenNav={() => setMobileNavOpen(true)} />
         <main className="app-main dashboard-main min-h-screen">
           <section className="app-content dashboard-content px-5 py-4 lg:px-8">
             <Routes>
@@ -63,7 +73,7 @@ function App() {
   );
 }
 
-function Sidebar() {
+function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const links = [
     ["/", "Overview", Activity],
     ["/research", "Research", LineChart],
@@ -79,19 +89,30 @@ function Sidebar() {
     ["/help", "Manual / Help", CircleHelp]
   ] as const;
   return (
-    <aside className="app-sidebar sidebar-dark-primary dashboard-sidebar border-r border-slate-800 bg-slate-950" data-bs-theme="dark">
+    <aside
+      aria-label="Main navigation"
+      className={`app-sidebar sidebar-dark-primary dashboard-sidebar border-r border-slate-800 bg-slate-950 ${isOpen ? "mobile-open" : ""}`}
+      data-bs-theme="dark"
+    >
       <div className="sidebar-brand dashboard-brand border-0">
         <div className="brand-link text-slate-100">
           <span className="brand-text text-lg font-semibold">QuantForge AI</span>
         </div>
         <div className="text-xs text-slate-400">Production Research Dashboard</div>
+        <button aria-label="Close navigation" className="mobile-nav-close" onClick={onClose} type="button">
+          <X size={18} />
+        </button>
       </div>
       <div className="sidebar-wrapper">
         <nav className="mt-2">
           <ul className="nav nav-pills nav-sidebar dashboard-nav flex-column" role="menu">
             {links.map(([to, label, Icon]) => (
               <li className="nav-item" key={to}>
-                <NavLink to={to} className={({ isActive }) => `nav-link ${isActive ? "nav-link-active active" : ""}`}>
+                <NavLink
+                  to={to}
+                  className={({ isActive }) => `nav-link ${isActive ? "nav-link-active active" : ""}`}
+                  onClick={onClose}
+                >
                   <Icon className="nav-icon" size={17} />
                   <p>{label}</p>
                 </NavLink>
@@ -104,11 +125,14 @@ function Sidebar() {
   );
 }
 
-function Header() {
+function Header({ onOpenNav }: { onOpenNav: () => void }) {
   return (
     <header className="app-header navbar navbar-expand dashboard-header sticky top-0 z-20 px-5 py-3 lg:px-8">
       <div className="dashboard-header-inner flex flex-wrap items-center justify-between gap-3">
         <div className="dashboard-header-brand">
+          <button aria-label="Open navigation" className="mobile-nav-toggle" onClick={onOpenNav} type="button">
+            <Menu size={20} />
+          </button>
           <div className="dashboard-header-mark">
             <Activity size={19} />
           </div>

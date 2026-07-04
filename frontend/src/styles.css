@@ -111,6 +111,7 @@ body {
 }
 
 .dashboard-brand {
+  position: relative;
   display: flex;
   align-items: flex-start;
   flex-direction: column;
@@ -119,6 +120,32 @@ body {
   min-height: 92px;
   line-height: 1.25;
   padding: 18px 18px 14px;
+}
+
+.mobile-nav-toggle,
+.mobile-nav-close,
+.mobile-nav-backdrop {
+  display: none;
+}
+
+.mobile-nav-toggle,
+.mobile-nav-close {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 8px;
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.82);
+}
+
+.mobile-nav-toggle:hover,
+.mobile-nav-close:hover {
+  color: #f8fafc;
+  border-color: rgba(34, 211, 238, 0.5);
+  background: rgba(23, 32, 51, 0.96);
 }
 
 .dashboard-nav {
@@ -533,6 +560,64 @@ body {
 }
 
 @media (max-width: 640px) {
+  .dashboard-shell {
+    display: block;
+  }
+
+  .dashboard-header,
+  .dashboard-main {
+    margin-left: 0 !important;
+  }
+
+  .dashboard-sidebar {
+    position: fixed !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    width: min(82vw, 18rem);
+    min-width: 0;
+    max-width: min(82vw, 18rem);
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+    border-right: 1px solid #1e293b;
+  }
+
+  .dashboard-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .dashboard-sidebar .sidebar-wrapper {
+    height: calc(100vh - 5.75rem);
+  }
+
+  .mobile-nav-open {
+    overflow: hidden;
+  }
+
+  .mobile-nav-open .mobile-nav-backdrop {
+    display: block;
+  }
+
+  .mobile-nav-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    border: 0;
+    background: rgba(2, 6, 23, 0.68);
+  }
+
+  .mobile-nav-toggle,
+  .mobile-nav-close {
+    display: inline-flex;
+  }
+
+  .mobile-nav-close {
+    position: absolute;
+    top: 16px;
+    right: 14px;
+  }
+
   .dashboard-header-inner,
   .dashboard-content,
   .page-shell {
@@ -541,6 +626,22 @@ body {
 
   .dashboard-header {
     padding: 18px 16px;
+  }
+
+  .dashboard-header-brand {
+    gap: 10px;
+  }
+
+  .dashboard-header-brand h1 {
+    font-size: 1.05rem;
+  }
+
+  .dashboard-header-brand p {
+    font-size: 0.8rem;
+  }
+
+  .dashboard-header-mark {
+    display: none;
   }
 
   .dashboard-content {

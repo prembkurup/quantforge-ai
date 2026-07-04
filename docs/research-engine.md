@@ -54,13 +54,15 @@ Calculations are derived inputs used inside features and templates. Indicators a
 10. Plugin Framework
 11. Strategy Template Selection
 12. Strategy Composer
-13. Parameter Generation
-14. Optimization
-15. Backtesting
-16. Validation
-17. Ranking
-18. Research Analytics
-19. Strategy Publishing
+13. Structural Validation
+14. Complexity and Diversity Filtering
+15. Parameter Generation
+16. Optimization
+17. Backtesting
+18. Validation
+19. Ranking
+20. Research Analytics
+21. Strategy Publishing
 
 ## Engine Responsibilities
 
@@ -173,7 +175,23 @@ Provides reusable blueprints such as trend pullback, breakout, mean reversion, v
 
 ### Strategy Composer
 
-Assembles candidate strategies by selecting a template and compatible market-regime, entry, confirmation, exit, risk, and trade-management plugins. It never performs optimization. The orchestrator decides what should be built; the composer decides how the reusable parts fit together.
+Assembles candidate strategies by satisfying research constraints with compatible market-regime, entry, confirmation, exit, risk, and trade-management plugins. It never performs optimization and never sends invalid strategies downstream. The orchestrator decides what should be built; the composer decides which reusable parts satisfy the constraints.
+
+The composer pipeline is:
+
+```text
+Research Goal
+  -> Constraint Builder
+  -> Knowledge Base
+  -> Compatibility Engine
+  -> Dependency Engine
+  -> Strategy Graph Builder
+  -> Complexity Scoring
+  -> Diversity Filter
+  -> Candidate Strategies
+```
+
+Every candidate has a decision trace that records which hypothesis, constraints, knowledge, plugin selections, rejection reasons, complexity estimate, and diversity decision produced it.
 
 ### Parameter Generator
 

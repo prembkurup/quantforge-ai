@@ -1,6 +1,54 @@
-"""Strategy plugin contracts and discovery."""
+"""Strategy plugin contracts, discovery, and constraint-based composition."""
 
+from quantforge.strategies.composer import (
+    CandidateStrategy,
+    ComplexityAnalyzer,
+    CompatibilityEngine,
+    ConstraintBasedStrategyComposer,
+    ConstraintBuilder,
+    ConstraintOperator,
+    DecisionTrace,
+    DecisionTraceEvent,
+    DependencyEngine,
+    DiversityFilter,
+    StrategyComponent,
+    StrategyCompositionRequest,
+    StrategyCompositionResult,
+    StrategyConstraint,
+    StrategyGraph,
+    StrategyGraphBuilder,
+    StrategyGraphEdge,
+    StrategyGraphNode,
+    StrategyValidationResult,
+    StrategyValidator,
+    TraceDecision,
+    build_demo_components,
+)
 from quantforge.strategies.plugin import StrategyPlugin, StrategySignal
 
-__all__ = ["StrategyPlugin", "StrategySignal"]
-
+__all__ = [
+    "CandidateStrategy",
+    "ComplexityAnalyzer",
+    "CompatibilityEngine",
+    "ConstraintBasedStrategyComposer",
+    "ConstraintBuilder",
+    "ConstraintOperator",
+    "DecisionTrace",
+    "DecisionTraceEvent",
+    "DependencyEngine",
+    "DiversityFilter",
+    "StrategyComponent",
+    "StrategyCompositionRequest",
+    "StrategyCompositionResult",
+    "StrategyConstraint",
+    "StrategyGraph",
+    "StrategyGraphBuilder",
+    "StrategyGraphEdge",
+    "StrategyGraphNode",
+    "StrategyPlugin",
+    "StrategySignal",
+    "StrategyValidationResult",
+    "StrategyValidator",
+    "TraceDecision",
+    "build_demo_components",
+]

@@ -34,7 +34,7 @@
 - Add Research Knowledge Base to remember validated findings, failed setups, and research evidence before plugin and template selection.
 - Add Research Orchestrator to coordinate hypotheses, datasets, features, regimes, knowledge, template/plugin selection, parameter planning, job scheduling, result collection, and next experiment planning before strategy composition.
 - Discover strategy plugins.
-- Rename the future Strategy Factory layer to Strategy Composer because it assembles candidates from reusable components instead of manufacturing strategies in isolation.
+- Add Constraint-Based Strategy Composer with constraint building, compatibility checks, dependency checks, strategy graphs, validation, complexity scoring, diversity filtering, and decision traceability.
 - Run parameter searches, optimization, backtests, and validation inside experiments.
 - Store experiment lineage, analytics, and final metrics.
 - Export research cache to Parquet.

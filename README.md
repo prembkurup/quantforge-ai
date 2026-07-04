@@ -57,6 +57,7 @@ docs/
   research-engine.md
   research-knowledge-base.md
   research-orchestrator.md
+  strategy-composer.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -112,6 +113,12 @@ Run the full research-loop queue demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\run_research.py
+```
+
+Run the constraint-based Strategy Composer demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\compose_strategy.py
 ```
 
 ## Foundation Setup

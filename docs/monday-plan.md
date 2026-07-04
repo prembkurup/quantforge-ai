@@ -35,7 +35,7 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Build Research Orchestrator to coordinate hypotheses, datasets, regimes, knowledge, experiment planning, job scheduling, result collection, and progress monitoring.
 - Implement strategy plugin discovery.
 - Implement experiment definition workflow.
-- Build Strategy Composer to assemble candidates from market-regime, entry, confirmation, exit, risk, and trade-management plugins.
+- Build Constraint-Based Strategy Composer with validation, complexity scoring, diversity filtering, and decision traceability.
 - Build first template strategy plugin.
 - Implement basic backtest runner.
 - Store experiment lineage, research run metrics, validation results, and analytics.

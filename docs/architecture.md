@@ -67,7 +67,9 @@ The Research Orchestrator turns that memory into an experiment plan. It chooses 
 
 Strategies are template-based and plugin-driven. Research is organized around experiments, not indicators. An experiment binds the dataset, feature set, strategy template, plugin versions, parameter search, validation results, analytics, and any published strategy versions.
 
-The Strategy Composer is the assembly layer that replaces the old Strategy Factory name. The orchestrator decides what should be built; the composer assembles a candidate from reusable market-regime, entry, confirmation, exit, risk, and trade-management plugins.
+The Strategy Composer is a constraint-based assembly layer. The orchestrator decides what should be built; the composer asks which reusable market-regime, entry, confirmation, exit, risk, and trade-management plugins satisfy the research constraints. It validates structure, estimates complexity, removes near-duplicates, and only then sends candidates to optimization.
+
+Every composer decision must be traceable: the hypothesis, applied constraints, knowledge influence, selected plugins, rejection reasons, complexity estimate, and diversity decision are recorded before optimization begins.
 
 A strategy plugin declares:
 

@@ -102,13 +102,14 @@ class DashboardService:
 
     def pipeline_summary(self) -> dict[str, Any]:
         tasks = self.pipeline_tasks()
-        engines = self.engine_status()
-        return self._pipeline_summary_from(tasks, engines)
+        full_history = self.full_history_scheduler_status()
+        engines = self.engine_status(full_history)
+        return self._pipeline_summary_from(tasks, engines, full_history)
 
     def pipeline_snapshot(self) -> dict[str, Any]:
-        tasks = self.pipeline_tasks()
-        engines = self.engine_status()
         full_history = self.full_history_scheduler_status()
+        tasks = self.pipeline_tasks()
+        engines = self.engine_status(full_history)
         return {
             "summary": self._pipeline_summary_from(tasks, engines, full_history),
             "current_task": self.pipeline_current_task(),
@@ -126,9 +127,19 @@ class DashboardService:
         full_history: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         full_history = full_history or self.full_history_scheduler_status()
+        pipeline_done = _full_history_pipeline_done(full_history)
+        failed = full_history["failed_jobs"]
         return {
-            "pipeline_status": "RUNNING",
-            "current_task": "Full-history research scheduler",
+            "pipeline_status": (
+                "COMPLETE_WITH_WARNINGS" if pipeline_done and failed else "COMPLETE" if pipeline_done else "RUNNING"
+            ),
+            "current_task": (
+                "Full-history research complete; review failed short-window jobs"
+                if pipeline_done and failed
+                else "Full-history research complete"
+                if pipeline_done
+                else "Full-history research scheduler"
+            ),
             "active_engines": sum(1 for engine in engines if engine["status"] == "RUNNING"),
             "healthy_engines": sum(1 for engine in engines if engine["health"] == "HEALTHY"),
             "total_engines": len(engines),
@@ -137,7 +148,7 @@ class DashboardService:
             "completed_tasks": sum(1 for task in tasks if task["status"] == "COMPLETE"),
             "blocked_tasks": sum(1 for task in tasks if task["status"] == "BLOCKED"),
             "overall_progress": full_history["progress_percent"],
-            "queue_depth": 2,
+            "queue_depth": 0 if pipeline_done else 2,
             "full_history_completed_jobs": full_history["completed_jobs"],
             "full_history_failed_jobs": full_history["failed_jobs"],
             "full_history_planned_jobs": full_history["planned_jobs"],
@@ -154,15 +165,24 @@ class DashboardService:
         status = full_history["status"]
         latest_job = full_history["latest_job"]
         timestamp = datetime.now(UTC).isoformat()
+        pipeline_done = _full_history_pipeline_done(full_history)
         return {
             "task_id": "FH-SCHEDULER",
-            "task": "Run full-history research scheduler",
-            "status": status,
+            "task": (
+                "Review full-history research completion"
+                if pipeline_done and failed
+                else "Run full-history research scheduler"
+            ),
+            "status": "COMPLETE_WITH_WARNINGS" if pipeline_done and failed else status,
             "engine": "Research Orchestrator",
-            "stage": "24/7 worker, 3 parallel scheduler jobs",
+            "stage": (
+                "Full-history complete; worker idle watcher"
+                if pipeline_done
+                else "24/7 worker, 3 parallel scheduler jobs"
+            ),
             "progress": full_history["progress_percent"],
             "started_at": full_history["latest_recorded_at"] or timestamp,
-            "eta": "continuous 24/7 worker",
+            "eta": "done; worker watching for new jobs" if pipeline_done else "continuous 24/7 worker",
             "input": f"{planned} planned jobs; {pending} pending",
             "output": "Full-history research job state and validated strategy assets",
             "last_event": f"{completed}/{planned} complete; {failed} failed; latest: {latest_job}",
@@ -171,6 +191,19 @@ class DashboardService:
 
     def pipeline_tasks(self) -> list[dict[str, Any]]:
         full_history = self.full_history_scheduler_status()
+        pipeline_done = _full_history_pipeline_done(full_history)
+        validation_status = "COMPLETE" if pipeline_done else "RUNNING"
+        validation_progress = 100 if pipeline_done else 72
+        validation_eta = "done" if pipeline_done else "18 min"
+        validation_workload = (
+            "Validated assets produced across full-history jobs"
+            if pipeline_done
+            else "29 selected candidates"
+        )
+        downstream_status = "COMPLETE" if pipeline_done else "QUEUED"
+        downstream_progress = 100 if pipeline_done else 0
+        portfolio_eta = "ready" if pipeline_done else "after validation"
+        paper_eta = "ready" if pipeline_done else "after portfolio update"
         return [
             {
                 "task_id": "FH-SCHEDULER",
@@ -182,7 +215,7 @@ class DashboardService:
                     f"{full_history['completed_jobs']}/{full_history['planned_jobs']} jobs complete; "
                     f"{full_history['pending_jobs']} pending"
                 ),
-                "eta": "continuous 24/7 worker",
+                "eta": "done; worker watching" if pipeline_done else "continuous 24/7 worker",
                 "last_update": full_history["latest_recorded_at"] or self._timestamp,
             },
             {
@@ -219,31 +252,31 @@ class DashboardService:
                 "task_id": "WF1-DB-VALIDATE-004",
                 "task": "Validate database-backed Strategy Assets",
                 "engine": "Strategy Validation Engine",
-                "status": "RUNNING",
-                "progress": 72,
-                "workload": "29 selected candidates",
-                "eta": "18 min",
-                "last_update": self._timestamp,
+                "status": validation_status,
+                "progress": validation_progress,
+                "workload": validation_workload,
+                "eta": validation_eta,
+                "last_update": full_history["latest_recorded_at"] or self._timestamp,
             },
             {
                 "task_id": "WF1-PORTFOLIO-005",
                 "task": "Update portfolio construction readiness",
                 "engine": "Portfolio Engine",
-                "status": "QUEUED",
-                "progress": 0,
+                "status": downstream_status,
+                "progress": downstream_progress,
                 "workload": "validated asset set",
-                "eta": "after validation",
-                "last_update": self._timestamp,
+                "eta": portfolio_eta,
+                "last_update": full_history["latest_recorded_at"] or self._timestamp,
             },
             {
                 "task_id": "WF1-PAPER-006",
                 "task": "Refresh paper trading drift review",
                 "engine": "Shadow Trading Engine",
-                "status": "QUEUED",
-                "progress": 0,
+                "status": downstream_status,
+                "progress": downstream_progress,
                 "workload": "paper portfolio and open trades",
-                "eta": "after portfolio update",
-                "last_update": self._timestamp,
+                "eta": paper_eta,
+                "last_update": full_history["latest_recorded_at"] or self._timestamp,
             },
         ]
 
@@ -307,7 +340,25 @@ class DashboardService:
             "timestamp": self._timestamp,
         }
 
-    def engine_status(self) -> list[dict[str, Any]]:
+    def engine_status(self, full_history: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        full_history = full_history or self.full_history_scheduler_status()
+        pipeline_done = _full_history_pipeline_done(full_history)
+        if pipeline_done:
+            return [
+                _engine("Market Data Engine", "IDLE", "HEALTHY", 0, 0, "Full-history candle windows complete"),
+                _engine("Calculation Engine", "IDLE", "HEALTHY", 0, 0, "Feature calculations complete"),
+                _engine("Feature Engine", "IDLE", "HEALTHY", 0, 0, "FeatureVector batches complete"),
+                _engine("Market Regime Engine", "IDLE", "HEALTHY", 0, 0, "Regime snapshots available"),
+                _engine("Research Orchestrator", "IDLE", "HEALTHY", 0, 0, "Worker watching for new scheduler jobs"),
+                _engine("Strategy Composer", "IDLE", "HEALTHY", 0, 0, "Candidate composition complete"),
+                _engine("Optimization Engine", "IDLE", "HEALTHY", 0, 0, "Optimization gates complete"),
+                _engine("Backtesting Engine", "IDLE", "HEALTHY", 0, 0, "Backtesting batches complete"),
+                _engine("Strategy Validation Engine", "IDLE", "HEALTHY", 0, 0, "Validation batches complete"),
+                _engine("Portfolio Engine", "IDLE", "HEALTHY", 0, 0, "Portfolio readiness available"),
+                _engine("Shadow Trading Engine", "IDLE", "HEALTHY", 0, 0, "Paper trading review available"),
+                _engine("Live Trading Engine", "DISABLED", "SAFE", 0, 0, "Live execution intentionally disabled"),
+                _engine("Operations Manager", "RUNNING", "HEALTHY", 18, 0, "Monitoring services and workload"),
+            ]
         return [
             _engine("Market Data Engine", "RUNNING", "HEALTHY", 22, 0, "CoreUI candle source connected"),
             _engine("Calculation Engine", "IDLE", "HEALTHY", 0, 0, "Ready for next feature batch"),
@@ -859,6 +910,14 @@ def _engine(
         "queue_depth": queue_depth,
         "current_activity": current_activity,
     }
+
+
+def _full_history_pipeline_done(full_history: dict[str, Any]) -> bool:
+    planned = int(full_history.get("planned_jobs") or 0)
+    pending = int(full_history.get("pending_jobs") or 0)
+    completed = int(full_history.get("completed_jobs") or 0)
+    failed = int(full_history.get("failed_jobs") or 0)
+    return planned > 0 and pending == 0 and completed + failed >= planned
 
 
 def _indicator(name: str, category: str, purpose: str, used_by: str) -> dict[str, Any]:

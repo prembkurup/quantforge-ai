@@ -59,11 +59,16 @@ def test_pipeline_page_data_shows_tasks_engines_and_current_work() -> None:
     engines = client.get("/api/pipeline/engines").json()
     workload = client.get("/api/pipeline/workload").json()
 
-    assert summary["pipeline_status"] == "RUNNING"
-    assert summary["running_tasks"] >= 1
-    assert current["status"] == "RUNNING"
+    assert summary["pipeline_status"] in {"RUNNING", "COMPLETE", "COMPLETE_WITH_WARNINGS"}
+    if summary["pipeline_status"] == "RUNNING":
+        assert summary["running_tasks"] >= 1
+        assert current["status"] == "RUNNING"
+        assert any(task["status"] == "RUNNING" for task in tasks)
+    else:
+        assert summary["queue_depth"] == 0
+        assert current["status"] in {"COMPLETE", "COMPLETE_WITH_WARNINGS"}
+        assert all(task["status"] != "QUEUED" for task in tasks)
     assert current["progress"] > 0
-    assert any(task["status"] == "RUNNING" for task in tasks)
     assert any(engine["engine"] == "Live Trading Engine" for engine in engines)
     assert any(engine["status"] == "DISABLED" for engine in engines)
     assert len(workload) == len(engines)
@@ -72,8 +77,8 @@ def test_pipeline_page_data_shows_tasks_engines_and_current_work() -> None:
 def test_pipeline_snapshot_combines_page_payload_for_fast_loading() -> None:
     snapshot = client.get("/api/pipeline/snapshot").json()
 
-    assert snapshot["summary"]["pipeline_status"] == "RUNNING"
-    assert snapshot["current_task"]["status"] == "RUNNING"
+    assert snapshot["summary"]["pipeline_status"] in {"RUNNING", "COMPLETE", "COMPLETE_WITH_WARNINGS"}
+    assert snapshot["current_task"]["status"] in {"RUNNING", "COMPLETE", "COMPLETE_WITH_WARNINGS"}
     assert snapshot["tasks"]
     assert snapshot["engines"]
     assert len(snapshot["workload"]) == len(snapshot["engines"])

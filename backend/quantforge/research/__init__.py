@@ -79,6 +79,17 @@ from quantforge.research.knowledge_base import (
     RecommendationLevel,
     build_demo_knowledge_engine,
 )
+from quantforge.research.library import (
+    InstitutionalStrategyLibraryBuilder,
+    InstitutionalStrategyLibraryResult,
+    StrategyLibraryAsset,
+    StrategyLibraryDashboard,
+    StrategyLibraryKPIReport,
+    StrategyLibraryProgram,
+    StrategyLibraryReport,
+    StrategyLibraryStatus,
+    StrategyLibraryTargets,
+)
 from quantforge.research.market_regime import (
     MarketRegime,
     MarketRegimeEngine,
@@ -202,6 +213,15 @@ __all__ = [
     "RecommendationEngine",
     "RecommendationLevel",
     "build_demo_knowledge_engine",
+    "InstitutionalStrategyLibraryBuilder",
+    "InstitutionalStrategyLibraryResult",
+    "StrategyLibraryAsset",
+    "StrategyLibraryDashboard",
+    "StrategyLibraryKPIReport",
+    "StrategyLibraryProgram",
+    "StrategyLibraryReport",
+    "StrategyLibraryStatus",
+    "StrategyLibraryTargets",
     "MarketRegimeEngine",
     "MarketRegime",
     "RegimeConfidenceScore",

@@ -149,6 +149,12 @@ The acceptance manager combines evidence from production certification, institut
 
 Capital scaling is deliberately gradual. Stage A starts at small controlled capital, and progression to later stages requires successful trading days, risk compliance, operational reliability, and no critical incidents. Profitability alone never authorizes scaling.
 
+## Workstream 1 Strategy Library
+
+After Version 1.0 acceptance, Workstream 1 scales research output into an institutional strategy library. The workstream targets 500,000-1,000,000 experiments, 500-2,000 validated Strategy Assets, and 50-100 production-grade strategies.
+
+The strategy library is built across independent trend following, mean reversion, breakout, momentum, and volatility programs. Every validated asset remains reproducible, explainable, auditable, and backed by complete validation evidence. Production-grade status is intentionally more selective than validation so portfolio construction receives only a scarce, high-quality set.
+
 ## Safety Rules
 
 - Research code must not place live orders.

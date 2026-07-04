@@ -75,3 +75,7 @@
 - Add Production Acceptance and Live Capital Qualification for Version 1.0 scorecard, executive dashboard, capital scaling policy, release signoffs, and production approval.
 - Connect project tasks to Monday.com.
 - Push private repository to GitHub.
+
+## Phase 7: Institutional Scale-Out
+
+- Add Workstream 1 Strategy Library to execute 500,000-1,000,000 experiments, validate 500-2,000 Strategy Assets, publish 50-100 production-grade strategies, and prepare the library for portfolio construction.

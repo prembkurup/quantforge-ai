@@ -70,6 +70,7 @@ docs/
   institutional-research-campaign.md
   autonomous-operations-validation.md
   production-acceptance-live-capital.md
+  workstream-1-strategy-library.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -204,6 +205,12 @@ Run the Production Acceptance and Live Capital Qualification demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\production_acceptance.py
+```
+
+Run the Workstream 1 Strategy Library demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\strategy_library.py
 ```
 
 ## Foundation Setup

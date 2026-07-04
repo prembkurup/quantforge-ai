@@ -62,12 +62,16 @@ def test_scheduler_creates_complete_workstream_task_plan() -> None:
 
     schedule = Workstream1PipelineScheduler().schedule(scope)
 
-    assert len(schedule.tasks) == 5
+    assert len(schedule.tasks) == 9
     assert tuple(task.task_type for task in schedule.tasks) == (
         WorkstreamPipelineTaskType.DATABASE_CONNECTION,
         WorkstreamPipelineTaskType.CANDLE_COVERAGE_VALIDATION,
         WorkstreamPipelineTaskType.REAL_EXPERIMENT_BATCHES,
         WorkstreamPipelineTaskType.CANDIDATE_ASSET_GENERATION,
+        WorkstreamPipelineTaskType.OPTIMIZATION,
+        WorkstreamPipelineTaskType.BACKTESTING,
+        WorkstreamPipelineTaskType.VALIDATION,
+        WorkstreamPipelineTaskType.STRATEGY_ASSET_PUBLICATION,
         WorkstreamPipelineTaskType.PIPELINE_REPORT,
     )
     assert all(task.status == WorkstreamPipelineTaskStatus.PENDING for task in schedule.tasks)
@@ -77,25 +81,32 @@ def test_pipeline_runs_database_backed_workstream_to_completion() -> None:
     result = Workstream1PipelineRunner(FakeCandleRepository()).run(_scope())
 
     assert result.successful is True
-    assert len(result.completed_tasks) == 5
+    assert len(result.completed_tasks) == 9
     assert result.failed_tasks == ()
-    assert result.report.completed_tasks == 5
+    assert result.report.completed_tasks == 9
     assert result.report.failed_tasks == 0
     assert result.report.stored_candles >= 700
     assert result.report.real_experiment_batches == 12
     assert result.report.database_backed_candidate_assets == 12
+    assert result.report.optimized_candidates == 3
+    assert result.report.backtested_candidates == 3
+    assert result.report.validated_strategy_assets == 3
+    assert len(result.validated_assets) == 3
+    assert all(asset.strategy_asset.passport.production for asset in result.validated_assets)
     assert result.report.archived is True
     assert result.audit_trail
 
 
-def test_pipeline_reports_failed_coverage_without_publishing_assets() -> None:
+def test_pipeline_reports_failed_coverage_without_validated_assets() -> None:
     result = Workstream1PipelineRunner(FakeCandleRepository(duplicates=1)).run(_scope())
 
     assert result.successful is False
-    assert len(result.failed_tasks) == 3
-    assert result.report.failed_tasks == 3
+    assert len(result.failed_tasks) == 7
+    assert result.report.failed_tasks == 7
     assert result.report.real_experiment_batches == 0
     assert result.report.database_backed_candidate_assets == 0
+    assert result.report.validated_strategy_assets == 0
+    assert result.validated_assets == ()
     assert result.schedule.tasks[1].status == WorkstreamPipelineTaskStatus.FAILED
 
 
@@ -108,4 +119,5 @@ def _scope() -> DatabaseResearchScope:
         window_candles=100,
         stride_candles=50,
         max_batches=12,
+        max_assets_to_validate=3,
     )

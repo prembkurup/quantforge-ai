@@ -57,3 +57,4 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Implement Workstream 1 Strategy Library for 500,000-1,000,000 experiments, 500-2,000 validated Strategy Assets, 50-100 production-grade strategies, dashboard, report, audit trail, and reproducibility key.
 - Wire Workstream 1 to real CoreUI/OANDA candle database windows for database-backed experiment batches and candidate Strategy Assets.
 - Schedule and run Workstream 1 as a database-backed pipeline with task-level evidence and completion reporting.
+- Connect Workstream 1 database-backed candidates to optimization, event-driven backtesting, validation, and Strategy Asset publication.

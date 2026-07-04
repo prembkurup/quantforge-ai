@@ -160,6 +160,7 @@ from quantforge.research.workstream_pipeline import (
     WorkstreamPipelineTask,
     WorkstreamPipelineTaskStatus,
     WorkstreamPipelineTaskType,
+    WorkstreamValidatedStrategyAsset,
 )
 
 __all__ = [
@@ -306,4 +307,5 @@ __all__ = [
     "WorkstreamPipelineTask",
     "WorkstreamPipelineTaskStatus",
     "WorkstreamPipelineTaskType",
+    "WorkstreamValidatedStrategyAsset",
 ]

@@ -8,7 +8,11 @@ It sits above `DatabaseBackedStrategyLibraryRunner` and turns the run into expli
 2. Candle coverage validation
 3. Real experiment batch execution
 4. Database-backed candidate Strategy Asset generation
-5. Pipeline report archival
+5. Optimization for stable parameter regions
+6. Event-driven backtesting
+7. Strategy validation
+8. Immutable Strategy Asset publication
+9. Pipeline report archival
 
 ## Start Command
 
@@ -36,6 +40,9 @@ The pipeline report includes:
 - missing candle count
 - real experiment batch count
 - database-backed candidate asset count
+- optimized candidate count
+- backtested candidate count
+- validated Strategy Asset count
 - reproducibility key
 - task-level evidence
 
@@ -43,4 +50,6 @@ The pipeline report includes:
 
 This pipeline is research-only. It does not place live orders.
 
-Database-backed candidate assets must still pass the normal validation, paper/shadow trading, operations, and controlled live capital gates before they can influence real trading.
+Database-backed candidates now pass through optimization, backtesting, validation, and Strategy Asset publication inside the research pipeline.
+
+Published Strategy Assets must still pass paper/shadow trading, operations, and controlled live capital gates before they can influence real trading.

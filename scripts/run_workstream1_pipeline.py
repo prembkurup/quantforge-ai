@@ -19,6 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--window-candles", type=int, default=300)
     parser.add_argument("--stride-candles", type=int, default=100)
     parser.add_argument("--max-batches", type=int, default=25)
+    parser.add_argument("--max-assets-to-validate", type=int, default=25)
     return parser.parse_args()
 
 
@@ -33,6 +34,7 @@ def main() -> None:
         window_candles=args.window_candles,
         stride_candles=args.stride_candles,
         max_batches=args.max_batches,
+        max_assets_to_validate=args.max_assets_to_validate,
     )
     engine = get_coreui_history_engine()
     with engine.connect() as connection:
@@ -55,6 +57,9 @@ def main() -> None:
     print(f"Missing Candles: {result.report.missing_candles:,}")
     print(f"Real Experiment Batches: {result.report.real_experiment_batches:,}")
     print(f"Database-Backed Candidate Assets: {result.report.database_backed_candidate_assets:,}")
+    print(f"Optimized Candidates: {result.report.optimized_candidates:,}")
+    print(f"Backtested Candidates: {result.report.backtested_candidates:,}")
+    print(f"Validated Strategy Assets: {result.report.validated_strategy_assets:,}")
     print(f"Reproducibility Key: {result.database_result.reproducibility_key}")
     print(f"Successful: {'YES' if result.successful else 'NO'}")
     print()

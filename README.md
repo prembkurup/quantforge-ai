@@ -227,6 +227,8 @@ Schedule and complete the Workstream 1 database pipeline:
 .\.venv\Scripts\python .\scripts\run_workstream1_pipeline.py --pairs EUR_USD --timeframes H1 --from 2025-01-01 --to 2025-02-01 --max-batches 2
 ```
 
+The scheduled pipeline continues from real candle batches into optimization, event-driven backtesting, validation, and Strategy Asset publication. Use `--max-assets-to-validate` to cap how many database-backed candidates move through the expensive gates in one run.
+
 ## Foundation Setup
 
 Create and activate the local Python environment:

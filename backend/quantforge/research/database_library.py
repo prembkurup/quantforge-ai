@@ -50,6 +50,7 @@ class DatabaseResearchScope:
     window_candles: int = 300
     stride_candles: int = 100
     max_batches: int = 100
+    max_assets_to_validate: int = 25
 
 
 @dataclass(frozen=True, slots=True)

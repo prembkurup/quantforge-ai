@@ -81,3 +81,4 @@
 - Add Workstream 1 Strategy Library to execute 500,000-1,000,000 experiments, validate 500-2,000 Strategy Assets, publish 50-100 production-grade strategies, and prepare the library for portfolio construction.
 - Wire Workstream 1 into the real PostgreSQL/CoreUI OANDA candle database so research batches execute against stored 10-year candle windows instead of target-mode simulations.
 - Schedule Workstream 1 as a database-backed pipeline with task-level completion evidence for connection, candle validation, real experiment batches, candidate assets, and report archival.
+- Extend the Workstream 1 database pipeline so database-backed candidates pass through optimization, event-driven backtesting, validation, and immutable Strategy Asset publication.

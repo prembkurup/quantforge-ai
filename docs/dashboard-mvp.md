@@ -74,6 +74,11 @@ Primary endpoints:
 - `GET /api/dashboard/overview`
 - `GET /api/dashboard/research/progress`
 - `GET /api/dashboard/research/programs`
+- `GET /api/pipeline/summary`
+- `GET /api/pipeline/current-task`
+- `GET /api/pipeline/tasks`
+- `GET /api/pipeline/engines`
+- `GET /api/pipeline/workload`
 - `GET /api/strategies`
 - `GET /api/strategies/{strategy_id}`
 - `GET /api/portfolio/readiness`
@@ -108,6 +113,7 @@ Routes:
 
 - `/` Executive Overview
 - `/research` Research Progress
+- `/pipeline` Pipeline / Engine Monitor
 - `/strategies` Strategy Library
 - `/strategies/:id` Strategy Detail
 - `/portfolio` Portfolio Readiness
@@ -120,6 +126,7 @@ Routes:
 
 - Executive overview loads correctly.
 - Research metrics display correctly.
+- Pipeline tasks, current task, engine status, and engine workload display correctly.
 - Strategy library is filterable.
 - Strategy detail is traceable.
 - Portfolio readiness is visible.

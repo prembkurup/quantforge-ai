@@ -49,6 +49,26 @@ def create_app() -> FastAPI:
     def research_rejections() -> list[dict[str, Any]]:
         return service.research_rejections()
 
+    @app.get("/api/pipeline/summary")
+    def pipeline_summary() -> dict[str, Any]:
+        return service.pipeline_summary()
+
+    @app.get("/api/pipeline/current-task")
+    def pipeline_current_task() -> dict[str, Any]:
+        return service.pipeline_current_task()
+
+    @app.get("/api/pipeline/tasks")
+    def pipeline_tasks() -> list[dict[str, Any]]:
+        return service.pipeline_tasks()
+
+    @app.get("/api/pipeline/engines")
+    def pipeline_engines() -> list[dict[str, Any]]:
+        return service.engine_status()
+
+    @app.get("/api/pipeline/workload")
+    def pipeline_workload() -> list[dict[str, Any]]:
+        return service.engine_workload()
+
     @app.get("/api/strategies")
     def strategies() -> list[dict[str, Any]]:
         return service.strategies()

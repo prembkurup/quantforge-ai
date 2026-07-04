@@ -256,6 +256,8 @@ Open the UI at `http://127.0.0.1:5174` locally or `http://192.168.1.113:5174` fr
 
 The dashboard shell uses CoreUI and AdminLTE styling while staying read-only for Version 1.
 
+The `/pipeline` dashboard page shows the current running task, queued pipeline tasks, all engine statuses, and per-engine workload.
+
 Production dashboard deployment:
 
 ```powershell

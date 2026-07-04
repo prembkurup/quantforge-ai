@@ -87,6 +87,135 @@ class DashboardService:
             {"reason": "Decision trace incomplete", "count": 1_128, "severity": "high"},
         ]
 
+    def pipeline_summary(self) -> dict[str, Any]:
+        tasks = self.pipeline_tasks()
+        engines = self.engine_status()
+        return {
+            "pipeline_status": "RUNNING",
+            "current_task": "Validate database-backed Strategy Assets",
+            "active_engines": sum(1 for engine in engines if engine["status"] == "RUNNING"),
+            "healthy_engines": sum(1 for engine in engines if engine["health"] == "HEALTHY"),
+            "total_engines": len(engines),
+            "running_tasks": sum(1 for task in tasks if task["status"] == "RUNNING"),
+            "queued_tasks": sum(1 for task in tasks if task["status"] == "QUEUED"),
+            "completed_tasks": sum(1 for task in tasks if task["status"] == "COMPLETE"),
+            "blocked_tasks": sum(1 for task in tasks if task["status"] == "BLOCKED"),
+            "overall_progress": 68,
+            "queue_depth": 2,
+            "source": "Workstream 1 Pipeline + Operations Manager",
+            "timestamp": self._timestamp,
+        }
+
+    def pipeline_current_task(self) -> dict[str, Any]:
+        return {
+            "task_id": "WF1-DB-VALIDATE-004",
+            "task": "Validate database-backed Strategy Assets",
+            "status": "RUNNING",
+            "engine": "Strategy Validation Engine",
+            "stage": "Walk-forward + robustness gates",
+            "progress": 72,
+            "started_at": "2026-07-04T15:42:00+08:00",
+            "eta": "18 min",
+            "input": "29 candidate assets from Workstream 1 database batches",
+            "output": "Strategy Asset validation reports and promotion decisions",
+            "last_event": "Monte Carlo robustness passed for 17 of 24 processed assets",
+            "timestamp": self._timestamp,
+        }
+
+    def pipeline_tasks(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "task_id": "WF1-DB-INGEST-001",
+                "task": "Read CoreUI/OANDA candle database windows",
+                "engine": "Market Data Engine",
+                "status": "COMPLETE",
+                "progress": 100,
+                "workload": "6216 H1 candles",
+                "eta": "done",
+                "last_update": self._timestamp,
+            },
+            {
+                "task_id": "WF1-FEATURE-002",
+                "task": "Generate standardized FeatureVectors",
+                "engine": "Feature Engine",
+                "status": "COMPLETE",
+                "progress": 100,
+                "workload": "300-candle lookback windows",
+                "eta": "done",
+                "last_update": self._timestamp,
+            },
+            {
+                "task_id": "WF1-COMPOSE-003",
+                "task": "Compose candidate strategies",
+                "engine": "Strategy Composer",
+                "status": "COMPLETE",
+                "progress": 100,
+                "workload": "7,500,000 candidates screened",
+                "eta": "done",
+                "last_update": self._timestamp,
+            },
+            {
+                "task_id": "WF1-DB-VALIDATE-004",
+                "task": "Validate database-backed Strategy Assets",
+                "engine": "Strategy Validation Engine",
+                "status": "RUNNING",
+                "progress": 72,
+                "workload": "29 selected candidates",
+                "eta": "18 min",
+                "last_update": self._timestamp,
+            },
+            {
+                "task_id": "WF1-PORTFOLIO-005",
+                "task": "Update portfolio construction readiness",
+                "engine": "Portfolio Engine",
+                "status": "QUEUED",
+                "progress": 0,
+                "workload": "validated asset set",
+                "eta": "after validation",
+                "last_update": self._timestamp,
+            },
+            {
+                "task_id": "WF1-PAPER-006",
+                "task": "Refresh paper trading drift review",
+                "engine": "Shadow Trading Engine",
+                "status": "QUEUED",
+                "progress": 0,
+                "workload": "paper portfolio and open trades",
+                "eta": "after portfolio update",
+                "last_update": self._timestamp,
+            },
+        ]
+
+    def engine_status(self) -> list[dict[str, Any]]:
+        return [
+            _engine("Market Data Engine", "RUNNING", "HEALTHY", 22, 0, "CoreUI candle source connected"),
+            _engine("Calculation Engine", "IDLE", "HEALTHY", 0, 0, "Ready for next feature batch"),
+            _engine("Feature Engine", "IDLE", "HEALTHY", 0, 0, "Latest FeatureVector batch complete"),
+            _engine("Market Regime Engine", "IDLE", "HEALTHY", 0, 0, "Latest regime snapshot available"),
+            _engine("Research Orchestrator", "RUNNING", "HEALTHY", 44, 2, "Scheduling next validation gate"),
+            _engine("Strategy Composer", "IDLE", "HEALTHY", 0, 0, "Candidate composition complete"),
+            _engine("Optimization Engine", "IDLE", "HEALTHY", 0, 0, "Stable parameter regions ready"),
+            _engine("Backtesting Engine", "RUNNING", "HEALTHY", 63, 1, "Event replay for validation batch"),
+            _engine("Strategy Validation Engine", "RUNNING", "HEALTHY", 72, 1, "Walk-forward and robustness gates active"),
+            _engine("Portfolio Engine", "QUEUED", "HEALTHY", 0, 1, "Waiting for validation output"),
+            _engine("Shadow Trading Engine", "QUEUED", "HEALTHY", 0, 1, "Waiting for portfolio update"),
+            _engine("Live Trading Engine", "DISABLED", "SAFE", 0, 0, "Live execution intentionally disabled"),
+            _engine("Operations Manager", "RUNNING", "HEALTHY", 18, 0, "Monitoring services and workload"),
+        ]
+
+    def engine_workload(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "engine": engine["engine"],
+                "status": engine["status"],
+                "active_workload": engine["workload_percent"],
+                "queue_depth": engine["queue_depth"],
+                "capacity": 100,
+                "last_update": self._timestamp,
+            }
+            for engine in self.engine_status()
+        ]
+
     def strategies(self) -> list[dict[str, Any]]:
         return [_strategy_row(asset) for asset in self._library.production_grade_strategies]
 
@@ -420,3 +549,21 @@ def _ranked(kind: str, values: dict[str, float]) -> list[dict[str, Any]]:
             start=1,
         )
     ]
+
+
+def _engine(
+    engine: str,
+    status: str,
+    health: str,
+    workload_percent: int,
+    queue_depth: int,
+    current_activity: str,
+) -> dict[str, Any]:
+    return {
+        "engine": engine,
+        "status": status,
+        "health": health,
+        "workload_percent": workload_percent,
+        "queue_depth": queue_depth,
+        "current_activity": current_activity,
+    }

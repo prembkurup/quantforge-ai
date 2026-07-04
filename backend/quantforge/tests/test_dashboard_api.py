@@ -42,6 +42,23 @@ def test_strategy_library_is_readable_and_traceable() -> None:
     assert detail["decision_trace"]["complete"] is True
 
 
+def test_pipeline_page_data_shows_tasks_engines_and_current_work() -> None:
+    summary = client.get("/api/pipeline/summary").json()
+    current = client.get("/api/pipeline/current-task").json()
+    tasks = client.get("/api/pipeline/tasks").json()
+    engines = client.get("/api/pipeline/engines").json()
+    workload = client.get("/api/pipeline/workload").json()
+
+    assert summary["pipeline_status"] == "RUNNING"
+    assert summary["running_tasks"] >= 1
+    assert current["status"] == "RUNNING"
+    assert current["progress"] > 0
+    assert any(task["status"] == "RUNNING" for task in tasks)
+    assert any(engine["engine"] == "Live Trading Engine" for engine in engines)
+    assert any(engine["status"] == "DISABLED" for engine in engines)
+    assert len(workload) == len(engines)
+
+
 def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:
     assert client.get("/api/portfolio/readiness").json()["portfolio_readiness"] == "READY_FOR_PAPER_TRADING"
     assert client.get("/api/ops/health").json()["platform_status"] == "HEALTHY"

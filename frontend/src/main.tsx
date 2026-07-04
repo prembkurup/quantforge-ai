@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
 import { CBadge } from "@coreui/react";
-import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, HeartPulse, Library, LineChart, ShieldCheck } from "lucide-react";
+import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, HeartPulse, Library, LineChart, ListChecks, ShieldCheck } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
 import "./styles.css";
@@ -45,6 +45,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Overview />} />
               <Route path="/research" element={<Research />} />
+              <Route path="/pipeline" element={<Pipeline />} />
               <Route path="/strategies" element={<Strategies />} />
               <Route path="/strategies/:id" element={<StrategyDetail />} />
               <Route path="/portfolio" element={<Portfolio />} />
@@ -64,6 +65,7 @@ function Sidebar() {
   const links = [
     ["/", "Overview", Activity],
     ["/research", "Research", LineChart],
+    ["/pipeline", "Pipeline", ListChecks],
     ["/strategies", "Strategies", Library],
     ["/portfolio", "Portfolio", ShieldCheck],
     ["/paper", "Paper", CandlestickChart],
@@ -162,6 +164,57 @@ function Research() {
       </div>
       <DataTable title="Research Programs" rows={programs} />
       <DataTable title="Rejected Strategy Reasons" rows={rejections} />
+    </Page>
+  );
+}
+
+function Pipeline() {
+  const summary = useApi<Row>("/api/pipeline/summary");
+  const current = useApi<Row>("/api/pipeline/current-task");
+  const tasks = useApi<Row[]>("/api/pipeline/tasks");
+  const engines = useApi<Row[]>("/api/pipeline/engines");
+  const workload = useApi<Row[]>("/api/pipeline/workload");
+  if (!summary || !current || !tasks || !engines || !workload) return <Loading />;
+  return (
+    <Page title="Pipeline / Engine Monitor">
+      <div className="kpi-grid">
+        <KpiCard title="Pipeline" value={summary.pipeline_status} tone="good" />
+        <KpiCard title="Current Task" value={summary.current_task} />
+        <KpiCard title="Overall Progress" value={`${summary.overall_progress}%`} />
+        <KpiCard title="Active Engines" value={`${summary.active_engines}/${summary.total_engines}`} tone="good" />
+        <KpiCard title="Healthy Engines" value={`${summary.healthy_engines}/${summary.total_engines}`} tone="good" />
+        <KpiCard title="Queue Depth" value={summary.queue_depth} />
+        <KpiCard title="Running Tasks" value={summary.running_tasks} />
+        <KpiCard title="Queued Tasks" value={summary.queued_tasks} tone="warn" />
+      </div>
+
+      <section className="card panel dashboard-card">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Current Running Task</div>
+        <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+          <div>
+            <div className="pipeline-current-title">{current.task}</div>
+            <div className="pipeline-current-meta">
+              {current.engine} / {current.stage}
+            </div>
+            <ProgressBar value={Number(current.progress)} />
+            <div className="pipeline-current-detail">{current.last_event}</div>
+          </div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Task ID" value={current.task_id} />
+            <MiniFact label="Status" value={current.status} />
+            <MiniFact label="Started" value={current.started_at} />
+            <MiniFact label="ETA" value={current.eta} />
+            <MiniFact label="Input" value={current.input} />
+            <MiniFact label="Output" value={current.output} />
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <WorkloadPanel rows={workload} />
+        <DataTable title="Current Status of All Engines" rows={engines} />
+      </div>
+      <DataTable title="Tasks in the Pipeline" rows={tasks} />
     </Page>
   );
 }
@@ -316,6 +369,21 @@ const manualSections = [
     ]
   },
   {
+    title: "Pipeline",
+    purpose: "Shows the running task, queued work, all engine states, and per-engine workload for the active production research pipeline.",
+    use: [
+      "Read Current Running Task first to see exactly what the system is processing now.",
+      "Use Engine Workload to find overloaded or idle engines.",
+      "Use Current Status of All Engines to confirm health, disabled live execution, queue depth, and current activity.",
+      "Use Tasks in the Pipeline to track each stage from candle reads through validation, portfolio update, and paper-trading refresh."
+    ],
+    details: [
+      "RUNNING means the engine or task is actively processing work.",
+      "QUEUED means the task is waiting on an upstream gate.",
+      "DISABLED on Live Trading Engine is intentional until production approval gates are added."
+    ]
+  },
+  {
     title: "Strategy Library",
     purpose: "Lists production-grade or near-production strategy candidates with validation metrics and links to strategy passports.",
     use: [
@@ -398,6 +466,7 @@ const manualSections = [
 
 const workflowSteps = [
   "Start on Overview and confirm the Decision banner is acceptable.",
+  "Open Pipeline to see the current running task, engine statuses, queue depth, and workload.",
   "Check Operations to make sure services and resource trends are healthy.",
   "Review Research progress and rejection reasons to understand the current experiment state.",
   "Open Strategy Library, filter candidates, and inspect individual Strategy Passports.",
@@ -457,6 +526,44 @@ function Help() {
         ))}
       </div>
     </Page>
+  );
+}
+
+function WorkloadPanel({ rows }: { rows: Row[] }) {
+  return (
+    <section className="card panel dashboard-card">
+      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Engine Workload</div>
+      <div className="space-y-3">
+        {rows.map((row) => (
+          <div className="workload-row" key={String(row.engine)}>
+            <div className="workload-header">
+              <span>{row.engine}</span>
+              <span>{row.active_workload}% / queue {row.queue_depth}</span>
+            </div>
+            <ProgressBar value={Number(row.active_workload)} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ProgressBar({ value }: { value: number }) {
+  const clamped = Math.max(0, Math.min(100, value));
+  return (
+    <div className="progress-shell" aria-label={`Progress ${clamped}%`}>
+      <div className="progress-fill" style={{ width: `${clamped}%` }} />
+      <span className="progress-label">{clamped}%</span>
+    </div>
+  );
+}
+
+function MiniFact({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="mini-fact">
+      <div className="mini-fact-label">{label}</div>
+      <div className="mini-fact-value">{value}</div>
+    </div>
   );
 }
 

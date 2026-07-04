@@ -44,6 +44,15 @@ from quantforge.research.campaign import (
     StrategyQualityRequirements,
 )
 from quantforge.research.data_preparation import DataPreparationEngine
+from quantforge.research.database_library import (
+    CandleCoverageReport,
+    DatabaseBackedStrategyAsset,
+    DatabaseBackedStrategyLibraryResult,
+    DatabaseBackedStrategyLibraryRunner,
+    DatabaseExperimentBatch,
+    DatabaseResearchScope,
+    DatabaseWorkstreamReport,
+)
 from quantforge.research.experiment import (
     ExperimentDataset,
     ExperimentDefinition,
@@ -145,6 +154,13 @@ from quantforge.research.ranking import StrategyRankingEngine
 
 __all__ = [
     "DataPreparationEngine",
+    "CandleCoverageReport",
+    "DatabaseBackedStrategyAsset",
+    "DatabaseBackedStrategyLibraryResult",
+    "DatabaseBackedStrategyLibraryRunner",
+    "DatabaseExperimentBatch",
+    "DatabaseResearchScope",
+    "DatabaseWorkstreamReport",
     "AutonomousResearchPipeline",
     "AutonomousResearchResult",
     "DatasetSelection",

@@ -155,6 +155,8 @@ After Version 1.0 acceptance, Workstream 1 scales research output into an instit
 
 The strategy library is built across independent trend following, mean reversion, breakout, momentum, and volatility programs. Every validated asset remains reproducible, explainable, auditable, and backed by complete validation evidence. Production-grade status is intentionally more selective than validation so portfolio construction receives only a scarce, high-quality set.
 
+Database-Backed Workstream 1 executes the same research scale-out against real PostgreSQL/CoreUI OANDA candles. It checks database coverage, duplicate candles, and gap evidence, then slices actual candle rows into rolling research windows and runs strategy-template experiment batches. Its outputs are database-backed candidate assets, not synthetic target-mode assets, and they still require the normal validation and paper/shadow gates before live capital.
+
 ## Safety Rules
 
 - Research code must not place live orders.

@@ -79,3 +79,4 @@
 ## Phase 7: Institutional Scale-Out
 
 - Add Workstream 1 Strategy Library to execute 500,000-1,000,000 experiments, validate 500-2,000 Strategy Assets, publish 50-100 production-grade strategies, and prepare the library for portfolio construction.
+- Wire Workstream 1 into the real PostgreSQL/CoreUI OANDA candle database so research batches execute against stored 10-year candle windows instead of target-mode simulations.

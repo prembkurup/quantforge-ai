@@ -177,13 +177,15 @@ function Research() {
 function Pipeline() {
   const snapshot = useApi<any>("/api/pipeline/snapshot");
   if (!snapshot) return <Loading />;
-  const { summary, current_task: current, tasks, engines, workload } = snapshot;
+  const { summary, current_task: current, tasks, engines, workload, full_history } = snapshot;
   return (
     <Page title="Pipeline / Engine Monitor">
       <div className="kpi-grid">
         <KpiCard title="Pipeline" value={summary.pipeline_status} tone="good" />
         <KpiCard title="Current Task" value={summary.current_task} />
         <KpiCard title="Overall Progress" value={`${summary.overall_progress}%`} />
+        <KpiCard title="Full History Jobs" value={`${summary.full_history_completed_jobs}/${summary.full_history_planned_jobs}`} />
+        <KpiCard title="Full History Failed" value={summary.full_history_failed_jobs} tone={summary.full_history_failed_jobs ? "warn" : "good"} />
         <KpiCard title="Active Engines" value={`${summary.active_engines}/${summary.total_engines}`} tone="good" />
         <KpiCard title="Healthy Engines" value={`${summary.healthy_engines}/${summary.total_engines}`} tone="good" />
         <KpiCard title="Queue Depth" value={summary.queue_depth} />
@@ -213,11 +215,35 @@ function Pipeline() {
         </div>
       </section>
 
+      {full_history && (
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Full History Research Scheduler</div>
+          <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+            <div>
+              <div className="pipeline-current-title">{full_history.status}</div>
+              <div className="pipeline-current-meta">
+                {full_history.completed_jobs}/{full_history.planned_jobs} jobs complete / {full_history.pending_jobs} pending
+              </div>
+              <ProgressBar value={Number(full_history.progress_percent)} />
+              <div className="pipeline-current-detail">{full_history.latest_job}</div>
+            </div>
+            <div className="pipeline-detail-grid">
+              <MiniFact label="Completed" value={full_history.completed_jobs} />
+              <MiniFact label="Failed" value={full_history.failed_jobs} />
+              <MiniFact label="Pending" value={full_history.pending_jobs} />
+              <MiniFact label="Latest Update" value={full_history.latest_recorded_at || "waiting"} />
+              <MiniFact label="State File" value={full_history.state_file} />
+            </div>
+          </div>
+        </section>
+      )}
+
       <div className="grid gap-4 xl:grid-cols-2">
         <WorkloadPanel rows={workload} />
         <DataTable title="Current Status of All Engines" rows={engines} />
       </div>
       <DataTable title="Tasks in the Pipeline" rows={tasks} />
+      {full_history?.jobs?.length ? <DataTable title="Recent Full History Scheduler Jobs" rows={full_history.jobs} /> : null}
     </Page>
   );
 }

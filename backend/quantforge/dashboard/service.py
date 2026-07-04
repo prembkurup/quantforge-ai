@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from quantforge.infrastructure.operations import AutonomousOperationsManager
@@ -90,31 +92,19 @@ class DashboardService:
     def pipeline_summary(self) -> dict[str, Any]:
         tasks = self.pipeline_tasks()
         engines = self.engine_status()
-        return {
-            "pipeline_status": "RUNNING",
-            "current_task": "Validate database-backed Strategy Assets",
-            "active_engines": sum(1 for engine in engines if engine["status"] == "RUNNING"),
-            "healthy_engines": sum(1 for engine in engines if engine["health"] == "HEALTHY"),
-            "total_engines": len(engines),
-            "running_tasks": sum(1 for task in tasks if task["status"] == "RUNNING"),
-            "queued_tasks": sum(1 for task in tasks if task["status"] == "QUEUED"),
-            "completed_tasks": sum(1 for task in tasks if task["status"] == "COMPLETE"),
-            "blocked_tasks": sum(1 for task in tasks if task["status"] == "BLOCKED"),
-            "overall_progress": 68,
-            "queue_depth": 2,
-            "source": "Workstream 1 Pipeline + Operations Manager",
-            "timestamp": self._timestamp,
-        }
+        return self._pipeline_summary_from(tasks, engines)
 
     def pipeline_snapshot(self) -> dict[str, Any]:
         tasks = self.pipeline_tasks()
         engines = self.engine_status()
+        full_history = self.full_history_scheduler_status()
         return {
-            "summary": self._pipeline_summary_from(tasks, engines),
+            "summary": self._pipeline_summary_from(tasks, engines, full_history),
             "current_task": self.pipeline_current_task(),
             "tasks": tasks,
             "engines": engines,
             "workload": self._engine_workload_from(engines),
+            "full_history": full_history,
             "timestamp": self._timestamp,
         }
 
@@ -122,10 +112,12 @@ class DashboardService:
         self,
         tasks: list[dict[str, Any]],
         engines: list[dict[str, Any]],
+        full_history: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        full_history = full_history or self.full_history_scheduler_status()
         return {
             "pipeline_status": "RUNNING",
-            "current_task": "Validate database-backed Strategy Assets",
+            "current_task": "Full-history research scheduler",
             "active_engines": sum(1 for engine in engines if engine["status"] == "RUNNING"),
             "healthy_engines": sum(1 for engine in engines if engine["health"] == "HEALTHY"),
             "total_engines": len(engines),
@@ -133,9 +125,12 @@ class DashboardService:
             "queued_tasks": sum(1 for task in tasks if task["status"] == "QUEUED"),
             "completed_tasks": sum(1 for task in tasks if task["status"] == "COMPLETE"),
             "blocked_tasks": sum(1 for task in tasks if task["status"] == "BLOCKED"),
-            "overall_progress": 68,
+            "overall_progress": full_history["progress_percent"],
             "queue_depth": 2,
-            "source": "Workstream 1 Pipeline + Operations Manager",
+            "full_history_completed_jobs": full_history["completed_jobs"],
+            "full_history_failed_jobs": full_history["failed_jobs"],
+            "full_history_planned_jobs": full_history["planned_jobs"],
+            "source": "Workstream 1 Pipeline + Full History Research Scheduler",
             "timestamp": self._timestamp,
         }
 
@@ -156,7 +151,21 @@ class DashboardService:
         }
 
     def pipeline_tasks(self) -> list[dict[str, Any]]:
+        full_history = self.full_history_scheduler_status()
         return [
+            {
+                "task_id": "FH-SCHEDULER",
+                "task": "Run full-history research scheduler",
+                "engine": "Research Orchestrator",
+                "status": "RUNNING" if full_history["pending_jobs"] > 0 else "COMPLETE",
+                "progress": full_history["progress_percent"],
+                "workload": (
+                    f"{full_history['completed_jobs']}/{full_history['planned_jobs']} jobs complete; "
+                    f"{full_history['pending_jobs']} pending"
+                ),
+                "eta": "daily 02:00 batches",
+                "last_update": full_history["latest_recorded_at"] or self._timestamp,
+            },
             {
                 "task_id": "WF1-DB-INGEST-001",
                 "task": "Read CoreUI/OANDA candle database windows",
@@ -218,6 +227,54 @@ class DashboardService:
                 "last_update": self._timestamp,
             },
         ]
+
+    def full_history_scheduler_status(self) -> dict[str, Any]:
+        state_file = Path(__file__).resolve().parents[3] / "var" / "full_history_research_state.json"
+        planned_jobs = 126
+        if not state_file.exists():
+            return {
+                "status": "PENDING",
+                "planned_jobs": planned_jobs,
+                "completed_jobs": 0,
+                "failed_jobs": 0,
+                "pending_jobs": planned_jobs,
+                "progress_percent": 0,
+                "latest_job": "No scheduler state yet",
+                "latest_recorded_at": "",
+                "state_file": str(state_file),
+                "jobs": [],
+            }
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+        completed = len(state.get("completed", []))
+        failed = len(state.get("failed", []))
+        history = list(state.get("history", []))
+        latest = history[-1] if history else {}
+        pending = max(0, planned_jobs - completed - failed)
+        progress = round(((completed + failed) / planned_jobs) * 100) if planned_jobs else 0
+        return {
+            "status": "RUNNING" if pending else "COMPLETE",
+            "planned_jobs": planned_jobs,
+            "completed_jobs": completed,
+            "failed_jobs": failed,
+            "pending_jobs": pending,
+            "progress_percent": progress,
+            "latest_job": latest.get("job_id", "No completed job yet"),
+            "latest_recorded_at": latest.get("recorded_at", ""),
+            "state_file": str(state_file),
+            "jobs": [
+                {
+                    "stage": item.get("stage", ""),
+                    "pair": item.get("pair", ""),
+                    "timeframe": item.get("timeframe", ""),
+                    "status": item.get("status", ""),
+                    "start": item.get("start", ""),
+                    "end": item.get("end", ""),
+                    "evidence": item.get("evidence", ""),
+                    "recorded_at": item.get("recorded_at", ""),
+                }
+                for item in reversed(history[-10:])
+            ],
+        }
 
     def engine_status(self) -> list[dict[str, Any]]:
         return [

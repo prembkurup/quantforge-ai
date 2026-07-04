@@ -36,6 +36,7 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Implement strategy plugin discovery.
 - Implement experiment definition workflow.
 - Build Constraint-Based Strategy Composer with validation, complexity scoring, diversity filtering, and decision traceability.
+- Build Optimization Laboratory to find stable parameter regions and run Research Review Board gates.
 - Build first template strategy plugin.
 - Implement basic backtest runner.
 - Store experiment lineage, research run metrics, validation results, and analytics.

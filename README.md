@@ -58,6 +58,7 @@ docs/
   research-knowledge-base.md
   research-orchestrator.md
   strategy-composer.md
+  optimization-laboratory.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -119,6 +120,12 @@ Run the constraint-based Strategy Composer demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\compose_strategy.py
+```
+
+Run the Optimization Laboratory demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\optimize_strategy.py
 ```
 
 ## Foundation Setup

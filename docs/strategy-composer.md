@@ -82,7 +82,7 @@ Compose
   -> Validate Structure
   -> Estimate Complexity
   -> Remove Duplicates
-  -> Optimize
+  -> Optimization Laboratory
   -> Backtest
   -> Validate Performance
 ```

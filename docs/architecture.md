@@ -67,9 +67,11 @@ The Research Orchestrator turns that memory into an experiment plan. It chooses 
 
 Strategies are template-based and plugin-driven. Research is organized around experiments, not indicators. An experiment binds the dataset, feature set, strategy template, plugin versions, parameter search, validation results, analytics, and any published strategy versions.
 
-The Strategy Composer is a constraint-based assembly layer. The orchestrator decides what should be built; the composer asks which reusable market-regime, entry, confirmation, exit, risk, and trade-management plugins satisfy the research constraints. It validates structure, estimates complexity, removes near-duplicates, and only then sends candidates to optimization.
+The Strategy Composer is a constraint-based assembly layer. The orchestrator decides what should be built; the composer asks which reusable market-regime, entry, confirmation, exit, risk, and trade-management plugins satisfy the research constraints. It validates structure, estimates complexity, removes near-duplicates, and only then sends candidates to the Optimization Laboratory.
 
 Every composer decision must be traceable: the hypothesis, applied constraints, knowledge influence, selected plugins, rejection reasons, complexity estimate, and diversity decision are recorded before optimization begins.
+
+The Optimization Laboratory looks for stable parameter regions rather than the highest historical profit. It produces recommended parameter spaces, parameter landscapes, robustness estimates, and Research Knowledge Base updates. A Research Review Board checks parameter stability, complexity, diversity, decision traceability, and Knowledge Base alignment before candidates move to expensive backtesting and validation.
 
 A strategy plugin declares:
 
@@ -81,7 +83,7 @@ A strategy plugin declares:
 - risk model hooks
 - validation constraints
 
-The research engine defines experiments, discovers plugins, expands parameter templates, runs backtests, validates results, compares experiment analytics, and ranks candidates. The live engine only runs approved strategy versions.
+The research engine defines experiments, discovers plugins, expands parameter templates, identifies stable parameter regions, runs review gates, backtests, validates results, compares experiment analytics, and ranks candidates. The live engine only runs approved strategy versions.
 
 ## Live Execution
 

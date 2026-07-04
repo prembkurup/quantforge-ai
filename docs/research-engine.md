@@ -57,12 +57,13 @@ Calculations are derived inputs used inside features and templates. Indicators a
 13. Structural Validation
 14. Complexity and Diversity Filtering
 15. Parameter Generation
-16. Optimization
-17. Backtesting
-18. Validation
-19. Ranking
-20. Research Analytics
-21. Strategy Publishing
+16. Optimization Laboratory
+17. Research Review Board
+18. Backtesting
+19. Validation
+20. Ranking
+21. Research Analytics
+22. Strategy Publishing
 
 ## Engine Responsibilities
 
@@ -197,9 +198,15 @@ Every candidate has a decision trace that records which hypothesis, constraints,
 
 Generates valid parameter combinations and rejects invalid combinations before optimization.
 
-### Optimization Engine
+### Optimization Laboratory
 
-Searches parameter space with grid search, random search, Bayesian optimization, genetic algorithms, or Optuna. The optimization objective is configurable.
+Finds stable parameter regions instead of single best historical-profit points. It supports grid search, random search, Bayesian optimization, Optuna, genetic algorithms, particle swarm, and future ML search surfaces, but its primary objective is parameter stability.
+
+The lab rejects sharp peaks such as one high-profit EMA value surrounded by weak results. It produces parameter candidates, stable regions, sensitivity scores, parameter landscapes, robustness labels, and Knowledge Base updates.
+
+### Research Review Board
+
+Automated gate before expensive validation. It checks parameter stability, complexity score, diversity score, decision trace, and Knowledge Base alignment. Human approval is not required in normal operation, but the gate protects the research pipeline from overfit or low-quality outputs.
 
 ### Backtesting Engine
 

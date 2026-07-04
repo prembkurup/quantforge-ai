@@ -35,7 +35,8 @@
 - Add Research Orchestrator to coordinate hypotheses, datasets, features, regimes, knowledge, template/plugin selection, parameter planning, job scheduling, result collection, and next experiment planning before strategy composition.
 - Discover strategy plugins.
 - Add Constraint-Based Strategy Composer with constraint building, compatibility checks, dependency checks, strategy graphs, validation, complexity scoring, diversity filtering, and decision traceability.
-- Run parameter searches, optimization, backtests, and validation inside experiments.
+- Add Optimization Laboratory for stable parameter regions, sensitivity analysis, parameter landscapes, robustness estimates, optimization knowledge writing, reports, and Research Review Board gates.
+- Run backtests and validation only after strategy structure and parameter regions pass review.
 - Store experiment lineage, analytics, and final metrics.
 - Export research cache to Parquet.
 

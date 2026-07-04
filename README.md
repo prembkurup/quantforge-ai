@@ -230,6 +230,16 @@ Schedule and complete the Workstream 1 database pipeline:
 
 The scheduled pipeline continues from real candle batches into optimization, event-driven backtesting, validation, and Strategy Asset publication. Use `--max-assets-to-validate` to cap how many database-backed candidates move through the expensive gates in one run.
 
+Run the resumable full-history scheduler:
+
+```powershell
+.\.venv\Scripts\python .\scripts\full_history_research_scheduler.py --max-jobs 3
+```
+
+The scheduler plans candle coverage checks, smoke windows, rolling yearly windows, and full-history jobs for configured pairs/timeframes.
+It stores resume state in `var/full_history_research_state.json` and writes output to the database-backed Logs page.
+The Windows task `QuantForge Full History Research Scheduler` runs this daily with `--max-jobs 3`, so the 10-year workload progresses in controlled batches.
+
 Run the read-only dashboard API:
 
 ```powershell

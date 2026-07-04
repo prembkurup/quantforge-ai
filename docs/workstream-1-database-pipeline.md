@@ -28,6 +28,22 @@ Scale only after the small run completes cleanly:
 .\.venv\Scripts\python .\scripts\run_workstream1_pipeline.py --pairs EUR_USD,GBP_USD,USD_JPY --timeframes M15,H1,H4 --from 2015-01-01 --to 2025-01-01 --max-batches 500
 ```
 
+Run the resumable full-history scheduler:
+
+```powershell
+.\.venv\Scripts\python .\scripts\full_history_research_scheduler.py --max-jobs 3
+```
+
+The scheduler breaks the historical rollout into controlled jobs:
+
+- full-period candle coverage check
+- short smoke window
+- rolling yearly windows
+- capped full-history run
+
+Each invocation reads `var/full_history_research_state.json`, skips completed jobs, runs the next pending jobs, updates state, and writes process logs to PostgreSQL.
+The Windows task `QuantForge Full History Research Scheduler` runs it daily with `--max-jobs 3`.
+
 ## Completion Evidence
 
 The pipeline report includes:

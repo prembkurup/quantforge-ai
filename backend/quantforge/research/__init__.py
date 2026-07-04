@@ -70,6 +70,14 @@ from quantforge.research.experiment import (
     ParameterSearchPlan,
 )
 from quantforge.research.feature_store import FeatureStore
+from quantforge.research.full_history_scheduler import (
+    FullHistoryJobStatus,
+    FullHistoryResearchJob,
+    FullHistoryResearchScheduler,
+    FullHistoryRunResult,
+    FullHistorySchedulerConfig,
+    FullHistoryStage,
+)
 from quantforge.research.knowledge_base import (
     ExperimentResultKnowledge,
     Hypothesis,
@@ -224,6 +232,12 @@ __all__ = [
     "ExperimentStatus",
     "ExperimentComparisonSpec",
     "FeatureStore",
+    "FullHistoryJobStatus",
+    "FullHistoryResearchJob",
+    "FullHistoryResearchScheduler",
+    "FullHistoryRunResult",
+    "FullHistorySchedulerConfig",
+    "FullHistoryStage",
     "ExperimentResultKnowledge",
     "Hypothesis",
     "HypothesisStatus",

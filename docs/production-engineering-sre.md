@@ -133,6 +133,84 @@ Examples:
 
 `RecoveryCoordinator` creates automatic recovery actions for critical or offline services. When no failure is active, it still verifies that the live trading state snapshot is current.
 
+Automatic recovery covers database restart, Redis restart, OANDA disconnect, network failure, and service crash. Recovery actions reconnect services, rebuild cache, reconcile broker state, pause execution when needed, restore state, and resume processing.
+
+## State Recovery
+
+`StateRecoveryManager` snapshots durable trading state:
+
+- portfolio
+- positions
+- orders
+- strategy allocation
+- risk exposure
+- active signals
+
+The state snapshot is designed to survive server reboot, service restart, and power failure.
+
+## Synchronization
+
+`StateSynchronizer` runs on a 60-second interval. It compares internal state with broker state and repairs missing positions, missing orders, unexpected fills, and modified stop-loss records. Duplicate order prevention is part of the synchronization report.
+
+## Disaster Recovery
+
+`DisasterRecoveryManager` defines recovery objectives for database corruption, server loss, power outage, network outage, and disk failure.
+
+- RPO: 5 minutes
+- RTO: 15 minutes
+
+## Backups
+
+`BackupManager` verifies the backup policy:
+
+- database full backup: daily
+- WAL archive: hourly
+- configuration: every change
+- Knowledge Base: daily
+- research results: daily
+- Strategy Assets: immediately after publication
+
+## Production Checkpoints
+
+`ProductionCheckpointService` runs before market open. No trading should begin unless all checks pass:
+
+- database
+- broker
+- internet
+- clock synchronization
+- active strategies
+- risk limits
+- portfolio state
+
+## Dashboard
+
+`OperationalDashboard` displays system health, trading status, research status, portfolio, risk, latency, alerts, recovery events, and broker status.
+
+## Failure Injection
+
+`FailureInjectionFramework` simulates database offline, Redis offline, broker disconnect, internet failure, clock drift, memory exhaustion, and CPU overload. Each scenario must recover automatically unless a runbook explicitly requires operator action.
+
+## Performance Targets
+
+The benchmark suite enforces:
+
+- market event processing below 100 ms
+- feature generation below 50 ms
+- strategy selection below 20 ms
+- trade decision below 20 ms
+- execution submission below 250 ms
+- recovery below 30 seconds
+
+## Security Operations
+
+`SecurityOperations` verifies controls for API credential rotation, encrypted secrets, privileged action audit, restricted database permissions, and TLS for internal communication where appropriate.
+
+## Runbooks
+
+`RunbookLibrary` includes runbooks for database recovery, broker recovery, server recovery, kill switch activation, manual trading suspension, emergency shutdown, and disaster recovery.
+
+Each runbook contains symptoms, diagnosis, recovery steps, verification, and escalation.
+
 ## Demo
 
 ```powershell
@@ -164,6 +242,27 @@ Alerts
 
 Recovery
 READY
+
+State Sync
+REPAIRED
+
+Disaster Recovery
+RPO 5m / RTO 15m
+
+Backups
+RESTORED
+
+Pre-Market
+7/7 checks pass
+
+Failure Injection
+7/7 recovered
+
+Latency
+PASS
+
+Runbooks
+7 ready
 
 Capital Protection
 YES

@@ -121,6 +121,14 @@ Before live capital, approved Strategy Assets pass through Shadow Trading and Pa
 
 A Digital Twin runs the broker execution path and internal simulation exchange path in parallel against the same market events, Strategy Assets, and feature vectors. If decisions diverge, promotion is frozen for investigation.
 
+## Production Certification
+
+Production Certification is the final quality gate before controlled live trading. The certification engine consumes evidence from Autonomous Research Validation, Strategy Validation, Production Engineering/SRE, and Shadow Trading.
+
+Certification covers research, strategy, infrastructure, operations, security, risk, performance, and governance, with supporting checks for disaster recovery, data integrity, audit completeness, and Knowledge Base consistency. The weighted readiness score must meet the configured threshold, all mandatory domains must pass, and critical findings must be zero before live trading can be authorized.
+
+Only a `CERTIFIED` decision from the Production Approval Manager allows controlled live trading. Provisionally certified, remediation-required, and rejected systems remain blocked from real capital.
+
 ## Safety Rules
 
 - Research code must not place live orders.

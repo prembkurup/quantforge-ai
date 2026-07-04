@@ -57,6 +57,7 @@
 - Add Production Strategy Management Platform with Strategy Catalog, Strategy Registry, Deployment Manager, Portfolio Manager, Capital Allocator, Scheduler, Drift Detector, Live Performance Monitor, Retirement Manager, Strategy Marketplace, and Production Dashboard.
 - Add Live Trading Engine with event bus, strategy selector, Trade Decision Engine, signal generator, risk controller, execution manager, position monitor, state store, recovery, and broker synchronization.
 - Add Shadow Trading and Paper Trading Platform with virtual exchange, paper portfolio, decision audit, expected-vs-actual analysis, drift analytics, Digital Twin comparison, and promotion gate before live capital.
+- Add Production Certification Platform with mandatory research, strategy, infrastructure, operations, security, risk, performance, governance, disaster recovery, data integrity, audit, and knowledge gates before controlled live trading.
 - Use Redis for latest live cache.
 - Evaluate signals on completed candles.
 - Enforce risk checks before execution.

@@ -66,6 +66,7 @@ docs/
   live-trading-engine.md
   production-engineering-sre.md
   shadow-trading-platform.md
+  production-certification-platform.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -176,6 +177,12 @@ Run the Shadow Trading and Paper Trading demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\shadow_trading.py
+```
+
+Run the Production Certification demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\certify_production.py
 ```
 
 ## Foundation Setup

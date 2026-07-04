@@ -50,7 +50,7 @@ npm install
 npm run dev
 ```
 
-Open `http://127.0.0.1:5174`.
+Open locally at `http://127.0.0.1:5174` or from the private LAN at `http://192.168.1.113:5174`.
 
 Routes:
 

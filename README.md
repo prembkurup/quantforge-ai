@@ -244,6 +244,8 @@ npm install
 npm run dev
 ```
 
+Open the UI at `http://127.0.0.1:5174` locally or `http://192.168.1.113:5174` from the private LAN.
+
 The dashboard shell uses CoreUI and AdminLTE styling while staying read-only for Version 1.
 
 ## Foundation Setup

@@ -37,12 +37,12 @@ function useApi<T>(path: string): T | null {
 function App() {
   return (
     <BrowserRouter>
-      <div className="app-wrapper min-h-screen bg-slate-950 text-slate-100" data-bs-theme="dark">
-        <div className="app-main flex">
+      <div className="app-wrapper dashboard-shell min-h-screen bg-slate-950 text-slate-100" data-bs-theme="dark">
+        <div className="dashboard-frame">
           <Sidebar />
-          <main className="app-content-wrapper min-h-screen flex-1">
+          <main className="dashboard-main min-h-screen">
             <Header />
-            <section className="app-content px-5 py-4 lg:px-8">
+            <section className="app-content dashboard-content px-5 py-4 lg:px-8">
               <Routes>
                 <Route path="/" element={<Overview />} />
                 <Route path="/research" element={<Research />} />
@@ -72,14 +72,14 @@ function Sidebar() {
     ["/knowledge", "Knowledge", Brain]
   ] as const;
   return (
-    <aside className="app-sidebar sidebar-dark-primary sticky top-0 hidden h-screen w-64 border-r border-slate-800 bg-slate-950 px-4 py-5 lg:block">
-      <div className="sidebar-brand mb-7 border-0 p-0">
+    <aside className="app-sidebar sidebar-dark-primary dashboard-sidebar hidden h-screen border-r border-slate-800 bg-slate-950 px-4 py-5 lg:block">
+      <div className="sidebar-brand dashboard-brand mb-7 border-0 p-0">
         <div className="brand-link p-0 text-slate-100">
           <span className="brand-text text-lg font-semibold">QuantForge AI</span>
         </div>
         <div className="text-xs text-slate-400">Production Research Dashboard</div>
       </div>
-      <nav className="nav nav-pills nav-sidebar flex-column space-y-1">
+      <nav className="nav nav-pills nav-sidebar dashboard-nav flex-column space-y-1">
         {links.map(([to, label, Icon]) => (
           <NavLink key={to} to={to} className={({ isActive }) => `nav-link ${isActive ? "nav-link-active" : ""}`}>
             <Icon size={17} />
@@ -93,13 +93,13 @@ function Sidebar() {
 
 function Header() {
   return (
-    <header className="app-header navbar navbar-expand sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 px-5 py-3 backdrop-blur lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <header className="app-header navbar navbar-expand dashboard-header sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 px-5 py-3 backdrop-blur lg:px-8">
+      <div className="dashboard-header-inner flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-normal">QuantForge AI</h1>
           <p className="text-sm text-slate-400">Production Research Dashboard</p>
         </div>
-        <div className="flex gap-2">
+        <div className="dashboard-status-strip flex flex-wrap gap-2">
           <CBadge color="info">CoreUI</CBadge>
           <span className="badge text-bg-secondary">AdminLTE</span>
           <StatusBadge label="HEALTHY" tone="good" />
@@ -284,8 +284,8 @@ function Knowledge() {
 
 function Page({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-5">
-      <h2 className="text-lg font-semibold">{title}</h2>
+    <div className="page-shell space-y-5">
+      <h2 className="page-title text-lg font-semibold">{title}</h2>
       {children}
     </div>
   );

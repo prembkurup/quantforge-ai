@@ -135,6 +135,12 @@ Institutional Research Campaigns run the complete research ecosystem as an auton
 
 Campaign results measure research outcomes rather than new software capability: experiments completed, candidate strategies generated, optimized and validated strategies, approved Strategy Assets, production candidates, Knowledge Base growth, and portfolio diversification. Portfolio construction intentionally balances strategy family, market regime, currency exposure, timeframe, and correlation instead of selecting only the highest-profit strategy.
 
+## Autonomous Operations Validation
+
+Autonomous Operations Validation proves the platform can run as a production trading organization over a 90-day simulation. The operations layer continuously monitors infrastructure, trading state, research activity, and service health; converts issues into incidents; executes self-healing recovery; synchronizes broker state every 60 seconds; evaluates operational drift; schedules non-interrupting maintenance; forecasts capacity; and archives daily, weekly, monthly, and capacity reports.
+
+The validation gate fails if duplicate orders are created, broker mismatches remain unreconciled, recovery exceeds configured objectives, compliance evidence is incomplete, or reliability and trading KPIs miss their targets. Operational metrics feed the Knowledge Base and research priorities so production experience improves future Strategy Assets.
+
 ## Safety Rules
 
 - Research code must not place live orders.

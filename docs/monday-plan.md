@@ -52,3 +52,4 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Implement OANDA execution adapter dry-run mode.
 - Add Linux server deployment plan.
 - Implement Production Engineering and SRE controls for health, heartbeats, metrics, logs, traces, alerting, and recovery.
+- Implement Autonomous Operations Validation for 90-day continuous production simulation, incident recovery, broker synchronization, maintenance, capacity planning, SLO checks, and archived operations reports.

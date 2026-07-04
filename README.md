@@ -68,6 +68,7 @@ docs/
   shadow-trading-platform.md
   production-certification-platform.md
   institutional-research-campaign.md
+  autonomous-operations-validation.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -190,6 +191,12 @@ Run the Institutional Research Campaign demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\institutional_campaign.py
+```
+
+Run the Autonomous Operations Validation demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\autonomous_operations.py
 ```
 
 ## Foundation Setup

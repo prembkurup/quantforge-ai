@@ -231,6 +231,71 @@ body {
   vertical-align: middle;
 }
 
+.manual-grid,
+.manual-section-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.manual-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.manual-section-grid {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.manual-panel {
+  align-self: stretch;
+}
+
+.manual-title {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.manual-purpose,
+.manual-copy p {
+  margin: 6px 0 0;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.manual-block {
+  margin-top: 14px;
+}
+
+.manual-label {
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.manual-list,
+.manual-steps {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #e2e8f0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.manual-list li,
+.manual-steps li {
+  padding-left: 4px;
+}
+
+.manual-list li + li,
+.manual-steps li + li {
+  margin-top: 6px;
+}
+
 @media (min-width: 1024px) {
   .dashboard-status-strip {
     justify-content: flex-end;

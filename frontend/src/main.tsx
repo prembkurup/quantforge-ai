@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
 import { CBadge } from "@coreui/react";
-import { Activity, BookOpen, Brain, CandlestickChart, Database, HeartPulse, Library, LineChart, ShieldCheck } from "lucide-react";
+import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, HeartPulse, Library, LineChart, ShieldCheck } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
 import "./styles.css";
@@ -51,6 +51,7 @@ function App() {
               <Route path="/paper" element={<Paper />} />
               <Route path="/operations" element={<Operations />} />
               <Route path="/knowledge" element={<Knowledge />} />
+              <Route path="/help" element={<Help />} />
             </Routes>
           </section>
         </main>
@@ -67,7 +68,8 @@ function Sidebar() {
     ["/portfolio", "Portfolio", ShieldCheck],
     ["/paper", "Paper", CandlestickChart],
     ["/operations", "Operations", HeartPulse],
-    ["/knowledge", "Knowledge", Brain]
+    ["/knowledge", "Knowledge", Brain],
+    ["/help", "Manual / Help", CircleHelp]
   ] as const;
   return (
     <aside className="app-sidebar sidebar-dark-primary dashboard-sidebar border-r border-slate-800 bg-slate-950" data-bs-theme="dark">
@@ -282,6 +284,178 @@ function Knowledge() {
       <DataTable title="Feature Rankings" rows={features} />
       <DataTable title="Plugin Rankings" rows={plugins} />
       <DataTable title="Hypothesis Confidence" rows={hypotheses} />
+    </Page>
+  );
+}
+
+const manualSections = [
+  {
+    title: "Overview",
+    purpose: "Executive command screen for deciding whether QuantForge is healthy enough to continue research and paper-trading review.",
+    use: [
+      "Read the Decision banner first. It summarizes the safest current action.",
+      "Check Platform, Research, Portfolio, Paper Trading, Live Trading, and Alerts for a fast status scan.",
+      "Use the lower KPI group to compare experiment volume, candidate count, validated assets, confidence, profit factor, and drawdown."
+    ],
+    details: [
+      "The dashboard is read-only. It does not start trades, deploy strategies, or change production state.",
+      "LIVE DISABLED means live execution is intentionally blocked from this dashboard."
+    ]
+  },
+  {
+    title: "Research",
+    purpose: "Tracks experiment progress, knowledge growth, profit-factor distribution, drawdown distribution, active programs, and rejection reasons.",
+    use: [
+      "Use the experiment and knowledge charts to confirm research velocity.",
+      "Use profit-factor and drawdown distributions to judge whether the library is improving or becoming riskier.",
+      "Review rejected strategy reasons before adding new templates or calculators."
+    ],
+    details: [
+      "Research programs show current workstreams and progress.",
+      "Rejected reasons explain why candidates failed validation so the next experiment can avoid repeated mistakes."
+    ]
+  },
+  {
+    title: "Strategy Library",
+    purpose: "Lists production-grade or near-production strategy candidates with validation metrics and links to strategy passports.",
+    use: [
+      "Type in the filter box to search by pair, timeframe, regime, grade, profit factor, drawdown, or any visible field.",
+      "Click a strategy ID to open its Strategy Passport page.",
+      "Compare confidence, validation grade, profit factor, and drawdown before considering portfolio inclusion."
+    ],
+    details: [
+      "Tables scroll horizontally on smaller screens so columns stay readable.",
+      "The page shows a capped list for fast scanning; refine the filter to narrow results."
+    ]
+  },
+  {
+    title: "Strategy Passport",
+    purpose: "Shows the traceable record for one strategy, including decision trace, optimization, validation, and backtest evidence.",
+    use: [
+      "Start with Pair, Timeframe, Confidence, and Grade.",
+      "Review the Decision Trace to understand why the strategy exists.",
+      "Compare Optimization, Validation, and Backtest reports before trusting any single metric."
+    ],
+    details: [
+      "Passport JSON is intentionally raw so audit evidence is not hidden behind summaries.",
+      "A strategy should not move toward production unless validation and drawdown evidence both support it."
+    ]
+  },
+  {
+    title: "Portfolio",
+    purpose: "Shows whether the selected strategy set is balanced enough for paper trading or later certification.",
+    use: [
+      "Read the Portfolio Readiness banner before looking at individual charts.",
+      "Use Regime Coverage to spot overdependence on one market condition.",
+      "Use Pair Exposure and Average Correlation to avoid crowded risk.",
+      "Use Expected Drawdown and Validation Equity Curve to judge portfolio-level risk."
+    ],
+    details: [
+      "Portfolio readiness is about the combined set, not only the best individual strategy.",
+      "Low correlation and broad regime coverage are preferred before promotion."
+    ]
+  },
+  {
+    title: "Paper Trading",
+    purpose: "Monitors virtual trading performance, open paper trades, drift, and promotion readiness.",
+    use: [
+      "Compare Paper Balance, Paper Equity, and Daily P/L for current simulation performance.",
+      "Review Open Paper Trades to see active exposure.",
+      "Use Drift to detect if live-like behavior is moving away from validation expectations."
+    ],
+    details: [
+      "Paper trading is still simulated. Treat it as a gate before any live approval.",
+      "Promotion readiness should be supported by stable drift and risk, not only profit."
+    ]
+  },
+  {
+    title: "Operations",
+    purpose: "Checks service health, queue size, warnings, and system resource trends.",
+    use: [
+      "Confirm overall platform status and services online.",
+      "Watch warnings and queue size for blocked or delayed research jobs.",
+      "Use CPU and RAM trends to decide whether the research workload is too heavy."
+    ],
+    details: [
+      "Operations health helps explain slow or missing research output.",
+      "A healthy service table is required before trusting fresh dashboard numbers."
+    ]
+  },
+  {
+    title: "Knowledge Base",
+    purpose: "Summarizes validated findings, rejected hypotheses, feature rankings, plugin rankings, and confidence evidence.",
+    use: [
+      "Check Records, Confirmed, and Rejected counts to see whether the research memory is growing.",
+      "Use Feature Rankings to identify the strongest reusable signals.",
+      "Use Plugin Rankings and Hypothesis Confidence before selecting the next experiment direction."
+    ],
+    details: [
+      "The Knowledge Base is the feedback loop for future strategy discovery.",
+      "Rejected hypotheses are valuable evidence and should not be ignored."
+    ]
+  }
+];
+
+const workflowSteps = [
+  "Start on Overview and confirm the Decision banner is acceptable.",
+  "Check Operations to make sure services and resource trends are healthy.",
+  "Review Research progress and rejection reasons to understand the current experiment state.",
+  "Open Strategy Library, filter candidates, and inspect individual Strategy Passports.",
+  "Check Portfolio to confirm strategy diversity, correlation, and drawdown behavior.",
+  "Review Paper Trading for drift and simulated execution performance.",
+  "Use Knowledge Base findings to choose the next research direction."
+];
+
+function Help() {
+  return (
+    <Page title="Manual / Help">
+      <div className="manual-grid">
+        <section className="card panel dashboard-card manual-panel">
+          <div className="card-header border-0 bg-transparent p-0 pb-2 font-medium">How to use the dashboard</div>
+          <ol className="manual-steps">
+            {workflowSteps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </section>
+        <section className="card panel dashboard-card manual-panel">
+          <div className="card-header border-0 bg-transparent p-0 pb-2 font-medium">Safety model</div>
+          <div className="manual-copy">
+            <p>This dashboard is a read-only control surface for research, validation, portfolio readiness, paper trading, operations, and evidence review.</p>
+            <p>It is designed to help decide what to inspect next. It does not place trades, enable live trading, deploy strategies, or mutate research records from the browser.</p>
+          </div>
+        </section>
+      </div>
+
+      <div className="manual-section-grid">
+        {manualSections.map((section) => (
+          <section className="card panel dashboard-card manual-panel" key={section.title}>
+            <div className="flex items-start gap-3">
+              <BookOpen className="mt-1 shrink-0 text-cyan-300" size={18} />
+              <div>
+                <h3 className="manual-title">{section.title}</h3>
+                <p className="manual-purpose">{section.purpose}</p>
+              </div>
+            </div>
+            <div className="manual-block">
+              <div className="manual-label">How to work with it</div>
+              <ul className="manual-list">
+                {section.use.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="manual-block">
+              <div className="manual-label">Details</div>
+              <ul className="manual-list">
+                {section.details.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        ))}
+      </div>
     </Page>
   );
 }

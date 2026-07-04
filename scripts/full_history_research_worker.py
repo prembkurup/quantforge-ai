@@ -17,6 +17,11 @@ from quantforge.research.full_history_scheduler import (
     claim_pending_jobs,
     release_running_jobs,
 )
+from quantforge.research.post_full_history_automation import (
+    automation_already_finished,
+    full_history_plan_exhausted,
+    run_post_full_history_automation,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -29,6 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--idle-sleep-seconds", type=int, default=900)
     parser.add_argument("--running-stale-seconds", type=int, default=21600)
     parser.add_argument("--state-file", default="var/full_history_research_state.json")
+    parser.add_argument("--post-pipeline-state-file", default="var/post_full_history_pipeline_state.json")
     return parser.parse_args()
 
 
@@ -42,6 +48,7 @@ def main() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     scheduler_script = repo_root / "scripts" / "full_history_research_scheduler.py"
     state_file = repo_root / args.state_file
+    post_pipeline_state_file = repo_root / args.post_pipeline_state_file
     python_exe = repo_root / ".venv" / "Scripts" / "python.exe"
     if not python_exe.exists():
         python_exe = Path(sys.executable)
@@ -69,6 +76,13 @@ def main() -> None:
             stale_after_seconds=args.running_stale_seconds,
         )
         if not jobs:
+            _run_post_pipeline_if_ready(
+                scheduler=scheduler,
+                full_history_state_file=state_file,
+                post_pipeline_state_file=post_pipeline_state_file,
+                repo_root=repo_root,
+                python_exe=python_exe,
+            )
             print(
                 f"[{_now()}] No pending full-history jobs detected; "
                 f"sleeping {args.idle_sleep_seconds}s"
@@ -125,6 +139,33 @@ def main() -> None:
         )
         sys.stdout.flush()
         time.sleep(args.sleep_seconds)
+
+
+def _run_post_pipeline_if_ready(
+    *,
+    scheduler: FullHistoryResearchScheduler,
+    full_history_state_file: Path,
+    post_pipeline_state_file: Path,
+    repo_root: Path,
+    python_exe: Path,
+) -> None:
+    planned = scheduler.plan()
+    if not full_history_plan_exhausted(full_history_state_file, planned):
+        return
+    if automation_already_finished(post_pipeline_state_file):
+        return
+
+    print(f"[{_now()}] Full-history plan exhausted; starting post-full-history automation")
+    sys.stdout.flush()
+    result = run_post_full_history_automation(
+        repo_root=repo_root,
+        state_file=post_pipeline_state_file,
+        python_exe=python_exe,
+    )
+    print(f"[{_now()}] Post-full-history automation finished with status {result.status}")
+    for stage in result.stages:
+        print(f"- {stage.stage_id} {stage.status}")
+    sys.stdout.flush()
 
 
 def _now() -> str:

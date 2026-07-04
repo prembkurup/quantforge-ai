@@ -37,25 +37,23 @@ function useApi<T>(path: string): T | null {
 function App() {
   return (
     <BrowserRouter>
-      <div className="app-wrapper dashboard-shell min-h-screen bg-slate-950 text-slate-100" data-bs-theme="dark">
-        <div className="dashboard-frame">
-          <Sidebar />
-          <main className="dashboard-main min-h-screen">
-            <Header />
-            <section className="app-content dashboard-content px-5 py-4 lg:px-8">
-              <Routes>
-                <Route path="/" element={<Overview />} />
-                <Route path="/research" element={<Research />} />
-                <Route path="/strategies" element={<Strategies />} />
-                <Route path="/strategies/:id" element={<StrategyDetail />} />
-                <Route path="/portfolio" element={<Portfolio />} />
-                <Route path="/paper" element={<Paper />} />
-                <Route path="/operations" element={<Operations />} />
-                <Route path="/knowledge" element={<Knowledge />} />
-              </Routes>
-            </section>
-          </main>
-        </div>
+      <div className="app-wrapper dashboard-shell sidebar-expand-lg min-h-screen bg-slate-950 text-slate-100" data-bs-theme="dark">
+        <Sidebar />
+        <Header />
+        <main className="app-main dashboard-main min-h-screen">
+          <section className="app-content dashboard-content px-5 py-4 lg:px-8">
+            <Routes>
+              <Route path="/" element={<Overview />} />
+              <Route path="/research" element={<Research />} />
+              <Route path="/strategies" element={<Strategies />} />
+              <Route path="/strategies/:id" element={<StrategyDetail />} />
+              <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/paper" element={<Paper />} />
+              <Route path="/operations" element={<Operations />} />
+              <Route path="/knowledge" element={<Knowledge />} />
+            </Routes>
+          </section>
+        </main>
       </div>
     </BrowserRouter>
   );
@@ -72,21 +70,27 @@ function Sidebar() {
     ["/knowledge", "Knowledge", Brain]
   ] as const;
   return (
-    <aside className="app-sidebar sidebar-dark-primary dashboard-sidebar hidden h-screen border-r border-slate-800 bg-slate-950 px-4 py-5 lg:block">
-      <div className="sidebar-brand dashboard-brand mb-7 border-0 p-0">
-        <div className="brand-link p-0 text-slate-100">
+    <aside className="app-sidebar sidebar-dark-primary dashboard-sidebar border-r border-slate-800 bg-slate-950" data-bs-theme="dark">
+      <div className="sidebar-brand dashboard-brand border-0">
+        <div className="brand-link text-slate-100">
           <span className="brand-text text-lg font-semibold">QuantForge AI</span>
         </div>
         <div className="text-xs text-slate-400">Production Research Dashboard</div>
       </div>
-      <nav className="nav nav-pills nav-sidebar dashboard-nav flex-column space-y-1">
-        {links.map(([to, label, Icon]) => (
-          <NavLink key={to} to={to} className={({ isActive }) => `nav-link ${isActive ? "nav-link-active" : ""}`}>
-            <Icon size={17} />
-            <span>{label}</span>
-          </NavLink>
-        ))}
-      </nav>
+      <div className="sidebar-wrapper">
+        <nav className="mt-2">
+          <ul className="nav nav-pills nav-sidebar dashboard-nav flex-column" role="menu">
+            {links.map(([to, label, Icon]) => (
+              <li className="nav-item" key={to}>
+                <NavLink to={to} className={({ isActive }) => `nav-link ${isActive ? "nav-link-active active" : ""}`}>
+                  <Icon className="nav-icon" size={17} />
+                  <p>{label}</p>
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
     </aside>
   );
 }
@@ -117,7 +121,7 @@ function Overview() {
   return (
     <div className="space-y-5">
       <ReadinessBanner value={String(data.decision_banner)} source={String(data.source)} />
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="kpi-grid">
         <KpiCard title="Platform" value={data.platform_status} tone="good" />
         <KpiCard title="Research" value={data.research_status} tone="good" />
         <KpiCard title="Portfolio" value={data.portfolio_readiness} tone="good" />
@@ -125,7 +129,7 @@ function Overview() {
         <KpiCard title="Live Trading" value={data.live_trading_status} tone="warn" />
         <KpiCard title="Alerts" value={data.critical_alerts} tone="good" />
       </div>
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <div className="kpi-grid">
         <KpiCard title="Experiments" value={number(data.experiments)} />
         <KpiCard title="Candidates" value={number(data.candidate_strategies)} />
         <KpiCard title="Optimized" value={number(data.optimized_strategies)} />
@@ -202,7 +206,7 @@ function Portfolio() {
   return (
     <Page title="Portfolio Readiness">
       <ReadinessBanner value={String(ready.portfolio_readiness)} source={String(ready.source)} />
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="kpi-grid">
         <KpiCard title="Production Strategies" value={ready.production_strategies} />
         <KpiCard title="Selected Portfolio" value={ready.selected_portfolio_strategies} />
         <KpiCard title="Average Correlation" value={ready.average_correlation} />
@@ -225,7 +229,7 @@ function Paper() {
   if (!summary || !trades || !drift) return <Loading />;
   return (
     <Page title="Paper Trading">
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="kpi-grid">
         <KpiCard title="Paper Balance" value={`$${number(summary.paper_balance)}`} />
         <KpiCard title="Paper Equity" value={`$${number(summary.paper_equity)}`} />
         <KpiCard title="Daily P/L" value={`$${summary.daily_pl}`} />
@@ -244,7 +248,7 @@ function Operations() {
   if (!health || !services || !system) return <Loading />;
   return (
     <Page title="Operations Health">
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="kpi-grid">
         <KpiCard title="Status" value={health.platform_status} tone="good" />
         <KpiCard title="Services Online" value={health.services_online} />
         <KpiCard title="Warnings" value={health.warnings} tone="good" />
@@ -267,7 +271,7 @@ function Knowledge() {
   if (!summary || !features || !plugins || !hypotheses) return <Loading />;
   return (
     <Page title="Knowledge Base">
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="kpi-grid">
         <KpiCard title="Records" value={number(summary.knowledge_records)} />
         <KpiCard title="Confirmed" value={summary.confirmed_hypotheses} />
         <KpiCard title="Rejected" value={summary.rejected_hypotheses} />
@@ -296,7 +300,7 @@ function KpiCard({ title, value, tone = "neutral" }: { title: string; value: Rea
     <div className={`card panel dashboard-card border-l-4 ${tone === "good" ? "border-l-emerald-400" : tone === "warn" ? "border-l-amber-400" : "border-l-sky-400"}`}>
       <div className="card-body p-0">
         <div className="text-xs uppercase text-slate-400">{title}</div>
-        <div className="mt-2 break-words text-xl font-semibold">{value}</div>
+        <div className="dashboard-card-value mt-2 font-semibold">{value}</div>
       </div>
     </div>
   );
@@ -311,7 +315,7 @@ function ReadinessBanner({ value, source }: { value: string; source: string }) {
   return (
     <div className="callout callout-success rounded border border-emerald-500/40 bg-emerald-500/10 p-4">
       <div className="text-sm text-emerald-200">Decision</div>
-      <div className="text-2xl font-semibold text-emerald-50">{value}</div>
+      <div className="readiness-value text-2xl font-semibold text-emerald-50">{value}</div>
       <div className="mt-1 text-xs text-emerald-200/80">Source: {source}</div>
     </div>
   );

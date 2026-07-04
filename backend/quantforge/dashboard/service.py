@@ -146,19 +146,27 @@ class DashboardService:
         }
 
     def pipeline_current_task(self) -> dict[str, Any]:
+        full_history = self.full_history_scheduler_status()
+        completed = full_history["completed_jobs"]
+        planned = full_history["planned_jobs"]
+        failed = full_history["failed_jobs"]
+        pending = full_history["pending_jobs"]
+        status = full_history["status"]
+        latest_job = full_history["latest_job"]
+        timestamp = datetime.now(UTC).isoformat()
         return {
-            "task_id": "WF1-DB-VALIDATE-004",
-            "task": "Validate database-backed Strategy Assets",
-            "status": "RUNNING",
-            "engine": "Strategy Validation Engine",
-            "stage": "Walk-forward + robustness gates",
-            "progress": 72,
-            "started_at": "2026-07-04T15:42:00+08:00",
-            "eta": "18 min",
-            "input": "29 candidate assets from Workstream 1 database batches",
-            "output": "Strategy Asset validation reports and promotion decisions",
-            "last_event": "Monte Carlo robustness passed for 17 of 24 processed assets",
-            "timestamp": self._timestamp,
+            "task_id": "FH-SCHEDULER",
+            "task": "Run full-history research scheduler",
+            "status": status,
+            "engine": "Research Orchestrator",
+            "stage": "24/7 worker, 3 parallel scheduler jobs",
+            "progress": full_history["progress_percent"],
+            "started_at": full_history["latest_recorded_at"] or timestamp,
+            "eta": "continuous 24/7 worker",
+            "input": f"{planned} planned jobs; {pending} pending",
+            "output": "Full-history research job state and validated strategy assets",
+            "last_event": f"{completed}/{planned} complete; {failed} failed; latest: {latest_job}",
+            "timestamp": timestamp,
         }
 
     def pipeline_tasks(self) -> list[dict[str, Any]]:
@@ -174,7 +182,7 @@ class DashboardService:
                     f"{full_history['completed_jobs']}/{full_history['planned_jobs']} jobs complete; "
                     f"{full_history['pending_jobs']} pending"
                 ),
-                "eta": "daily 02:00 batches",
+                "eta": "continuous 24/7 worker",
                 "last_update": full_history["latest_recorded_at"] or self._timestamp,
             },
             {

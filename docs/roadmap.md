@@ -82,3 +82,4 @@
 - Wire Workstream 1 into the real PostgreSQL/CoreUI OANDA candle database so research batches execute against stored 10-year candle windows instead of target-mode simulations.
 - Schedule Workstream 1 as a database-backed pipeline with task-level completion evidence for connection, candle validation, real experiment batches, candidate assets, and report archival.
 - Extend the Workstream 1 database pipeline so database-backed candidates pass through optimization, event-driven backtesting, validation, and immutable Strategy Asset publication.
+- Add Dashboard MVP with read-only FastAPI endpoints and a React/TypeScript interface for executive status, research progress, strategy library, portfolio readiness, paper trading, operations health, and Knowledge Base evidence.

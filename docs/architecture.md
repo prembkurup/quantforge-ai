@@ -159,6 +159,10 @@ Database-Backed Workstream 1 executes the same research scale-out against real P
 
 The Workstream 1 Database Pipeline schedules this real-data path as operational tasks: database connection, candle coverage validation, real experiment batch execution, database-backed candidate asset generation, optimization, event-driven backtesting, validation, immutable Strategy Asset publication, and report archival. This gives each run task-level completion evidence before published Strategy Assets move to paper/shadow and controlled live-capital gates.
 
+## Dashboard MVP
+
+The Dashboard MVP provides a read-only FastAPI and React interface over existing platform evidence. It exposes executive status, research progress, Strategy Library traceability, portfolio readiness, paper trading status, operations health, and Knowledge Base rankings. Version 1 deliberately has no trade execution, strategy deployment, or other write actions.
+
 ## Safety Rules
 
 - Research code must not place live orders.

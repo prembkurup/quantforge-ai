@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #020617;
+}
+
+.panel {
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  background: #0f172a;
+  padding: 16px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 6px;
+  padding: 9px 10px;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.nav-link:hover,
+.nav-link-active {
+  background: #172033;
+  color: #f8fafc;
+}
+
+.status {
+  border: 1px solid #334155;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status.good {
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #a7f3d0;
+}
+
+.status.warn {
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #fde68a;
+}
+
+.status.neutral {
+  color: #cbd5e1;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #0f172a;
+  padding: 10px 12px;
+  color: #f8fafc;
+  outline: none;
+}
+
+.input:focus {
+  border-color: #22d3ee;
+}

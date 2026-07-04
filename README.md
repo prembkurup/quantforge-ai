@@ -73,6 +73,7 @@ docs/
   workstream-1-strategy-library.md
   database-backed-workstream-1.md
   workstream-1-database-pipeline.md
+  dashboard-mvp.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -228,6 +229,20 @@ Schedule and complete the Workstream 1 database pipeline:
 ```
 
 The scheduled pipeline continues from real candle batches into optimization, event-driven backtesting, validation, and Strategy Asset publication. Use `--max-assets-to-validate` to cap how many database-backed candidates move through the expensive gates in one run.
+
+Run the read-only dashboard API:
+
+```powershell
+.\.venv\Scripts\python .\scripts\serve_dashboard_api.py
+```
+
+Run the React dashboard:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
 ## Foundation Setup
 

@@ -58,3 +58,4 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Wire Workstream 1 to real CoreUI/OANDA candle database windows for database-backed experiment batches and candidate Strategy Assets.
 - Schedule and run Workstream 1 as a database-backed pipeline with task-level evidence and completion reporting.
 - Connect Workstream 1 database-backed candidates to optimization, event-driven backtesting, validation, and Strategy Asset publication.
+- Build Dashboard MVP as a read-only FastAPI + React/TypeScript UI for executive status, research progress, strategy library, portfolio readiness, paper trading, operations health, and Knowledge Base evidence.

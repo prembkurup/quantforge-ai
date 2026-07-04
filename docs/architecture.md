@@ -157,6 +157,8 @@ The strategy library is built across independent trend following, mean reversion
 
 Database-Backed Workstream 1 executes the same research scale-out against real PostgreSQL/CoreUI OANDA candles. It checks database coverage, duplicate candles, and gap evidence, then slices actual candle rows into rolling research windows and runs strategy-template experiment batches. Its outputs are database-backed candidate assets, not synthetic target-mode assets, and they still require the normal validation and paper/shadow gates before live capital.
 
+The Workstream 1 Database Pipeline schedules this real-data path as operational tasks: database connection, candle coverage validation, real experiment batch execution, database-backed candidate asset generation, and report archival. This gives each run task-level completion evidence before the research output moves to the broader optimizer, backtester, and validator pipeline.
+
 ## Safety Rules
 
 - Research code must not place live orders.

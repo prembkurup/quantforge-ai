@@ -56,3 +56,4 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Implement Production Acceptance and Live Capital Qualification for Version 1.0 acceptance scorecard, executive dashboard, capital scaling controller, release approval workflow, checklist, and sign-off record.
 - Implement Workstream 1 Strategy Library for 500,000-1,000,000 experiments, 500-2,000 validated Strategy Assets, 50-100 production-grade strategies, dashboard, report, audit trail, and reproducibility key.
 - Wire Workstream 1 to real CoreUI/OANDA candle database windows for database-backed experiment batches and candidate Strategy Assets.
+- Schedule and run Workstream 1 as a database-backed pipeline with task-level evidence and completion reporting.

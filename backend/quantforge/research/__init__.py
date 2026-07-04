@@ -151,6 +151,16 @@ from quantforge.research.orchestrator import (
 from quantforge.research.parameters import ParameterGenerator
 from quantforge.research.pipeline import RESEARCH_PIPELINE, ResearchStage, ResearchStageResult
 from quantforge.research.ranking import StrategyRankingEngine
+from quantforge.research.workstream_pipeline import (
+    Workstream1PipelineRunner,
+    Workstream1PipelineScheduler,
+    WorkstreamPipelineReport,
+    WorkstreamPipelineResult,
+    WorkstreamPipelineSchedule,
+    WorkstreamPipelineTask,
+    WorkstreamPipelineTaskStatus,
+    WorkstreamPipelineTaskType,
+)
 
 __all__ = [
     "DataPreparationEngine",
@@ -288,4 +298,12 @@ __all__ = [
     "ResearchStageResult",
     "StrategyRankingEngine",
     "TemplatePlan",
+    "Workstream1PipelineRunner",
+    "Workstream1PipelineScheduler",
+    "WorkstreamPipelineReport",
+    "WorkstreamPipelineResult",
+    "WorkstreamPipelineSchedule",
+    "WorkstreamPipelineTask",
+    "WorkstreamPipelineTaskStatus",
+    "WorkstreamPipelineTaskType",
 ]

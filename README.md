@@ -72,6 +72,7 @@ docs/
   production-acceptance-live-capital.md
   workstream-1-strategy-library.md
   database-backed-workstream-1.md
+  workstream-1-database-pipeline.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -218,6 +219,12 @@ Run Workstream 1 against the real CoreUI/OANDA candle database:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\database_strategy_library.py --pairs EUR_USD --timeframes H1 --from 2025-01-01 --to 2025-02-01 --max-batches 25
+```
+
+Schedule and complete the Workstream 1 database pipeline:
+
+```powershell
+.\.venv\Scripts\python .\scripts\run_workstream1_pipeline.py --pairs EUR_USD --timeframes H1 --from 2025-01-01 --to 2025-02-01 --max-batches 2
 ```
 
 ## Foundation Setup

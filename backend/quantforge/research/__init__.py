@@ -77,6 +77,8 @@ from quantforge.research.full_history_scheduler import (
     FullHistoryRunResult,
     FullHistorySchedulerConfig,
     FullHistoryStage,
+    claim_pending_jobs,
+    release_running_jobs,
 )
 from quantforge.research.knowledge_base import (
     ExperimentResultKnowledge,
@@ -238,6 +240,8 @@ __all__ = [
     "FullHistoryRunResult",
     "FullHistorySchedulerConfig",
     "FullHistoryStage",
+    "claim_pending_jobs",
+    "release_running_jobs",
     "ExperimentResultKnowledge",
     "Hypothesis",
     "HypothesisStatus",

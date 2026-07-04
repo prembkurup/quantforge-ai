@@ -7,6 +7,8 @@ from quantforge.research import (
     FullHistoryResearchScheduler,
     FullHistorySchedulerConfig,
     FullHistoryStage,
+    claim_pending_jobs,
+    release_running_jobs,
 )
 from quantforge.tests.test_workstream1_pipeline import FakeCandleRepository
 
@@ -52,6 +54,69 @@ def test_full_history_scheduler_runs_limited_jobs_and_saves_state(tmp_path) -> N
 
     assert second_result.completed_jobs == 1
     assert second_result.executed_jobs[0].stage == FullHistoryStage.SMOKE
+
+
+def test_full_history_scheduler_claims_distinct_parallel_jobs(tmp_path) -> None:
+    state_file = tmp_path / "full_history_state.json"
+    scheduler = FullHistoryResearchScheduler(
+        config=_config(),
+        state_file=state_file,
+        repository_factory=FakeCandleRepository,
+    )
+    planned = scheduler.plan()
+
+    first_claim = claim_pending_jobs(
+        state_file,
+        planned,
+        limit=3,
+        owner="worker-a",
+        stale_after_seconds=3600,
+    )
+    second_claim = claim_pending_jobs(
+        state_file,
+        planned,
+        limit=3,
+        owner="worker-b",
+        stale_after_seconds=3600,
+    )
+
+    assert len(first_claim) == 3
+    assert len(second_claim) == 1
+    assert {job.job_id for job in first_claim}.isdisjoint(job.job_id for job in second_claim)
+
+    release_running_jobs(state_file, tuple(job.job_id for job in first_claim))
+    released_claim = claim_pending_jobs(
+        state_file,
+        planned,
+        limit=1,
+        owner="worker-c",
+        stale_after_seconds=3600,
+    )
+
+    assert released_claim[0].job_id == first_claim[0].job_id
+
+
+def test_full_history_scheduler_runs_specific_claimed_job(tmp_path) -> None:
+    state_file = tmp_path / "full_history_state.json"
+    scheduler = FullHistoryResearchScheduler(
+        config=_config(),
+        state_file=state_file,
+        repository_factory=FakeCandleRepository,
+    )
+    claimed = claim_pending_jobs(
+        state_file,
+        scheduler.plan(),
+        limit=1,
+        owner="worker-a",
+        stale_after_seconds=3600,
+    )
+
+    result = scheduler.run_job(claimed[0].job_id)
+
+    assert result.completed_jobs == 1
+    assert result.failed_jobs == 0
+    assert result.executed_jobs[0].job_id == claimed[0].job_id
+    assert result.executed_jobs[0].status == FullHistoryJobStatus.COMPLETE
 
 
 def _config() -> FullHistorySchedulerConfig:

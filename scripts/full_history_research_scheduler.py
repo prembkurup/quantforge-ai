@@ -24,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--to", dest="end", default=date.today().isoformat())
     parser.add_argument("--state-file", default="var/full_history_research_state.json")
     parser.add_argument("--max-jobs", type=int, default=1)
+    parser.add_argument("--job-id", default="")
     parser.add_argument("--window-candles", type=int, default=300)
     parser.add_argument("--stride-candles", type=int, default=100)
     parser.add_argument("--smoke-days", type=int, default=31)
@@ -59,7 +60,10 @@ def main() -> None:
             state_file=Path(args.state_file),
             repository_factory=lambda: repository,
         )
-        result = scheduler.run_pending(max_jobs=args.max_jobs, dry_run=args.dry_run)
+        if args.job_id:
+            result = scheduler.run_job(args.job_id, dry_run=args.dry_run)
+        else:
+            result = scheduler.run_pending(max_jobs=args.max_jobs, dry_run=args.dry_run)
 
     print("Full History Research Scheduler")
     print()

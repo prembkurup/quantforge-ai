@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
@@ -134,9 +136,14 @@ class FullHistoryResearchScheduler:
         state = _load_state(self.state_file)
         completed = set(state.get("completed", []))
         failed = set(state.get("failed", []))
+        running = set(_running_jobs(state))
         executed: list[FullHistoryResearchJob] = []
         planned = self.plan()
-        pending = [job for job in planned if job.job_id not in completed and job.job_id not in failed]
+        pending = [
+            job
+            for job in planned
+            if job.job_id not in completed and job.job_id not in failed and job.job_id not in running
+        ]
 
         for job in pending[: max(0, max_jobs)]:
             if dry_run:
@@ -144,11 +151,10 @@ class FullHistoryResearchScheduler:
                 continue
             result_job = self._run_job(job)
             executed.append(result_job)
-            if result_job.status == FullHistoryJobStatus.COMPLETE:
-                completed.add(result_job.job_id)
-            elif result_job.status == FullHistoryJobStatus.FAILED:
-                failed.add(result_job.job_id)
-            _save_state(self.state_file, completed, failed, result_job)
+            _record_job_result(self.state_file, result_job)
+            state = _load_state(self.state_file)
+            completed = set(state.get("completed", []))
+            failed = set(state.get("failed", []))
 
         return FullHistoryRunResult(
             planned_jobs=len(planned),
@@ -156,6 +162,51 @@ class FullHistoryResearchScheduler:
             failed_jobs=len(failed),
             skipped_jobs=max(0, len(pending) - len(executed)),
             executed_jobs=tuple(executed),
+            state_file=str(self.state_file),
+        )
+
+    def run_job(self, job_id: str, *, dry_run: bool = False) -> FullHistoryRunResult:
+        planned = self.plan()
+        jobs_by_id = {job.job_id: job for job in planned}
+        job = jobs_by_id.get(job_id)
+        if job is None:
+            raise ValueError(f"Unknown full-history job id: {job_id}")
+
+        state = _load_state(self.state_file)
+        completed = set(state.get("completed", []))
+        failed = set(state.get("failed", []))
+        if job_id in completed or job_id in failed:
+            return FullHistoryRunResult(
+                planned_jobs=len(planned),
+                completed_jobs=len(completed),
+                failed_jobs=len(failed),
+                skipped_jobs=0,
+                executed_jobs=(),
+                state_file=str(self.state_file),
+            )
+
+        if dry_run:
+            executed = (job,)
+        else:
+            result_job = self._run_job(job)
+            _record_job_result(self.state_file, result_job)
+            executed = (result_job,)
+
+        state = _load_state(self.state_file)
+        completed = set(state.get("completed", []))
+        failed = set(state.get("failed", []))
+        running = set(_running_jobs(state))
+        pending = [
+            item
+            for item in planned
+            if item.job_id not in completed and item.job_id not in failed and item.job_id not in running
+        ]
+        return FullHistoryRunResult(
+            planned_jobs=len(planned),
+            completed_jobs=len(completed),
+            failed_jobs=len(failed),
+            skipped_jobs=len(pending),
+            executed_jobs=executed,
             state_file=str(self.state_file),
         )
 
@@ -258,8 +309,166 @@ def _rolling_windows(start: datetime, end: datetime, years: int) -> tuple[tuple[
 
 def _load_state(path: Path) -> dict[str, object]:
     if not path.exists():
-        return {"completed": [], "failed": [], "history": []}
+        return {"completed": [], "failed": [], "history": [], "running": {}}
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def claim_pending_jobs(
+    path: Path,
+    planned: tuple[FullHistoryResearchJob, ...],
+    *,
+    limit: int,
+    owner: str,
+    stale_after_seconds: int,
+) -> tuple[FullHistoryResearchJob, ...]:
+    now = datetime.now(timezone.utc)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _state_lock(path):
+        state = _load_state(path)
+        running = _fresh_running_jobs(state, now=now, stale_after_seconds=stale_after_seconds)
+        completed = set(state.get("completed", []))
+        failed = set(state.get("failed", []))
+        claimed: list[FullHistoryResearchJob] = []
+        for job in planned:
+            if len(claimed) >= max(0, limit):
+                break
+            if job.job_id in completed or job.job_id in failed or job.job_id in running:
+                continue
+            running[job.job_id] = {"owner": owner, "claimed_at": now.isoformat()}
+            claimed.append(job)
+
+        _write_state(
+            path,
+            completed=completed,
+            failed=failed,
+            history=list(state.get("history", [])),
+            running=running,
+        )
+        return tuple(claimed)
+
+
+def release_running_jobs(path: Path, job_ids: tuple[str, ...]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _state_lock(path):
+        state = _load_state(path)
+        running = dict(state.get("running", {}))
+        for job_id in job_ids:
+            running.pop(job_id, None)
+        _write_state(
+            path,
+            completed=set(state.get("completed", [])),
+            failed=set(state.get("failed", [])),
+            history=list(state.get("history", [])),
+            running=running,
+        )
+
+
+def _record_job_result(path: Path, job: FullHistoryResearchJob) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _state_lock(path):
+        state = _load_state(path)
+        completed = set(state.get("completed", []))
+        failed = set(state.get("failed", []))
+        running = dict(state.get("running", {}))
+        if job.status == FullHistoryJobStatus.COMPLETE:
+            completed.add(job.job_id)
+            failed.discard(job.job_id)
+        elif job.status == FullHistoryJobStatus.FAILED:
+            failed.add(job.job_id)
+            completed.discard(job.job_id)
+        running.pop(job.job_id, None)
+
+        history = list(state.get("history", []))
+        payload = asdict(job)
+        payload["stage"] = job.stage.value
+        payload["status"] = job.status.value
+        payload["start"] = job.start.isoformat()
+        payload["end"] = job.end.isoformat()
+        payload["recorded_at"] = datetime.now(timezone.utc).isoformat()
+        history.append(payload)
+        _write_state(path, completed=completed, failed=failed, history=history, running=running)
+
+
+def _write_state(
+    path: Path,
+    *,
+    completed: set[str],
+    failed: set[str],
+    history: list[object],
+    running: dict[str, object],
+) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "completed": sorted(completed),
+                "failed": sorted(failed),
+                "history": history,
+                "running": running,
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _fresh_running_jobs(
+    state: dict[str, object],
+    *,
+    now: datetime,
+    stale_after_seconds: int,
+) -> dict[str, object]:
+    fresh: dict[str, object] = {}
+    running = state.get("running", {})
+    if not isinstance(running, dict):
+        return fresh
+    for job_id, payload in running.items():
+        if not isinstance(payload, dict):
+            continue
+        claimed_at = payload.get("claimed_at")
+        if not isinstance(claimed_at, str):
+            continue
+        try:
+            claimed = datetime.fromisoformat(claimed_at)
+        except ValueError:
+            continue
+        if claimed.tzinfo is None:
+            claimed = claimed.replace(tzinfo=timezone.utc)
+        if (now - claimed).total_seconds() <= stale_after_seconds:
+            fresh[job_id] = payload
+    return fresh
+
+
+def _running_jobs(state: dict[str, object]) -> tuple[str, ...]:
+    running = state.get("running", {})
+    if not isinstance(running, dict):
+        return ()
+    return tuple(str(job_id) for job_id in running)
+
+
+@contextmanager
+def _state_lock(path: Path):
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as handle:
+        if os.name == "nt":
+            import msvcrt
+
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _save_state(
@@ -268,7 +477,7 @@ def _save_state(
     failed: set[str],
     job: FullHistoryResearchJob,
 ) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    """Backward-compatible wrapper for older call sites."""
     state = _load_state(path)
     history = list(state.get("history", []))
     payload = asdict(job)
@@ -278,15 +487,10 @@ def _save_state(
     payload["end"] = job.end.isoformat()
     payload["recorded_at"] = datetime.now(timezone.utc).isoformat()
     history.append(payload)
-    path.write_text(
-        json.dumps(
-            {
-                "completed": sorted(completed),
-                "failed": sorted(failed),
-                "history": history,
-            },
-            indent=2,
-            sort_keys=True,
-        ),
-        encoding="utf-8",
+    _write_state(
+        path,
+        completed=completed,
+        failed=failed,
+        history=history,
+        running=dict(state.get("running", {})),
     )

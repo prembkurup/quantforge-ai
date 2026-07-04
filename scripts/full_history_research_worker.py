@@ -5,8 +5,18 @@ import socket
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, time as datetime_time, timedelta, timezone
 from pathlib import Path
+
+from quantforge.research.full_history_scheduler import (
+    FULL_HISTORY_RESEARCH_PAIRS,
+    FULL_HISTORY_RESEARCH_START,
+    FULL_HISTORY_RESEARCH_TIMEFRAMES,
+    FullHistoryResearchScheduler,
+    FullHistorySchedulerConfig,
+    claim_pending_jobs,
+    release_running_jobs,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -17,6 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sleep-seconds", type=int, default=30)
     parser.add_argument("--error-sleep-seconds", type=int, default=300)
     parser.add_argument("--idle-sleep-seconds", type=int, default=900)
+    parser.add_argument("--running-stale-seconds", type=int, default=21600)
     parser.add_argument("--state-file", default="var/full_history_research_state.json")
     return parser.parse_args()
 
@@ -30,9 +41,15 @@ def main() -> None:
 
     repo_root = Path(__file__).resolve().parents[1]
     scheduler_script = repo_root / "scripts" / "full_history_research_scheduler.py"
+    state_file = repo_root / args.state_file
     python_exe = repo_root / ".venv" / "Scripts" / "python.exe"
     if not python_exe.exists():
         python_exe = Path(sys.executable)
+    scheduler = FullHistoryResearchScheduler(
+        config=_scheduler_config(),
+        state_file=state_file,
+        repository_factory=lambda: None,
+    )
 
     print("Full History Research 24/7 Worker")
     print(f"Started At: {_now()}")
@@ -43,35 +60,15 @@ def main() -> None:
     sys.stdout.flush()
 
     while True:
-        command = [
-            str(python_exe),
-            str(scheduler_script),
-            "--max-jobs",
-            str(args.max_jobs),
-            "--state-file",
-            args.state_file,
-        ]
-        print(f"[{_now()}] Starting one full-history scheduler loop")
-        sys.stdout.flush()
-        completed = subprocess.run(
-            command,
-            cwd=repo_root,
-            check=False,
-            stderr=subprocess.STDOUT,
-            stdout=subprocess.PIPE,
-            text=True,
+        owner = f"{socket.gethostname()}:{_now()}"
+        jobs = claim_pending_jobs(
+            state_file,
+            scheduler.plan(),
+            limit=args.max_jobs,
+            owner=owner,
+            stale_after_seconds=args.running_stale_seconds,
         )
-        print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n")
-        if completed.returncode != 0:
-            print(
-                f"[{_now()}] Scheduler loop failed with exit code {completed.returncode}; "
-                f"sleeping {args.error_sleep_seconds}s"
-            )
-            sys.stdout.flush()
-            time.sleep(args.error_sleep_seconds)
-            continue
-
-        if "Executed This Run: 0" in completed.stdout:
+        if not jobs:
             print(
                 f"[{_now()}] No pending full-history jobs detected; "
                 f"sleeping {args.idle_sleep_seconds}s"
@@ -80,13 +77,68 @@ def main() -> None:
             time.sleep(args.idle_sleep_seconds)
             continue
 
-        print(f"[{_now()}] Scheduler loop complete; sleeping {args.sleep_seconds}s")
+        print(f"[{_now()}] Starting {len(jobs)} parallel full-history scheduler job(s)")
+        sys.stdout.flush()
+        processes: list[tuple[str, subprocess.Popen[str]]] = []
+        for job in jobs:
+            command = [
+                str(python_exe),
+                str(scheduler_script),
+                "--job-id",
+                job.job_id,
+                "--state-file",
+                args.state_file,
+            ]
+            processes.append(
+                (
+                    job.job_id,
+                    subprocess.Popen(
+                        command,
+                        cwd=repo_root,
+                        stderr=subprocess.STDOUT,
+                        stdout=subprocess.PIPE,
+                        text=True,
+                    ),
+                )
+            )
+
+        failures: list[str] = []
+        for job_id, process in processes:
+            stdout, _ = process.communicate()
+            print(stdout, end="" if stdout.endswith("\n") else "\n")
+            if process.returncode != 0:
+                failures.append(job_id)
+
+        if failures:
+            release_running_jobs(state_file, tuple(failures))
+            print(
+                f"[{_now()}] {len(failures)} scheduler job(s) failed at process level; "
+                f"sleeping {args.error_sleep_seconds}s"
+            )
+            sys.stdout.flush()
+            time.sleep(args.error_sleep_seconds)
+            continue
+
+        print(
+            f"[{_now()}] Parallel scheduler loop complete; "
+            f"executed {len(jobs)} job(s); sleeping {args.sleep_seconds}s"
+        )
         sys.stdout.flush()
         time.sleep(args.sleep_seconds)
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _scheduler_config() -> FullHistorySchedulerConfig:
+    return FullHistorySchedulerConfig(
+        pairs=FULL_HISTORY_RESEARCH_PAIRS,
+        timeframes=FULL_HISTORY_RESEARCH_TIMEFRAMES,
+        start=FULL_HISTORY_RESEARCH_START,
+        end=datetime.combine(date.today(), datetime_time.min, tzinfo=timezone.utc)
+        + timedelta(days=1),
+    )
 
 
 def _single_instance_lock() -> socket.socket | None:

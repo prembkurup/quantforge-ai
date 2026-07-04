@@ -42,6 +42,7 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Implement Strategy Validation Platform with Strategy Passport and Strategy Asset lifecycle.
 - Implement Production Strategy Management Platform for catalog, registry, deployment, portfolio allocation, drift monitoring, and retirement.
 - Implement Autonomous Research Validation for 100+ experiment lifecycle runs, Strategy Asset publishing, Knowledge Base updates, reports, and audit trails.
+- Implement Institutional Research Campaigns for 100,000+ experiments, 1,000,000+ candidates, validated Strategy Asset publication, diversified portfolio construction, and daily/weekly/monthly research reports.
 - Store experiment lineage, research run metrics, validation results, and analytics.
 - Add Parquet research cache.
 - Define live trading risk checks.

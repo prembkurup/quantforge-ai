@@ -39,6 +39,7 @@
 - Run backtests and validation only after strategy structure and parameter regions pass review.
 - Add Backtesting Engine 2.0 with event-driven market simulation, execution simulation, position and portfolio management, trade journal, performance reports, replay mode, and time machine.
 - Add Autonomous Research Validation to run the complete research lifecycle, execute 100+ experiments, publish validated Strategy Assets, update the Knowledge Base, and preserve audit trails.
+- Add Institutional Research Campaigns to run independent research programs at campaign scale, publish hundreds of approved Strategy Assets, construct diversified portfolio candidates, and generate daily/weekly/monthly research reports.
 - Store experiment lineage, analytics, and final metrics.
 - Export research cache to Parquet.
 

@@ -67,6 +67,7 @@ docs/
   production-engineering-sre.md
   shadow-trading-platform.md
   production-certification-platform.md
+  institutional-research-campaign.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -183,6 +184,12 @@ Run the Production Certification demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\certify_production.py
+```
+
+Run the Institutional Research Campaign demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\institutional_campaign.py
 ```
 
 ## Foundation Setup

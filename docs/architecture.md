@@ -129,6 +129,12 @@ Certification covers research, strategy, infrastructure, operations, security, r
 
 Only a `CERTIFIED` decision from the Production Approval Manager allows controlled live trading. Provisionally certified, remediation-required, and rejected systems remain blocked from real capital.
 
+## Institutional Research Campaigns
+
+Institutional Research Campaigns run the complete research ecosystem as an autonomous quantitative research organization. Campaigns are divided into independent programs such as trend following, mean reversion, breakout, momentum, and volatility. Each program starts with hypotheses, plans experiments, composes strategies, optimizes stable regions, backtests, validates, ranks, updates the Knowledge Base, and publishes Strategy Assets.
+
+Campaign results measure research outcomes rather than new software capability: experiments completed, candidate strategies generated, optimized and validated strategies, approved Strategy Assets, production candidates, Knowledge Base growth, and portfolio diversification. Portfolio construction intentionally balances strategy family, market regime, currency exposure, timeframe, and correlation instead of selecting only the highest-profit strategy.
+
 ## Safety Rules
 
 - Research code must not place live orders.

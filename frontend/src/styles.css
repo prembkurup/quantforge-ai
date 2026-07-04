@@ -13,12 +13,50 @@ body {
   background: #020617;
 }
 
+.app-wrapper {
+  --cui-body-bg: #020617;
+  --cui-body-color: #f8fafc;
+  --cui-border-color: #1e293b;
+  --bs-body-bg: #020617;
+  --bs-body-color: #f8fafc;
+  --bs-border-color: #1e293b;
+}
+
+.app-main {
+  min-height: 100vh;
+}
+
+.app-sidebar {
+  --lte-sidebar-width: 16rem;
+  box-shadow: 1px 0 0 rgba(148, 163, 184, 0.08);
+}
+
+.app-header {
+  margin-left: 0;
+  min-height: 65px;
+  color: #f8fafc;
+}
+
+.brand-link:hover {
+  color: #f8fafc;
+}
+
 .panel {
   border: 1px solid #1e293b;
   border-radius: 8px;
   background: #0f172a;
   padding: 16px;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+}
+
+.dashboard-card {
+  color: #f8fafc;
+  background-color: #0f172a;
+  border-color: #1e293b;
+}
+
+.callout {
+  border-left-width: 4px;
 }
 
 .nav-link {
@@ -38,20 +76,17 @@ body {
 }
 
 .status {
-  border: 1px solid #334155;
   border-radius: 999px;
-  padding: 5px 9px;
+  padding: 6px 9px;
   font-size: 12px;
   font-weight: 600;
 }
 
 .status.good {
-  border-color: rgba(52, 211, 153, 0.55);
   color: #a7f3d0;
 }
 
 .status.warn {
-  border-color: rgba(251, 191, 36, 0.55);
   color: #fde68a;
 }
 
@@ -71,4 +106,23 @@ body {
 
 .input:focus {
   border-color: #22d3ee;
+}
+
+.dashboard-table {
+  --bs-table-bg: #0f172a;
+  --bs-table-striped-bg: #111c2e;
+  --bs-table-hover-bg: #172033;
+  --bs-table-color: #e2e8f0;
+  --bs-table-border-color: #1e293b;
+  margin-bottom: 0;
+}
+
+.dashboard-table th {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.dashboard-table td,
+.dashboard-table th {
+  border-color: #1e293b;
 }

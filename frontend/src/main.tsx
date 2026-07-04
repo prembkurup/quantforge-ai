@@ -2,7 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
+import { CBadge } from "@coreui/react";
 import { Activity, BookOpen, Brain, CandlestickChart, Database, HeartPulse, Library, LineChart, ShieldCheck } from "lucide-react";
+import "@coreui/coreui/dist/css/coreui.min.css";
+import "admin-lte/dist/css/adminlte.min.css";
 import "./styles.css";
 
 const apiBase = import.meta.env.VITE_API_BASE ?? "";
@@ -34,12 +37,12 @@ function useApi<T>(path: string): T | null {
 function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-slate-950 text-slate-100">
-        <div className="flex">
+      <div className="app-wrapper min-h-screen bg-slate-950 text-slate-100" data-bs-theme="dark">
+        <div className="app-main flex">
           <Sidebar />
-          <main className="min-h-screen flex-1">
+          <main className="app-content-wrapper min-h-screen flex-1">
             <Header />
-            <section className="px-5 py-4 lg:px-8">
+            <section className="app-content px-5 py-4 lg:px-8">
               <Routes>
                 <Route path="/" element={<Overview />} />
                 <Route path="/research" element={<Research />} />
@@ -69,12 +72,14 @@ function Sidebar() {
     ["/knowledge", "Knowledge", Brain]
   ] as const;
   return (
-    <aside className="sticky top-0 hidden h-screen w-64 border-r border-slate-800 bg-slate-950 px-4 py-5 lg:block">
-      <div className="mb-7">
-        <div className="text-lg font-semibold">QuantForge AI</div>
+    <aside className="app-sidebar sidebar-dark-primary sticky top-0 hidden h-screen w-64 border-r border-slate-800 bg-slate-950 px-4 py-5 lg:block">
+      <div className="sidebar-brand mb-7 border-0 p-0">
+        <div className="brand-link p-0 text-slate-100">
+          <span className="brand-text text-lg font-semibold">QuantForge AI</span>
+        </div>
         <div className="text-xs text-slate-400">Production Research Dashboard</div>
       </div>
-      <nav className="space-y-1">
+      <nav className="nav nav-pills nav-sidebar flex-column space-y-1">
         {links.map(([to, label, Icon]) => (
           <NavLink key={to} to={to} className={({ isActive }) => `nav-link ${isActive ? "nav-link-active" : ""}`}>
             <Icon size={17} />
@@ -88,13 +93,15 @@ function Sidebar() {
 
 function Header() {
   return (
-    <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 px-5 py-3 backdrop-blur lg:px-8">
+    <header className="app-header navbar navbar-expand sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 px-5 py-3 backdrop-blur lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-normal">QuantForge AI</h1>
           <p className="text-sm text-slate-400">Production Research Dashboard</p>
         </div>
         <div className="flex gap-2">
+          <CBadge color="info">CoreUI</CBadge>
+          <span className="badge text-bg-secondary">AdminLTE</span>
           <StatusBadge label="HEALTHY" tone="good" />
           <StatusBadge label="READ ONLY" tone="neutral" />
           <StatusBadge label="LIVE DISABLED" tone="warn" />
@@ -286,20 +293,23 @@ function Page({ title, children }: { title: string; children: React.ReactNode })
 
 function KpiCard({ title, value, tone = "neutral" }: { title: string; value: React.ReactNode; tone?: "good" | "warn" | "neutral" }) {
   return (
-    <div className={`panel border-l-4 ${tone === "good" ? "border-l-emerald-400" : tone === "warn" ? "border-l-amber-400" : "border-l-sky-400"}`}>
-      <div className="text-xs uppercase text-slate-400">{title}</div>
-      <div className="mt-2 break-words text-xl font-semibold">{value}</div>
+    <div className={`card panel dashboard-card border-l-4 ${tone === "good" ? "border-l-emerald-400" : tone === "warn" ? "border-l-amber-400" : "border-l-sky-400"}`}>
+      <div className="card-body p-0">
+        <div className="text-xs uppercase text-slate-400">{title}</div>
+        <div className="mt-2 break-words text-xl font-semibold">{value}</div>
+      </div>
     </div>
   );
 }
 
 function StatusBadge({ label, tone }: { label: string; tone: "good" | "warn" | "neutral" }) {
-  return <span className={`status ${tone}`}>{label}</span>;
+  const bootstrapTone = tone === "good" ? "success" : tone === "warn" ? "warning" : "secondary";
+  return <span className={`badge text-bg-${bootstrapTone} status ${tone}`}>{label}</span>;
 }
 
 function ReadinessBanner({ value, source }: { value: string; source: string }) {
   return (
-    <div className="rounded border border-emerald-500/40 bg-emerald-500/10 p-4">
+    <div className="callout callout-success rounded border border-emerald-500/40 bg-emerald-500/10 p-4">
       <div className="text-sm text-emerald-200">Decision</div>
       <div className="text-2xl font-semibold text-emerald-50">{value}</div>
       <div className="mt-1 text-xs text-emerald-200/80">Source: {source}</div>
@@ -310,10 +320,10 @@ function ReadinessBanner({ value, source }: { value: string; source: string }) {
 function DataTable({ title, rows, linkKey }: { title: string; rows: Row[]; linkKey?: string }) {
   const columns = rows[0] ? Object.keys(rows[0]).slice(0, 10) : [];
   return (
-    <div className="panel overflow-hidden">
-      <div className="mb-3 font-medium">{title}</div>
+    <div className="card panel dashboard-card overflow-hidden">
+      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{title}</div>
       <div className="overflow-auto">
-        <table className="w-full min-w-[760px] text-left text-sm">
+        <table className="table table-dark table-hover dashboard-table w-full min-w-[760px] text-left text-sm">
           <thead className="bg-slate-900 text-xs uppercase text-slate-400">
             <tr>{columns.map((column) => <th key={column} className="px-3 py-2">{column.replace(/_/g, " ")}</th>)}</tr>
           </thead>
@@ -336,8 +346,8 @@ function DataTable({ title, rows, linkKey }: { title: string; rows: Row[]; linkK
 
 function LinePanel({ title, data }: { title: string; data: number[] }) {
   return (
-    <div className="panel">
-      <div className="mb-2 font-medium">{title}</div>
+    <div className="card panel dashboard-card">
+      <div className="card-header border-0 bg-transparent p-0 pb-2 font-medium">{title}</div>
       <ReactECharts className="h-64" option={{ backgroundColor: "transparent", xAxis: { type: "category", data: data.map((_, index) => `T${index + 1}`) }, yAxis: { type: "value" }, series: [{ data, type: "line", smooth: true, areaStyle: {} }], textStyle: { color: "#cbd5e1" }, grid: { left: 44, right: 16, top: 20, bottom: 28 } }} />
     </div>
   );
@@ -345,8 +355,8 @@ function LinePanel({ title, data }: { title: string; data: number[] }) {
 
 function BarPanel({ title, data, labels }: { title: string; data: number[]; labels?: string[] }) {
   return (
-    <div className="panel">
-      <div className="mb-2 font-medium">{title}</div>
+    <div className="card panel dashboard-card">
+      <div className="card-header border-0 bg-transparent p-0 pb-2 font-medium">{title}</div>
       <ReactECharts className="h-64" option={{ backgroundColor: "transparent", xAxis: { type: "category", data: labels ?? data.map((_, index) => `B${index + 1}`) }, yAxis: { type: "value" }, series: [{ data, type: "bar" }], textStyle: { color: "#cbd5e1" }, grid: { left: 44, right: 16, top: 20, bottom: 42 } }} />
     </div>
   );
@@ -354,8 +364,8 @@ function BarPanel({ title, data, labels }: { title: string; data: number[]; labe
 
 function JsonPanel({ title, data }: { title: string; data: unknown }) {
   return (
-    <div className="panel">
-      <div className="mb-2 font-medium">{title}</div>
+    <div className="card panel dashboard-card">
+      <div className="card-header border-0 bg-transparent p-0 pb-2 font-medium">{title}</div>
       <pre className="overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-300">{JSON.stringify(data, null, 2)}</pre>
     </div>
   );

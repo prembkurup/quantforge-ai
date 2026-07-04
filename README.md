@@ -244,6 +244,8 @@ npm install
 npm run dev
 ```
 
+The dashboard shell uses CoreUI and AdminLTE styling while staying read-only for Version 1.
+
 ## Foundation Setup
 
 Create and activate the local Python environment:

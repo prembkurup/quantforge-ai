@@ -35,6 +35,13 @@ The API currently exposes dashboard DTOs from existing QuantForge evidence modul
 
 ## Frontend
 
+The React dashboard uses Tailwind for local layout polish and imports CoreUI plus AdminLTE for the internal operations-console theme:
+
+- `@coreui/coreui`
+- `@coreui/react`
+- `admin-lte`
+- `bootstrap`
+
 Run the React dashboard:
 
 ```powershell

@@ -69,6 +69,7 @@ docs/
   production-certification-platform.md
   institutional-research-campaign.md
   autonomous-operations-validation.md
+  production-acceptance-live-capital.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -197,6 +198,12 @@ Run the Autonomous Operations Validation demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\autonomous_operations.py
+```
+
+Run the Production Acceptance and Live Capital Qualification demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\production_acceptance.py
 ```
 
 ## Foundation Setup

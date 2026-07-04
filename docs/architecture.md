@@ -141,6 +141,14 @@ Autonomous Operations Validation proves the platform can run as a production tra
 
 The validation gate fails if duplicate orders are created, broker mismatches remain unreconciled, recovery exceeds configured objectives, compliance evidence is incomplete, or reliability and trading KPIs miss their targets. Operational metrics feed the Knowledge Base and research priorities so production experience improves future Strategy Assets.
 
+## Production Acceptance
+
+Production Acceptance is the Version 1.0 release gate. It does not add trading functionality; it evaluates whether the complete platform is ready for controlled live capital under governance.
+
+The acceptance manager combines evidence from production certification, institutional research campaigns, autonomous operations validation, SRE recovery, shadow trading, paper trading, risk controls, and compliance checks. Engineering, research, strategy, risk, operations, infrastructure, security, and business domains contribute to the final qualification score. Only a clean `APPROVED_FOR_PRODUCTION` decision with all signoffs recorded allows Stage A capital allocation.
+
+Capital scaling is deliberately gradual. Stage A starts at small controlled capital, and progression to later stages requires successful trading days, risk compliance, operational reliability, and no critical incidents. Profitability alone never authorizes scaling.
+
 ## Safety Rules
 
 - Research code must not place live orders.

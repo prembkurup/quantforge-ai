@@ -20,6 +20,7 @@ from quantforge.research.full_history_scheduler import (
     FullHistorySchedulerConfig,
 )
 from quantforge.research.library import InstitutionalStrategyLibraryBuilder, StrategyLibraryAsset
+from quantforge.research.workflow_orchestration import WorkflowOrchestrator, default_workflow_paths
 
 
 class DashboardService:
@@ -110,6 +111,7 @@ class DashboardService:
         full_history = self.full_history_scheduler_status()
         tasks = self.pipeline_tasks()
         engines = self.engine_status(full_history)
+        workflow = self.workflow_current()
         return {
             "summary": self._pipeline_summary_from(tasks, engines, full_history),
             "current_task": self.pipeline_current_task(),
@@ -117,6 +119,7 @@ class DashboardService:
             "engines": engines,
             "workload": self._engine_workload_from(engines),
             "full_history": full_history,
+            "workflow": workflow,
             "timestamp": self._timestamp,
         }
 
@@ -339,6 +342,31 @@ class DashboardService:
             "source": "FullHistoryResearchScheduler + CoreUI/OANDA candle database",
             "timestamp": self._timestamp,
         }
+
+    def workflow_current(self) -> dict[str, Any]:
+        orchestrator = WorkflowOrchestrator(_workflow_paths())
+        return orchestrator.current(_planned_full_history_jobs(_full_history_state_file()))
+
+    def workflow_runs(self) -> list[dict[str, Any]]:
+        return [self.workflow_current()["run"]]
+
+    def workflow_run(self, workflow_id: str) -> dict[str, Any]:
+        current = self.workflow_current()
+        if current["run"]["workflow_id"] != workflow_id:
+            raise KeyError(workflow_id)
+        return current
+
+    def workflow_stages(self, workflow_id: str) -> list[dict[str, Any]]:
+        return self.workflow_run(workflow_id)["stages"]
+
+    def workflow_tasks(self, workflow_id: str) -> list[dict[str, Any]]:
+        return self.workflow_run(workflow_id)["tasks"]
+
+    def workflow_events(self, workflow_id: str) -> list[dict[str, Any]]:
+        return self.workflow_run(workflow_id)["events"]
+
+    def workflow_approvals(self, workflow_id: str) -> list[dict[str, Any]]:
+        return self.workflow_run(workflow_id)["approvals"]
 
     def engine_status(self, full_history: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         full_history = full_history or self.full_history_scheduler_status()
@@ -725,6 +753,10 @@ class DashboardService:
 
 def _full_history_state_file() -> Path:
     return Path(__file__).resolve().parents[3] / "var" / "full_history_research_state.json"
+
+
+def _workflow_paths():
+    return default_workflow_paths(Path(__file__).resolve().parents[3])
 
 
 def _full_history_config() -> FullHistorySchedulerConfig:

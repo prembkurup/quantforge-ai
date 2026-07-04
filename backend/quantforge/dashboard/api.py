@@ -21,7 +21,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.dashboard_allowed_origins,
         allow_credentials=False,
-        allow_methods=("GET",),
+        allow_methods=("GET", "POST"),
         allow_headers=("*",),
     )
     service = DashboardService()
@@ -77,6 +77,50 @@ def create_app() -> FastAPI:
     @app.get("/api/full-history/research")
     def full_history_research() -> dict[str, Any]:
         return service.full_history_research()
+
+    @app.get("/api/workflow/current")
+    def workflow_current() -> dict[str, Any]:
+        return service.workflow_current()
+
+    @app.get("/api/workflow/runs")
+    def workflow_runs() -> list[dict[str, Any]]:
+        return service.workflow_runs()
+
+    @app.get("/api/workflow/runs/{workflow_id}")
+    def workflow_run(workflow_id: str) -> dict[str, Any]:
+        return _or_404(service.workflow_run, workflow_id, "Workflow run not found")
+
+    @app.get("/api/workflow/runs/{workflow_id}/stages")
+    def workflow_stages(workflow_id: str) -> list[dict[str, Any]]:
+        return service.workflow_stages(workflow_id)
+
+    @app.get("/api/workflow/runs/{workflow_id}/tasks")
+    def workflow_tasks(workflow_id: str) -> list[dict[str, Any]]:
+        return service.workflow_tasks(workflow_id)
+
+    @app.get("/api/workflow/runs/{workflow_id}/events")
+    def workflow_events(workflow_id: str) -> list[dict[str, Any]]:
+        return service.workflow_events(workflow_id)
+
+    @app.get("/api/workflow/runs/{workflow_id}/approvals")
+    def workflow_approvals(workflow_id: str) -> list[dict[str, Any]]:
+        return service.workflow_approvals(workflow_id)
+
+    @app.post("/api/workflow/tasks/{task_id}/retry", status_code=403)
+    def workflow_retry_disabled(task_id: str) -> dict[str, str]:
+        return {"status": "disabled", "task_id": task_id, "reason": "MVP workflow mutation requires authentication"}
+
+    @app.post("/api/workflow/tasks/{task_id}/cancel", status_code=403)
+    def workflow_cancel_disabled(task_id: str) -> dict[str, str]:
+        return {"status": "disabled", "task_id": task_id, "reason": "MVP workflow mutation requires authentication"}
+
+    @app.post("/api/workflow/approvals/{approval_id}/approve", status_code=403)
+    def workflow_approve_disabled(approval_id: str) -> dict[str, str]:
+        return {"status": "disabled", "approval_id": approval_id, "reason": "MVP approval requires authentication"}
+
+    @app.post("/api/workflow/approvals/{approval_id}/reject", status_code=403)
+    def workflow_reject_disabled(approval_id: str) -> dict[str, str]:
+        return {"status": "disabled", "approval_id": approval_id, "reason": "MVP approval requires authentication"}
 
     @app.get("/api/strategies")
     def strategies() -> list[dict[str, Any]]:
@@ -213,10 +257,14 @@ def create_app() -> FastAPI:
 
 
 def _strategy_or_404(callback: Any, strategy_id: str) -> dict[str, Any]:
+    return _or_404(callback, strategy_id, "Strategy not found")
+
+
+def _or_404(callback: Any, item_id: str, detail: str) -> dict[str, Any]:
     try:
-        return callback(strategy_id)
+        return callback(item_id)
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Strategy not found") from exc
+        raise HTTPException(status_code=404, detail=detail) from exc
 
 
 app = create_app()

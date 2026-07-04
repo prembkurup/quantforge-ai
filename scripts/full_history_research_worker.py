@@ -22,6 +22,7 @@ from quantforge.research.post_full_history_automation import (
     full_history_plan_exhausted,
     run_post_full_history_automation,
 )
+from quantforge.research.workflow_orchestration import WorkflowOrchestrator, WorkflowPaths, default_workflow_paths
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,6 +36,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--running-stale-seconds", type=int, default=21600)
     parser.add_argument("--state-file", default="var/full_history_research_state.json")
     parser.add_argument("--post-pipeline-state-file", default="var/post_full_history_pipeline_state.json")
+    parser.add_argument("--workflow-state-file", default="var/workflow_state.json")
     return parser.parse_args()
 
 
@@ -49,6 +51,15 @@ def main() -> None:
     scheduler_script = repo_root / "scripts" / "full_history_research_scheduler.py"
     state_file = repo_root / args.state_file
     post_pipeline_state_file = repo_root / args.post_pipeline_state_file
+    workflow_paths = default_workflow_paths(repo_root)
+    workflow_paths = WorkflowPaths(
+        state_file=repo_root / args.workflow_state_file,
+        events_file=workflow_paths.events_file,
+        full_history_state_file=state_file,
+        post_pipeline_state_file=post_pipeline_state_file,
+        approval_file=workflow_paths.approval_file,
+    )
+    workflow = WorkflowOrchestrator(workflow_paths)
     python_exe = repo_root / ".venv" / "Scripts" / "python.exe"
     if not python_exe.exists():
         python_exe = Path(sys.executable)
@@ -65,6 +76,7 @@ def main() -> None:
     print(f"State File: {args.state_file}")
     print()
     sys.stdout.flush()
+    _refresh_workflow(workflow, scheduler)
 
     while True:
         owner = f"{socket.gethostname()}:{_now()}"
@@ -75,6 +87,7 @@ def main() -> None:
             owner=owner,
             stale_after_seconds=args.running_stale_seconds,
         )
+        _refresh_workflow(workflow, scheduler)
         if not jobs:
             _run_post_pipeline_if_ready(
                 scheduler=scheduler,
@@ -82,7 +95,9 @@ def main() -> None:
                 post_pipeline_state_file=post_pipeline_state_file,
                 repo_root=repo_root,
                 python_exe=python_exe,
+                workflow=workflow,
             )
+            _refresh_workflow(workflow, scheduler)
             print(
                 f"[{_now()}] No pending full-history jobs detected; "
                 f"sleeping {args.idle_sleep_seconds}s"
@@ -125,6 +140,7 @@ def main() -> None:
 
         if failures:
             release_running_jobs(state_file, tuple(failures))
+            _refresh_workflow(workflow, scheduler)
             print(
                 f"[{_now()}] {len(failures)} scheduler job(s) failed at process level; "
                 f"sleeping {args.error_sleep_seconds}s"
@@ -138,6 +154,7 @@ def main() -> None:
             f"executed {len(jobs)} job(s); sleeping {args.sleep_seconds}s"
         )
         sys.stdout.flush()
+        _refresh_workflow(workflow, scheduler)
         time.sleep(args.sleep_seconds)
 
 
@@ -148,6 +165,7 @@ def _run_post_pipeline_if_ready(
     post_pipeline_state_file: Path,
     repo_root: Path,
     python_exe: Path,
+    workflow: WorkflowOrchestrator,
 ) -> None:
     planned = scheduler.plan()
     if not full_history_plan_exhausted(full_history_state_file, planned):
@@ -163,10 +181,15 @@ def _run_post_pipeline_if_ready(
         python_exe=python_exe,
         planned=planned,
     )
+    _refresh_workflow(workflow, scheduler)
     print(f"[{_now()}] Post-full-history automation finished with status {result.status}")
     for stage in result.stages:
         print(f"- {stage.stage_id} {stage.status}")
     sys.stdout.flush()
+
+
+def _refresh_workflow(workflow: WorkflowOrchestrator, scheduler: FullHistoryResearchScheduler) -> None:
+    workflow.current(scheduler.plan())
 
 
 def _now() -> str:

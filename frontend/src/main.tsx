@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
-import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, HeartPulse, Library, LineChart, ListChecks, Menu, ScrollText, ShieldCheck, X } from "lucide-react";
+import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, GitBranch, HeartPulse, Library, LineChart, ListChecks, Menu, ScrollText, ShieldCheck, X } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
 import "./styles.css";
@@ -55,6 +55,7 @@ function App() {
               <Route path="/" element={<Overview />} />
               <Route path="/research" element={<Research />} />
               <Route path="/pipeline" element={<Pipeline />} />
+              <Route path="/workflow" element={<Workflow />} />
               <Route path="/full-history" element={<FullHistoryResearch />} />
               <Route path="/strategies" element={<Strategies />} />
               <Route path="/strategies/:id" element={<StrategyDetail />} />
@@ -78,6 +79,7 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     ["/", "Overview", Activity],
     ["/research", "Research", LineChart],
     ["/pipeline", "Pipeline", ListChecks],
+    ["/workflow", "Workflow", GitBranch],
     ["/full-history", "Full History", Database],
     ["/strategies", "Strategies", Library],
     ["/indicators", "Indicators", BookOpen],
@@ -289,6 +291,110 @@ function Pipeline() {
           />
         </>
       ) : null}
+    </Page>
+  );
+}
+
+function Workflow() {
+  const data = useApi<any>("/api/workflow/current");
+  const [taskPage, setTaskPage] = React.useState(1);
+  if (!data) return <Loading />;
+  const run = data.run ?? {};
+  const stages = data.stages ?? [];
+  const tasks = data.tasks ?? [];
+  const events = data.events ?? [];
+  const approvals = data.approvals ?? [];
+  const taskPageSize = 30;
+  const taskTotalPages = Math.max(1, Math.ceil(tasks.length / taskPageSize));
+  const taskRows = tasks.slice((taskPage - 1) * taskPageSize, taskPage * taskPageSize);
+  const stageRows = stages.map((stage: any) => ({
+    Stage: stage.stage_id,
+    Status: stage.status,
+    Progress: `${stage.progress_percent ?? 0}%`,
+    Started: stage.started_at,
+    Finished: stage.completed_at,
+    "Waiting Reason": stage.waiting_reason,
+    Blocker: stage.blocker_summary,
+  }));
+  const taskTableRows = taskRows.map((task: any) => ({
+    Task: task.name ?? task.task_id,
+    Stage: task.stage,
+    Pair: task.pair,
+    Timeframe: task.timeframe,
+    Status: task.status,
+    Attempt: task.attempt,
+    "Max Retries": task.max_retries,
+    Started: task.started_at,
+    Finished: task.finished_at,
+    "Waiting Reason": task.waiting_reason,
+    "Next Action": task.next_action,
+    Error: task.error_message,
+  }));
+  const approvalRows = approvals.map((approval: any) => ({
+    Approval: approval.approval_id,
+    Stage: approval.stage,
+    Type: approval.approval_type,
+    Status: approval.status,
+    Requested: approval.requested_at,
+    Approved: approval.approved_at,
+    Rejected: approval.rejected_at,
+    Reason: approval.reason,
+  }));
+  const eventRows = events.map((event: any) => ({
+    Time: event.timestamp,
+    Event: event.event_type,
+    Stage: event.stage,
+    Task: event.task_id,
+    From: event.old_status,
+    To: event.new_status,
+    Message: event.message,
+    Trace: event.trace_id,
+    Metadata: JSON.stringify(event.metadata ?? {}),
+  }));
+  return (
+    <Page title="Workflow Orchestration">
+      <div className="kpi-grid">
+        <KpiCard title="Current Stage" value={run.current_stage} />
+        <KpiCard title="Workflow Status" value={run.status} tone={run.status === "RUNNING" ? "good" : run.status === "BLOCKED" ? "warn" : "neutral"} />
+        <KpiCard title="Progress" value={`${run.completed_tasks}/${run.total_tasks}`} />
+        <KpiCard title="Running" value={run.running_tasks} tone="good" />
+        <KpiCard title="Failed" value={run.failed_tasks} tone={run.failed_tasks ? "warn" : "good"} />
+        <KpiCard title="Retryable" value={run.retryable_tasks} tone={run.retryable_tasks ? "warn" : "good"} />
+        <KpiCard title="Blocked" value={run.blocked_tasks} tone={run.blocked_tasks ? "warn" : "good"} />
+        <KpiCard title="Live Trading" value={run.live_trading_status} tone="warn" />
+      </div>
+
+      <section className="card panel dashboard-card">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Current Workflow Run</div>
+        <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+          <div>
+            <div className="pipeline-current-title">{run.name}</div>
+            <div className="pipeline-current-meta">{run.workflow_id}</div>
+            <ProgressBar value={Number(run.total_tasks ? Math.round((run.completed_tasks / run.total_tasks) * 100) : 0)} />
+            <div className="pipeline-current-detail">{run.next_action}</div>
+          </div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Plan Hash" value={run.plan_hash} />
+            <MiniFact label="Started" value={run.started_at} />
+            <MiniFact label="Live Gate" value={`${data.live_gate?.status ?? run.live_trading_status}: ${data.live_gate?.reason ?? "blocked"}`} />
+            <MiniFact label="Source" value={data.source} />
+          </div>
+        </div>
+      </section>
+
+      <DataTable title="Workflow Stage Timeline" rows={stageRows} />
+      <DataTable title={`Workflow Tasks (${tasks.length})`} rows={taskTableRows} />
+      <PaginationControls
+        page={taskPage}
+        totalPages={taskTotalPages}
+        pageSize={taskPageSize}
+        totalRows={tasks.length}
+        onPageChange={setTaskPage}
+      />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <DataTable title="Approvals" rows={approvalRows} />
+        <DataTable title="Workflow Events" rows={eventRows} />
+      </div>
     </Page>
   );
 }
@@ -881,7 +987,7 @@ function LogTable({ rows }: { rows: Row[] }) {
 }
 
 function DataTable({ title, rows, linkKey }: { title: string; rows: Row[]; linkKey?: string }) {
-  const columns = rows[0] ? Object.keys(rows[0]).slice(0, 10) : [];
+  const columns = rows[0] ? Object.keys(rows[0]) : [];
   return (
     <div className="card panel dashboard-card overflow-hidden">
       <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{title}</div>

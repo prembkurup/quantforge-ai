@@ -84,6 +84,36 @@ def test_pipeline_snapshot_combines_page_payload_for_fast_loading() -> None:
     assert len(snapshot["workload"]) == len(snapshot["engines"])
     assert snapshot["full_history"]["planned_jobs"] >= 1
     assert snapshot["full_history"]["jobs"]
+    assert snapshot["workflow"]["run"]["live_trading_status"] in {
+        "BLOCKED_BY_POLICY",
+        "WAITING_APPROVAL",
+        "APPROVED_NOT_STARTED",
+    }
+
+
+def test_workflow_api_exposes_state_machine() -> None:
+    response = client.get("/api/workflow/current")
+
+    assert response.status_code == 200
+    payload = response.json()
+    workflow_id = payload["run"]["workflow_id"]
+    assert payload["run"]["current_stage"]
+    assert payload["run"]["next_action"]
+    assert payload["run"]["live_trading_status"] in {
+        "BLOCKED_BY_POLICY",
+        "WAITING_APPROVAL",
+        "APPROVED_NOT_STARTED",
+    }
+    assert payload["stages"]
+    assert payload["tasks"]
+    assert payload["approvals"]
+
+    assert client.get("/api/workflow/runs").json()[0]["workflow_id"] == workflow_id
+    assert client.get(f"/api/workflow/runs/{workflow_id}/stages").json()
+    assert client.get(f"/api/workflow/runs/{workflow_id}/tasks").json()
+    assert client.get(f"/api/workflow/runs/{workflow_id}/events").json()
+    assert client.get(f"/api/workflow/runs/{workflow_id}/approvals").json()
+    assert client.post("/api/workflow/tasks/example/retry").status_code == 403
 
 
 def test_full_history_research_lists_configured_pairs_timeframes_and_jobs() -> None:

@@ -83,7 +83,7 @@ A strategy plugin declares:
 - risk model hooks
 - validation constraints
 
-The research engine defines experiments, discovers plugins, expands parameter templates, identifies stable parameter regions, runs review gates, backtests, validates results, compares experiment analytics, and ranks candidates. The live engine only runs approved strategy versions.
+The research engine defines experiments, discovers plugins, expands parameter templates, identifies stable parameter regions, runs review gates, backtests, validates results, compares experiment analytics, and ranks candidates. Backtesting is event-driven: the simulator processes market, order, execution, position, portfolio, risk, and journal events rather than idealized candle outcomes. The live engine should consume the same event concepts and only runs approved strategy versions.
 
 ## Live Execution
 

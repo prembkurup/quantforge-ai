@@ -38,7 +38,7 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Build Constraint-Based Strategy Composer with validation, complexity scoring, diversity filtering, and decision traceability.
 - Build Optimization Laboratory to find stable parameter regions and run Research Review Board gates.
 - Build first template strategy plugin.
-- Implement basic backtest runner.
+- Implement Backtesting Engine 2.0 with event-driven simulation, replay mode, time machine, and professional reports.
 - Store experiment lineage, research run metrics, validation results, and analytics.
 - Add Parquet research cache.
 - Define live trading risk checks.

@@ -37,6 +37,7 @@
 - Add Constraint-Based Strategy Composer with constraint building, compatibility checks, dependency checks, strategy graphs, validation, complexity scoring, diversity filtering, and decision traceability.
 - Add Optimization Laboratory for stable parameter regions, sensitivity analysis, parameter landscapes, robustness estimates, optimization knowledge writing, reports, and Research Review Board gates.
 - Run backtests and validation only after strategy structure and parameter regions pass review.
+- Add Backtesting Engine 2.0 with event-driven market simulation, execution simulation, position and portfolio management, trade journal, performance reports, replay mode, and time machine.
 - Store experiment lineage, analytics, and final metrics.
 - Export research cache to Parquet.
 

@@ -1,6 +1,55 @@
 """Backtesting domain."""
 
-from quantforge.backtesting.engine import BacktestEngine
+from quantforge.backtesting.engine import (
+    BacktestEngine,
+    BacktestEvent,
+    BacktestEventType,
+    BacktestExecution,
+    BacktestOrder,
+    BacktestReport,
+    BacktestResult,
+    Candle,
+    EquityPoint,
+    ExecutionSimulator,
+    MarketSimulator,
+    OrderSide,
+    OrderType,
+    PerformanceEngine,
+    PerformanceMetrics,
+    PortfolioManager,
+    PortfolioState,
+    Position,
+    PositionManager,
+    ReplayEngine,
+    ReplayFrame,
+    TimeMachine,
+    Trade,
+    TradeJournal,
+)
 
-__all__ = ["BacktestEngine"]
-
+__all__ = [
+    "BacktestEngine",
+    "BacktestEvent",
+    "BacktestEventType",
+    "BacktestExecution",
+    "BacktestOrder",
+    "BacktestReport",
+    "BacktestResult",
+    "Candle",
+    "EquityPoint",
+    "ExecutionSimulator",
+    "MarketSimulator",
+    "OrderSide",
+    "OrderType",
+    "PerformanceEngine",
+    "PerformanceMetrics",
+    "PortfolioManager",
+    "PortfolioState",
+    "Position",
+    "PositionManager",
+    "ReplayEngine",
+    "ReplayFrame",
+    "TimeMachine",
+    "Trade",
+    "TradeJournal",
+]

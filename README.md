@@ -59,6 +59,7 @@ docs/
   research-orchestrator.md
   strategy-composer.md
   optimization-laboratory.md
+  backtesting-engine.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -126,6 +127,12 @@ Run the Optimization Laboratory demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\optimize_strategy.py
+```
+
+Run the event-driven Backtesting Engine demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\backtest.py
 ```
 
 ## Foundation Setup

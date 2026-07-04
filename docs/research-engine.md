@@ -210,7 +210,11 @@ Automated gate before expensive validation. It checks parameter stability, compl
 
 ### Backtesting Engine
 
-Evaluates historical performance with realistic spread, slippage, commission, position sizing, partial close, trailing stop, multiple positions, and execution rules.
+Evaluates historical performance through an event-driven market simulator. It processes new candles, session changes, order submissions, fills, stop updates, take-profit hits, position closes, and risk events instead of treating candles as direct profit calculations.
+
+Backtesting Engine 2.0 contains a market simulator, execution simulator, position manager, portfolio manager, trade journal, performance engine, replay engine, time machine, and report generator. The same event model should later be shared with the live trading engine to reduce simulation/live drift.
+
+Every trade records the entry reason, decision trace, feature vector, market regime, strategy version, parameters, and exit reason.
 
 ### Validation Engine
 

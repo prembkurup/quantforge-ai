@@ -110,4 +110,6 @@ def _parse_datetime(value: str, *, end_of_date: bool) -> datetime:
 
 
 if __name__ == "__main__":
-    main()
+    from quantforge.observability import run_script
+
+    run_script(main, __file__)

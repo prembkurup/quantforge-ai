@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
-import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, HeartPulse, Library, LineChart, ListChecks, ShieldCheck } from "lucide-react";
+import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, HeartPulse, Library, LineChart, ListChecks, ScrollText, ShieldCheck } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
 import "./styles.css";
@@ -51,6 +51,7 @@ function App() {
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/paper" element={<Paper />} />
               <Route path="/operations" element={<Operations />} />
+              <Route path="/logs" element={<Logs />} />
               <Route path="/knowledge" element={<Knowledge />} />
               <Route path="/help" element={<Help />} />
             </Routes>
@@ -71,6 +72,7 @@ function Sidebar() {
     ["/portfolio", "Portfolio", ShieldCheck],
     ["/paper", "Paper", CandlestickChart],
     ["/operations", "Operations", HeartPulse],
+    ["/logs", "Logs", ScrollText],
     ["/knowledge", "Knowledge", Brain],
     ["/help", "Manual / Help", CircleHelp]
   ] as const;
@@ -344,6 +346,63 @@ function Operations() {
   );
 }
 
+function Logs() {
+  const [page, setPage] = React.useState(1);
+  const [category, setCategory] = React.useState("");
+  const [process, setProcess] = React.useState("");
+  const [level, setLevel] = React.useState("");
+  const query = new URLSearchParams({ page: String(page), page_size: "30" });
+  if (category) query.set("category", category);
+  if (process) query.set("process", process);
+  if (level) query.set("level", level);
+  const payload = useApi<any>(`/api/logs?${query.toString()}`);
+
+  const updateFilter = (setter: (value: string) => void, value: string) => {
+    setter(value);
+    setPage(1);
+  };
+
+  if (!payload) return <Loading />;
+  const rows = payload.rows ?? [];
+  return (
+    <Page title="Process Logs">
+      <div className="log-filter-grid">
+        <label className="log-filter">
+          <span>Category</span>
+          <select className="input" value={category} onChange={(event) => updateFilter(setCategory, event.target.value)}>
+            <option value="">All categories</option>
+            {(payload.categories ?? []).map((item: string) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <label className="log-filter">
+          <span>Process</span>
+          <select className="input" value={process} onChange={(event) => updateFilter(setProcess, event.target.value)}>
+            <option value="">All processes</option>
+            {(payload.processes ?? []).map((item: string) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <label className="log-filter">
+          <span>Level</span>
+          <select className="input" value={level} onChange={(event) => updateFilter(setLevel, event.target.value)}>
+            <option value="">All levels</option>
+            <option value="INFO">INFO</option>
+            <option value="WARNING">WARNING</option>
+            <option value="ERROR">ERROR</option>
+          </select>
+        </label>
+      </div>
+      <LogTable rows={rows} />
+      <PaginationControls
+        page={payload.page}
+        totalPages={payload.total_pages}
+        pageSize={payload.page_size}
+        totalRows={payload.total}
+        onPageChange={setPage}
+      />
+    </Page>
+  );
+}
+
 function Knowledge() {
   const summary = useApi<Row>("/api/knowledge/summary");
   const features = useApi<Row[]>("/api/knowledge/features");
@@ -489,6 +548,20 @@ const manualSections = [
     ]
   },
   {
+    title: "Logs",
+    purpose: "Shows database-backed runtime logs from dashboard services and project scripts, including process name, category, level, PID, and message.",
+    use: [
+      "Filter by category to separate dashboard, research, validation, operations, and utility scripts.",
+      "Filter by process when checking one script or service.",
+      "Use the level filter to isolate errors or warnings.",
+      "Use Previous and Next to review logs in batches of 30."
+    ],
+    details: [
+      "Python scripts write their stdout, stderr, start, finish, and exception events into the database log table.",
+      "The page is read-only and does not clear, rotate, or mutate logs."
+    ]
+  },
+  {
     title: "Knowledge Base",
     purpose: "Summarizes validated findings, rejected hypotheses, feature rankings, plugin rankings, and confidence evidence.",
     use: [
@@ -510,6 +583,7 @@ const workflowSteps = [
   "Review Research progress and rejection reasons to understand the current experiment state.",
   "Open Strategy Library, filter candidates, and inspect individual Strategy Passports.",
   "Open Indicators when you need to confirm which calculation inputs are used by the strategy and feature engines.",
+  "Open Logs when a script fails, restarts, or produces unexpected output.",
   "Check Portfolio to confirm strategy diversity, correlation, and drawdown behavior.",
   "Review Paper Trading for drift and simulated execution performance.",
   "Use Knowledge Base findings to choose the next research direction."
@@ -671,6 +745,41 @@ function ReadinessBanner({ value, source }: { value: string; source: string }) {
   );
 }
 
+function LogTable({ rows }: { rows: Row[] }) {
+  return (
+    <div className="card panel dashboard-card overflow-hidden">
+      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Database Logs</div>
+      <div className="overflow-auto">
+        <table className="table table-dark table-hover dashboard-table log-table w-full min-w-[1040px] text-left text-sm">
+          <thead className="bg-slate-900 text-xs uppercase text-slate-400">
+            <tr>
+              <th className="px-3 py-2">time</th>
+              <th className="px-3 py-2">level</th>
+              <th className="px-3 py-2">category</th>
+              <th className="px-3 py-2">process</th>
+              <th className="px-3 py-2">pid</th>
+              <th className="px-3 py-2">message</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={String(row.id)} className="border-t border-slate-800">
+                <td className="px-3 py-2 text-slate-300">{formatDate(row.created_at)}</td>
+                <td className="px-3 py-2"><span className={`log-level ${String(row.level).toLowerCase()}`}>{String(row.level)}</span></td>
+                <td className="px-3 py-2 text-slate-200">{String(row.category)}</td>
+                <td className="px-3 py-2 text-cyan-200">{String(row.process_name)}</td>
+                <td className="px-3 py-2 text-slate-400">{String(row.pid)}</td>
+                <td className="log-message px-3 py-2 text-slate-200">{String(row.message)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length === 0 && <div className="pt-3 text-sm text-slate-400">No logs match the current filters.</div>}
+    </div>
+  );
+}
+
 function DataTable({ title, rows, linkKey }: { title: string; rows: Row[]; linkKey?: string }) {
   const columns = rows[0] ? Object.keys(rows[0]).slice(0, 10) : [];
   return (
@@ -731,6 +840,13 @@ function Loading() {
 
 function number(value: unknown) {
   return Number(value).toLocaleString();
+}
+
+function formatDate(value: unknown) {
+  if (!value) return "";
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleString();
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

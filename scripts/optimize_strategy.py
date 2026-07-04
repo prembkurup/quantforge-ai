@@ -56,4 +56,6 @@ def _format_bounds(bounds: tuple[float, float]) -> str:
 
 
 if __name__ == "__main__":
-    main()
+    from quantforge.observability import run_script
+
+    run_script(main, __file__)

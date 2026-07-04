@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from quantforge.config.settings import get_settings
 from quantforge.dashboard.service import DashboardService
+from quantforge.observability.log_manager import ProcessLogQuery, get_process_logs, log_event
 
 
 def create_app() -> FastAPI:
@@ -153,6 +154,37 @@ def create_app() -> FastAPI:
     def ops_system() -> dict[str, Any]:
         return service.ops_system()
 
+    @app.get("/api/logs")
+    def process_logs(
+        page: int = 1,
+        page_size: int = 30,
+        category: str | None = None,
+        process: str | None = None,
+        level: str | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return get_process_logs(
+                ProcessLogQuery(
+                    page=page,
+                    page_size=page_size,
+                    category=category or None,
+                    process=process or None,
+                    level=level or None,
+                )
+            )
+        except Exception as exc:
+            return {
+                "page": max(1, page),
+                "page_size": page_size,
+                "total": 0,
+                "total_pages": 1,
+                "categories": [],
+                "processes": [],
+                "rows": [],
+                "database_status": "unavailable",
+                "error": str(exc),
+            }
+
     @app.get("/api/knowledge/summary")
     def knowledge_summary() -> dict[str, Any]:
         return service.knowledge_summary()
@@ -184,3 +216,4 @@ def _strategy_or_404(callback: Any, strategy_id: str) -> dict[str, Any]:
 
 
 app = create_app()
+log_event("dashboard-api", "dashboard", "INFO", "Dashboard API module loaded", script_path=__file__)

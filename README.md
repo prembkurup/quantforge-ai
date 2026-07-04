@@ -260,6 +260,8 @@ The `/pipeline` dashboard page shows the current running task, queued pipeline t
 It uses `GET /api/pipeline/snapshot` for a faster single-request page load.
 The `/indicators` page lists the active indicators, statistical calculators, volatility measures, price-action signals, market-structure signals, and session features used by the platform.
 The Strategy Library page paginates results at 30 strategies per page.
+The `/logs` page reads database-backed process logs from `GET /api/logs`, with category/process/level filters and 30 logs per page.
+Python scripts in `scripts/` are wrapped with the QuantForge log manager so process start, stdout, stderr, exceptions, and process finish events are written to `infrastructure.process_log`.
 
 Production dashboard deployment:
 

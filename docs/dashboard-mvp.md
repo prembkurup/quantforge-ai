@@ -86,9 +86,12 @@ Primary endpoints:
 - `GET /api/portfolio/readiness`
 - `GET /api/paper/summary`
 - `GET /api/ops/health`
+- `GET /api/logs`
 - `GET /api/knowledge/summary`
 
 The API currently exposes dashboard DTOs from existing QuantForge evidence modules: Workstream 1 Strategy Library, Shadow Trading, Operations Validation, and Knowledge evidence.
+Runtime script and dashboard logs are stored in PostgreSQL table `infrastructure.process_log`.
+`GET /api/logs` supports `page`, `page_size`, `category`, `process`, and `level` query parameters.
 
 ## Frontend
 
@@ -122,6 +125,7 @@ Routes:
 - `/portfolio` Portfolio Readiness
 - `/paper` Paper Trading
 - `/operations` Operations Health
+- `/logs` Process Logs
 - `/knowledge` Knowledge Base
 - `/help` Manual / Help
 
@@ -137,5 +141,6 @@ Routes:
 - Strategy detail is traceable.
 - Portfolio readiness is visible.
 - Operations health is visible.
+- Process logs are visible with category/process/level filters and 30-row pagination.
 - Dashboard refreshes API data automatically.
 - Write actions are unavailable.

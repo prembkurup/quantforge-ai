@@ -85,3 +85,15 @@ def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:
     assert client.get("/api/knowledge/summary").json()["knowledge_records"] == 795_000
     assert client.get("/api/paper/summary").json()["promotion_readiness"] == "PROMOTE"
     assert client.post("/api/dashboard/overview").status_code == 405
+
+
+def test_process_logs_endpoint_is_paginated_and_filterable() -> None:
+    response = client.get("/api/logs?page=1&page_size=30")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["page"] == 1
+    assert payload["page_size"] == 30
+    assert "rows" in payload
+    assert "categories" in payload
+    assert "processes" in payload

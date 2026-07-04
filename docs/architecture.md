@@ -109,6 +109,12 @@ Live Trading Engine 2.0 is event-driven. Market stream events flow through a Liv
 
 The Trade Decision Engine sits between strategy selection and signal generation. It asks whether QuantForge should trade right now based on spread, news windows, portfolio exposure, correlated positions, daily loss limits, market quality, broker health, and connection status. This keeps strategy logic clean while centralizing production trading permissions.
 
+## Production Reliability
+
+QuantForge AI includes an SRE layer for production readiness. Services report heartbeat, readiness, liveness, version, build, uptime, and dependency status. Health states are Healthy, Warning, Critical, and Offline.
+
+The production platform emits Prometheus-style metrics, structured JSON logs, distributed trace spans, classified alerts, and automatic recovery actions. This protects against lost trading state, duplicate orders, silent service failures, and capital-risk events such as emergency daily-loss kill switches.
+
 ## Safety Rules
 
 - Research code must not place live orders.

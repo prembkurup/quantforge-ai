@@ -64,6 +64,7 @@ docs/
   production-strategy-management.md
   autonomous-research-validation.md
   live-trading-engine.md
+  production-engineering-sre.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -162,6 +163,12 @@ Run the Live Trading Engine demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\live_trading.py
+```
+
+Run the Production Engineering and SRE demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\production_readiness.py
 ```
 
 ## Foundation Setup

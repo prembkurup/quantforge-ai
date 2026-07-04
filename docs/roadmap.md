@@ -67,5 +67,6 @@
 - Deploy on in-house Linux servers.
 - Add process supervision.
 - Add health checks and alerts.
+- Add Production Engineering and SRE layer with health, heartbeats, Prometheus metrics, structured JSON logs, distributed tracing, classified alerts, and automatic recovery actions.
 - Connect project tasks to Monday.com.
 - Push private repository to GitHub.

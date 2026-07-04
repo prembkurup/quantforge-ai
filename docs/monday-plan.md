@@ -48,3 +48,4 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Implement Live Trading Engine with event bus, Trade Decision Engine, execution manager, state store, recovery, and broker synchronization.
 - Implement OANDA execution adapter dry-run mode.
 - Add Linux server deployment plan.
+- Implement Production Engineering and SRE controls for health, heartbeats, metrics, logs, traces, alerting, and recovery.

@@ -152,7 +152,7 @@ def _run_post_pipeline_if_ready(
     planned = scheduler.plan()
     if not full_history_plan_exhausted(full_history_state_file, planned):
         return
-    if automation_already_finished(post_pipeline_state_file):
+    if automation_already_finished(post_pipeline_state_file, planned):
         return
 
     print(f"[{_now()}] Full-history plan exhausted; starting post-full-history automation")
@@ -161,6 +161,7 @@ def _run_post_pipeline_if_ready(
         repo_root=repo_root,
         state_file=post_pipeline_state_file,
         python_exe=python_exe,
+        planned=planned,
     )
     print(f"[{_now()}] Post-full-history automation finished with status {result.status}")
     for stage in result.stages:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -85,11 +86,18 @@ def full_history_plan_exhausted(
     return planned_ids <= finished_ids
 
 
-def automation_already_finished(state_file: Path) -> bool:
+def automation_already_finished(
+    state_file: Path,
+    planned: tuple[FullHistoryResearchJob, ...] = (),
+) -> bool:
     if not state_file.exists():
         return False
     state = _load_json(state_file)
-    return state.get("status") in {"COMPLETE", "FAILED"}
+    if state.get("status") not in {"COMPLETE", "FAILED"}:
+        return False
+    if not planned:
+        return True
+    return state.get("full_history_plan_hash") == full_history_plan_hash(planned)
 
 
 def run_post_full_history_automation(
@@ -97,13 +105,17 @@ def run_post_full_history_automation(
     repo_root: Path,
     state_file: Path,
     python_exe: Path,
+    planned: tuple[FullHistoryResearchJob, ...] = (),
     stages: tuple[PostFullHistoryStage, ...] = POST_FULL_HISTORY_STAGES,
 ) -> PostFullHistoryAutomationResult:
     state_file.parent.mkdir(parents=True, exist_ok=True)
     started_at = _now()
+    plan_hash = full_history_plan_hash(planned) if planned else ""
     _write_json(
         state_file,
         {
+            "full_history_plan_hash": plan_hash,
+            "full_history_planned_jobs": len(planned),
             "status": "RUNNING",
             "started_at": started_at,
             "completed_at": "",
@@ -125,6 +137,8 @@ def run_post_full_history_automation(
                 "status": "RUNNING",
                 "started_at": started_at,
                 "completed_at": "",
+                "full_history_plan_hash": plan_hash,
+                "full_history_planned_jobs": len(planned),
                 "stages": [asdict(item) for item in results],
             },
         )
@@ -134,6 +148,8 @@ def run_post_full_history_automation(
         "status": status,
         "started_at": started_at,
         "completed_at": completed_at,
+        "full_history_plan_hash": plan_hash,
+        "full_history_planned_jobs": len(planned),
         "stages": [asdict(item) for item in results],
     }
     _write_json(state_file, payload)
@@ -181,6 +197,11 @@ def _run_stage(
         return_code=process.returncode,
         output_tail=_tail(process.stdout),
     )
+
+
+def full_history_plan_hash(planned: tuple[FullHistoryResearchJob, ...]) -> str:
+    job_ids = "\n".join(job.job_id for job in planned)
+    return hashlib.sha256(job_ids.encode("utf-8")).hexdigest()
 
 
 def _load_json(path: Path) -> dict[str, object]:

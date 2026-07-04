@@ -13,6 +13,7 @@ from quantforge.research.post_full_history_automation import (
     PostFullHistoryStage,
     automation_already_finished,
     full_history_plan_exhausted,
+    full_history_plan_hash,
     run_post_full_history_automation,
 )
 from quantforge.tests.test_workstream1_pipeline import FakeCandleRepository
@@ -80,6 +81,29 @@ def test_post_full_history_automation_runs_stages_once_and_records_state(tmp_pat
     assert automation_already_finished(state_file) is True
 
 
+def test_post_full_history_automation_finished_state_is_plan_specific(tmp_path) -> None:
+    state_file = tmp_path / "post_pipeline.json"
+    scheduler = FullHistoryResearchScheduler(
+        config=_config(),
+        state_file=tmp_path / "full_history.json",
+        repository_factory=FakeCandleRepository,
+    )
+    planned = scheduler.plan()
+    state_file.write_text(
+        json.dumps(
+            {
+                "full_history_plan_hash": full_history_plan_hash(planned),
+                "status": "COMPLETE",
+                "stages": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert automation_already_finished(state_file, planned) is True
+    assert automation_already_finished(state_file, planned[:-1]) is False
+
+
 def _config() -> FullHistorySchedulerConfig:
     return FullHistorySchedulerConfig(
         pairs=("EUR_USD",),
@@ -94,4 +118,3 @@ def _config() -> FullHistorySchedulerConfig:
         full_history_max_batches=5,
         max_assets_to_validate=1,
     )
-

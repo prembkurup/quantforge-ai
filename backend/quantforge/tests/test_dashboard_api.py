@@ -93,11 +93,11 @@ def test_full_history_research_lists_configured_pairs_timeframes_and_jobs() -> N
     payload = response.json()
     symbols = {row["symbol"] for row in payload["pairs"]}
     timeframes = {row["timeframe"] for row in payload["timeframes"]}
-    assert {"EUR_USD", "GBP_USD", "USD_JPY", "NAS100_USD", "SPX500_USD"} <= symbols
-    assert {"M15", "H1", "H4"} <= timeframes
-    assert payload["pair_count"] == 5
-    assert payload["timeframe_count"] == 3
-    assert payload["pair_timeframe_count"] == 15
+    assert {"AUD_CAD", "EUR_USD", "GBP_USD", "USD_JPY", "NAS100_USD", "SPX500_USD"} <= symbols
+    assert {"M5", "M15", "H1", "H4"} <= timeframes
+    assert payload["pair_count"] == 30
+    assert payload["timeframe_count"] == 4
+    assert payload["pair_timeframe_count"] == 120
     assert payload["scheduler"]["jobs"]
     assert payload["coverage"]
 

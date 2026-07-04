@@ -42,6 +42,16 @@ def test_strategy_library_is_readable_and_traceable() -> None:
     assert detail["decision_trace"]["complete"] is True
 
 
+def test_indicators_are_listed_for_dashboard_reference() -> None:
+    indicators = client.get("/api/indicators").json()
+
+    names = {indicator["indicator"] for indicator in indicators}
+    assert "EMA" in names
+    assert "ATR" in names
+    assert "BOS" in names
+    assert all(indicator["status"] == "ACTIVE" for indicator in indicators)
+
+
 def test_pipeline_page_data_shows_tasks_engines_and_current_work() -> None:
     summary = client.get("/api/pipeline/summary").json()
     current = client.get("/api/pipeline/current-task").json()
@@ -57,6 +67,16 @@ def test_pipeline_page_data_shows_tasks_engines_and_current_work() -> None:
     assert any(engine["engine"] == "Live Trading Engine" for engine in engines)
     assert any(engine["status"] == "DISABLED" for engine in engines)
     assert len(workload) == len(engines)
+
+
+def test_pipeline_snapshot_combines_page_payload_for_fast_loading() -> None:
+    snapshot = client.get("/api/pipeline/snapshot").json()
+
+    assert snapshot["summary"]["pipeline_status"] == "RUNNING"
+    assert snapshot["current_task"]["status"] == "RUNNING"
+    assert snapshot["tasks"]
+    assert snapshot["engines"]
+    assert len(snapshot["workload"]) == len(snapshot["engines"])
 
 
 def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:

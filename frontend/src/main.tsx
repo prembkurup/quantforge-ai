@@ -48,6 +48,7 @@ function App() {
               <Route path="/pipeline" element={<Pipeline />} />
               <Route path="/strategies" element={<Strategies />} />
               <Route path="/strategies/:id" element={<StrategyDetail />} />
+              <Route path="/indicators" element={<Indicators />} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/paper" element={<Paper />} />
               <Route path="/operations" element={<Operations />} />
@@ -67,6 +68,7 @@ function Sidebar() {
     ["/research", "Research", LineChart],
     ["/pipeline", "Pipeline", ListChecks],
     ["/strategies", "Strategies", Library],
+    ["/indicators", "Indicators", BookOpen],
     ["/portfolio", "Portfolio", ShieldCheck],
     ["/paper", "Paper", CandlestickChart],
     ["/operations", "Operations", HeartPulse],
@@ -169,12 +171,9 @@ function Research() {
 }
 
 function Pipeline() {
-  const summary = useApi<Row>("/api/pipeline/summary");
-  const current = useApi<Row>("/api/pipeline/current-task");
-  const tasks = useApi<Row[]>("/api/pipeline/tasks");
-  const engines = useApi<Row[]>("/api/pipeline/engines");
-  const workload = useApi<Row[]>("/api/pipeline/workload");
-  if (!summary || !current || !tasks || !engines || !workload) return <Loading />;
+  const snapshot = useApi<any>("/api/pipeline/snapshot");
+  if (!snapshot) return <Loading />;
+  const { summary, current_task: current, tasks, engines, workload } = snapshot;
   return (
     <Page title="Pipeline / Engine Monitor">
       <div className="kpi-grid">
@@ -222,12 +221,18 @@ function Pipeline() {
 function Strategies() {
   const rows = useApi<Row[]>("/api/strategies");
   const [query, setQuery] = React.useState("");
+  const [page, setPage] = React.useState(1);
+  const pageSize = 30;
+  React.useEffect(() => setPage(1), [query]);
   if (!rows) return <Loading />;
   const filtered = rows.filter((row) => JSON.stringify(row).toLowerCase().includes(query.toLowerCase()));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
   return (
     <Page title="Strategy Library">
       <input className="input" placeholder="Filter by pair, timeframe, regime, grade, PF, drawdown..." value={query} onChange={(event) => setQuery(event.target.value)} />
-      <DataTable title="Production-Grade Strategies" rows={filtered.slice(0, 50)} linkKey="strategy_id" />
+      <DataTable title={`Production-Grade Strategies (${filtered.length})`} rows={pageRows} linkKey="strategy_id" />
+      <PaginationControls page={page} totalPages={totalPages} pageSize={pageSize} totalRows={filtered.length} onPageChange={setPage} />
     </Page>
   );
 }
@@ -249,6 +254,25 @@ function StrategyDetail() {
       <JsonPanel title="Optimization Report" data={data.optimization_report} />
       <JsonPanel title="Validation Report" data={data.validation_report} />
       <JsonPanel title="Backtest Report" data={data.backtest_report} />
+    </Page>
+  );
+}
+
+function Indicators() {
+  const rows = useApi<Row[]>("/api/indicators");
+  const [query, setQuery] = React.useState("");
+  if (!rows) return <Loading />;
+  const filtered = rows.filter((row) => JSON.stringify(row).toLowerCase().includes(query.toLowerCase()));
+  const categories = new Set(rows.map((row) => String(row.category))).size;
+  return (
+    <Page title="Indicators Used">
+      <div className="kpi-grid">
+        <KpiCard title="Active Indicators" value={rows.length} tone="good" />
+        <KpiCard title="Categories" value={categories} />
+        <KpiCard title="Status" value="ACTIVE" tone="good" />
+      </div>
+      <input className="input" placeholder="Filter by indicator, category, purpose, or engine usage..." value={query} onChange={(event) => setQuery(event.target.value)} />
+      <DataTable title={`Indicator / Calculator Reference (${filtered.length})`} rows={filtered} />
     </Page>
   );
 }
@@ -397,6 +421,19 @@ const manualSections = [
     ]
   },
   {
+    title: "Indicators",
+    purpose: "Lists the active indicators, statistical calculators, volatility measures, price-action signals, market-structure signals, and session features used by the research and strategy engines.",
+    use: [
+      "Filter by indicator name, category, purpose, or the engine that uses it.",
+      "Use the category column to separate indicators, volatility, statistics, price action, market structure, volume, and session features.",
+      "Use the purpose and used-by columns to understand why a signal exists before changing strategy templates."
+    ],
+    details: [
+      "The page is a read-only reference of active calculation inputs.",
+      "Indicator availability comes from the dashboard API and should match the Calculation Engine and Feature Engine vocabulary."
+    ]
+  },
+  {
     title: "Strategy Passport",
     purpose: "Shows the traceable record for one strategy, including decision trace, optimization, validation, and backtest evidence.",
     use: [
@@ -470,6 +507,7 @@ const workflowSteps = [
   "Check Operations to make sure services and resource trends are healthy.",
   "Review Research progress and rejection reasons to understand the current experiment state.",
   "Open Strategy Library, filter candidates, and inspect individual Strategy Passports.",
+  "Open Indicators when you need to confirm which calculation inputs are used by the strategy and feature engines.",
   "Check Portfolio to confirm strategy diversity, correlation, and drawdown behavior.",
   "Review Paper Trading for drift and simulated execution performance.",
   "Use Knowledge Base findings to choose the next research direction."
@@ -563,6 +601,35 @@ function MiniFact({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="mini-fact">
       <div className="mini-fact-label">{label}</div>
       <div className="mini-fact-value">{value}</div>
+    </div>
+  );
+}
+
+function PaginationControls({
+  page,
+  totalPages,
+  pageSize,
+  totalRows,
+  onPageChange
+}: {
+  page: number;
+  totalPages: number;
+  pageSize: number;
+  totalRows: number;
+  onPageChange: (page: number) => void;
+}) {
+  const firstRow = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
+  const lastRow = Math.min(page * pageSize, totalRows);
+  return (
+    <div className="pagination-bar">
+      <div className="pagination-summary">
+        Showing {firstRow}-{lastRow} of {totalRows} / 30 per page
+      </div>
+      <div className="pagination-actions">
+        <button className="pagination-button" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</button>
+        <span className="pagination-page">Page {page} of {totalPages}</span>
+        <button className="pagination-button" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</button>
+      </div>
     </div>
   );
 }

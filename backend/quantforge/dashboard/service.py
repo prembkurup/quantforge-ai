@@ -106,6 +106,39 @@ class DashboardService:
             "timestamp": self._timestamp,
         }
 
+    def pipeline_snapshot(self) -> dict[str, Any]:
+        tasks = self.pipeline_tasks()
+        engines = self.engine_status()
+        return {
+            "summary": self._pipeline_summary_from(tasks, engines),
+            "current_task": self.pipeline_current_task(),
+            "tasks": tasks,
+            "engines": engines,
+            "workload": self._engine_workload_from(engines),
+            "timestamp": self._timestamp,
+        }
+
+    def _pipeline_summary_from(
+        self,
+        tasks: list[dict[str, Any]],
+        engines: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        return {
+            "pipeline_status": "RUNNING",
+            "current_task": "Validate database-backed Strategy Assets",
+            "active_engines": sum(1 for engine in engines if engine["status"] == "RUNNING"),
+            "healthy_engines": sum(1 for engine in engines if engine["health"] == "HEALTHY"),
+            "total_engines": len(engines),
+            "running_tasks": sum(1 for task in tasks if task["status"] == "RUNNING"),
+            "queued_tasks": sum(1 for task in tasks if task["status"] == "QUEUED"),
+            "completed_tasks": sum(1 for task in tasks if task["status"] == "COMPLETE"),
+            "blocked_tasks": sum(1 for task in tasks if task["status"] == "BLOCKED"),
+            "overall_progress": 68,
+            "queue_depth": 2,
+            "source": "Workstream 1 Pipeline + Operations Manager",
+            "timestamp": self._timestamp,
+        }
+
     def pipeline_current_task(self) -> dict[str, Any]:
         return {
             "task_id": "WF1-DB-VALIDATE-004",
@@ -204,6 +237,9 @@ class DashboardService:
         ]
 
     def engine_workload(self) -> list[dict[str, Any]]:
+        return self._engine_workload_from(self.engine_status())
+
+    def _engine_workload_from(self, engines: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [
             {
                 "engine": engine["engine"],
@@ -213,7 +249,52 @@ class DashboardService:
                 "capacity": 100,
                 "last_update": self._timestamp,
             }
-            for engine in self.engine_status()
+            for engine in engines
+        ]
+
+    def indicators(self) -> list[dict[str, Any]]:
+        return [
+            _indicator("EMA", "Indicator", "Trend direction, pullback zones, moving-average alignment", "Strategy Library, Feature Engine"),
+            _indicator("SMA", "Indicator", "Baseline trend and mean reference", "Feature Engine"),
+            _indicator("WMA", "Indicator", "Weighted trend smoothing", "Calculation Engine"),
+            _indicator("HMA", "Indicator", "Low-lag trend smoothing", "Calculation Engine"),
+            _indicator("SuperTrend", "Indicator", "Trend state and trailing stop context", "Strategy Composer"),
+            _indicator("Ichimoku", "Indicator", "Cloud trend, support/resistance, and momentum context", "Strategy Composer"),
+            _indicator("Donchian Channels", "Indicator", "Breakout range and channel boundaries", "Breakout templates"),
+            _indicator("RSI", "Indicator", "Momentum exhaustion and pullback qualification", "Feature Engine"),
+            _indicator("MACD", "Indicator", "Momentum direction and signal-line confirmation", "Strategy Library"),
+            _indicator("Stochastic", "Indicator", "Range momentum and overbought/oversold context", "Mean reversion templates"),
+            _indicator("CCI", "Indicator", "Cyclical deviation from mean price", "Research features"),
+            _indicator("ROC", "Indicator", "Rate-of-change momentum", "Momentum templates"),
+            _indicator("Momentum", "Indicator", "Directional impulse scoring", "Feature Engine"),
+            _indicator("ATR", "Volatility", "Volatility sizing, stop distance, and exit model", "Backtesting, Risk, Portfolio"),
+            _indicator("Bollinger Bands", "Volatility", "Volatility envelope and mean-reversion context", "Mean reversion templates"),
+            _indicator("Keltner Channels", "Volatility", "ATR envelope and trend channel context", "Breakout templates"),
+            _indicator("OBV", "Volume", "Volume pressure confirmation", "Research features"),
+            _indicator("VWAP", "Session", "Session value reference and intraday mean", "Session features"),
+            _indicator("MFI", "Volume", "Volume-weighted momentum", "Research features"),
+            _indicator("Rolling Mean", "Statistical", "Moving statistical baseline", "Feature Engine"),
+            _indicator("Rolling Median", "Statistical", "Robust central tendency", "Feature Engine"),
+            _indicator("Rolling Standard Deviation", "Statistical", "Volatility and dispersion", "Feature Engine"),
+            _indicator("Z-Score", "Statistical", "Standardized distance from baseline", "Strategy Composer"),
+            _indicator("Variance", "Statistical", "Dispersion measurement", "Research features"),
+            _indicator("Percentile", "Statistical", "Relative rank of recent values", "Optimization Laboratory"),
+            _indicator("Skewness", "Statistical", "Return distribution asymmetry", "Validation reports"),
+            _indicator("Kurtosis", "Statistical", "Tail-risk profile", "Validation reports"),
+            _indicator("Simple Returns", "Statistical", "Basic return stream", "Backtesting"),
+            _indicator("Log Returns", "Statistical", "Normalized return stream", "Backtesting"),
+            _indicator("True Range", "Volatility", "Raw volatility component for ATR", "Calculation Engine"),
+            _indicator("Close-to-Close Volatility", "Volatility", "Realized volatility estimate", "Portfolio Engine"),
+            _indicator("Candle Body/Wick/Range", "Price Action", "Candle anatomy and rejection signals", "Price Action Calculator"),
+            _indicator("Inside/Outside Bar", "Price Action", "Compression and expansion patterns", "Strategy Composer"),
+            _indicator("Pin Bar", "Price Action", "Rejection and reversal signal", "Price Action templates"),
+            _indicator("Engulfing", "Price Action", "Momentum reversal pattern", "Price Action templates"),
+            _indicator("Swing High/Low", "Market Structure", "Local structure pivots", "Market Structure Calculator"),
+            _indicator("HH/HL/LH/LL", "Market Structure", "Trend structure classification", "Market Regime Engine"),
+            _indicator("BOS", "Market Structure", "Break of structure detection", "Strategy Composer"),
+            _indicator("CHoCH", "Market Structure", "Change of character detection", "Strategy Composer"),
+            _indicator("Support/Resistance Distance", "Market Structure", "Distance to nearby structure levels", "Risk and entry filters"),
+            _indicator("Session Flags", "Session", "Asian, London, New York, overlap, weekend, holiday context", "Session Calculator"),
         ]
 
     def strategies(self) -> list[dict[str, Any]]:
@@ -566,4 +647,14 @@ def _engine(
         "workload_percent": workload_percent,
         "queue_depth": queue_depth,
         "current_activity": current_activity,
+    }
+
+
+def _indicator(name: str, category: str, purpose: str, used_by: str) -> dict[str, Any]:
+    return {
+        "indicator": name,
+        "category": category,
+        "purpose": purpose,
+        "used_by": used_by,
+        "status": "ACTIVE",
     }

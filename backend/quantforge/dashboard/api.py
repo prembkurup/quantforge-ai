@@ -53,6 +53,10 @@ def create_app() -> FastAPI:
     def pipeline_summary() -> dict[str, Any]:
         return service.pipeline_summary()
 
+    @app.get("/api/pipeline/snapshot")
+    def pipeline_snapshot() -> dict[str, Any]:
+        return service.pipeline_snapshot()
+
     @app.get("/api/pipeline/current-task")
     def pipeline_current_task() -> dict[str, Any]:
         return service.pipeline_current_task()
@@ -72,6 +76,10 @@ def create_app() -> FastAPI:
     @app.get("/api/strategies")
     def strategies() -> list[dict[str, Any]]:
         return service.strategies()
+
+    @app.get("/api/indicators")
+    def indicators() -> list[dict[str, Any]]:
+        return service.indicators()
 
     @app.get("/api/strategies/{strategy_id}")
     def strategy(strategy_id: str) -> dict[str, Any]:

@@ -257,6 +257,9 @@ Open the UI at `http://127.0.0.1:5174` locally or `http://192.168.1.113:5174` fr
 The dashboard shell uses CoreUI and AdminLTE styling while staying read-only for Version 1.
 
 The `/pipeline` dashboard page shows the current running task, queued pipeline tasks, all engine statuses, and per-engine workload.
+It uses `GET /api/pipeline/snapshot` for a faster single-request page load.
+The `/indicators` page lists the active indicators, statistical calculators, volatility measures, price-action signals, market-structure signals, and session features used by the platform.
+The Strategy Library page paginates results at 30 strategies per page.
 
 Production dashboard deployment:
 

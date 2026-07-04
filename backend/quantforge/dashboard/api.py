@@ -5,10 +5,12 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from quantforge.config.settings import get_settings
 from quantforge.dashboard.service import DashboardService
 
 
 def create_app() -> FastAPI:
+    settings = get_settings()
     app = FastAPI(
         title="QuantForge AI Dashboard API",
         description="Read-only dashboard API for research, strategy library, portfolio, paper trading, operations, and knowledge evidence.",
@@ -16,12 +18,20 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=("http://localhost:5173", "http://127.0.0.1:5173"),
+        allow_origins=settings.dashboard_allowed_origins,
         allow_credentials=False,
         allow_methods=("GET",),
         allow_headers=("*",),
     )
     service = DashboardService()
+
+    @app.get("/api/health")
+    def health() -> dict[str, str]:
+        return {
+            "status": "ok",
+            "environment": settings.environment,
+            "mode": "read-only",
+        }
 
     @app.get("/api/dashboard/overview")
     def overview() -> dict[str, Any]:

@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import uvicorn
 
+from quantforge.config.settings import get_settings
+
 
 def main() -> None:
+    settings = get_settings()
     uvicorn.run(
         "quantforge.dashboard.api:app",
-        host="127.0.0.1",
-        port=8000,
+        host=settings.dashboard_api_host,
+        port=settings.dashboard_api_port,
         reload=False,
     )
 

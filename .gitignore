@@ -8,6 +8,7 @@ __pycache__/
 venv/
 *.egg-info/
 .env
+.env.production
 var/
 *.parquet
 frontend/node_modules/

@@ -21,6 +21,14 @@ def test_dashboard_overview_returns_core_kpis() -> None:
     assert payload["production_strategies"] == 75
 
 
+def test_dashboard_health_endpoint_is_read_only() -> None:
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["mode"] == "read-only"
+
+
 def test_strategy_library_is_readable_and_traceable() -> None:
     strategies = client.get("/api/strategies").json()
     first = strategies[0]

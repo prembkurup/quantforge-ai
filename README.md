@@ -236,6 +236,14 @@ Run the read-only dashboard API:
 .\.venv\Scripts\python .\scripts\serve_dashboard_api.py
 ```
 
+The dashboard API host, port, and browser origins are environment-driven:
+
+```powershell
+QUANTFORGE_DASHBOARD_API_HOST=127.0.0.1
+QUANTFORGE_DASHBOARD_API_PORT=8000
+QUANTFORGE_DASHBOARD_CORS_ORIGINS=http://localhost:5174,http://127.0.0.1:5174,http://192.168.1.113:5174
+```
+
 Run the React dashboard:
 
 ```powershell
@@ -247,6 +255,17 @@ npm run dev
 Open the UI at `http://127.0.0.1:5174` locally or `http://192.168.1.113:5174` from the private LAN.
 
 The dashboard shell uses CoreUI and AdminLTE styling while staying read-only for Version 1.
+
+Production dashboard deployment:
+
+```powershell
+Copy-Item .env.production.example .env.production
+# Edit .env.production secrets and production database URLs first.
+docker compose -f docker-compose.production.yml --env-file .env.production up -d --build
+docker compose -f docker-compose.production.yml --env-file .env.production exec dashboard-api python -m alembic upgrade head
+```
+
+The production stack serves the dashboard at `http://127.0.0.1:5174` and `http://192.168.1.113:5174`, proxies `/api/*` to FastAPI, supports React routes such as `/help`, and exposes `GET /api/health`.
 
 ## Foundation Setup
 

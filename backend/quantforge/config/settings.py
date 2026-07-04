@@ -28,6 +28,20 @@ class Settings(BaseSettings):
     monday_api_token: str | None = None
     monday_board_id: str | None = None
 
+    dashboard_api_host: str = Field(default="127.0.0.1")
+    dashboard_api_port: int = Field(default=8000)
+    dashboard_cors_origins: str = Field(
+        default="http://localhost:5174,http://127.0.0.1:5174,http://192.168.1.113:5174"
+    )
+
+    @property
+    def dashboard_allowed_origins(self) -> tuple[str, ...]:
+        return tuple(
+            origin.strip()
+            for origin in self.dashboard_cors_origins.split(",")
+            if origin.strip()
+        )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

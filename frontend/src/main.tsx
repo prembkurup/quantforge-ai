@@ -2,7 +2,6 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
-import { CBadge } from "@coreui/react";
 import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, HeartPulse, Library, LineChart, ListChecks, ShieldCheck } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
@@ -103,15 +102,18 @@ function Sidebar() {
 
 function Header() {
   return (
-    <header className="app-header navbar navbar-expand dashboard-header sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 px-5 py-3 backdrop-blur lg:px-8">
+    <header className="app-header navbar navbar-expand dashboard-header sticky top-0 z-20 px-5 py-3 lg:px-8">
       <div className="dashboard-header-inner flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-normal">QuantForge AI</h1>
-          <p className="text-sm text-slate-400">Production Research Dashboard</p>
+        <div className="dashboard-header-brand">
+          <div className="dashboard-header-mark">
+            <Activity size={19} />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold tracking-normal">QuantForge AI</h1>
+            <p className="text-sm text-slate-400">Production Research Dashboard</p>
+          </div>
         </div>
         <div className="dashboard-status-strip flex flex-wrap gap-2">
-          <CBadge color="info">CoreUI</CBadge>
-          <span className="badge text-bg-secondary">AdminLTE</span>
           <StatusBadge label="HEALTHY" tone="good" />
           <StatusBadge label="READ ONLY" tone="neutral" />
           <StatusBadge label="LIVE DISABLED" tone="warn" />

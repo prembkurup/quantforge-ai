@@ -1,6 +1,29 @@
 """Offline research and validation engine."""
 
 from quantforge.research.analytics import ResearchAnalyticsEngine
+from quantforge.research.autonomous import (
+    AutonomousResearchPipeline,
+    AutonomousResearchResult,
+    DatasetSelection,
+    DatasetSelector,
+    ExperimentExecutionResult,
+    ExperimentExecutionStatus,
+    ExperimentRunner,
+    ExperimentScheduleItem,
+    ExperimentScheduler,
+    GeneratedHypothesis,
+    HypothesisGenerator,
+    ImmutableExperimentPlan,
+    KnowledgeBaseUpdater,
+    KnowledgeUpdateReport,
+    ResearchDashboard,
+    ResearchGoal,
+    ResearchKPIReport,
+    ResearchReport,
+    ResearchReportGenerator,
+    StrategyAssetPublisher,
+    StrategyRankingReport,
+)
 from quantforge.research.data_preparation import DataPreparationEngine
 from quantforge.research.experiment import (
     ExperimentDataset,
@@ -92,6 +115,27 @@ from quantforge.research.ranking import StrategyRankingEngine
 
 __all__ = [
     "DataPreparationEngine",
+    "AutonomousResearchPipeline",
+    "AutonomousResearchResult",
+    "DatasetSelection",
+    "DatasetSelector",
+    "ExperimentExecutionResult",
+    "ExperimentExecutionStatus",
+    "ExperimentRunner",
+    "ExperimentScheduleItem",
+    "ExperimentScheduler",
+    "GeneratedHypothesis",
+    "HypothesisGenerator",
+    "ImmutableExperimentPlan",
+    "KnowledgeBaseUpdater",
+    "KnowledgeUpdateReport",
+    "ResearchDashboard",
+    "ResearchGoal",
+    "ResearchKPIReport",
+    "ResearchReport",
+    "ResearchReportGenerator",
+    "StrategyAssetPublisher",
+    "StrategyRankingReport",
     "ExperimentDataset",
     "ExperimentDefinition",
     "ExperimentFeatureSet",

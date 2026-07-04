@@ -41,6 +41,7 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Implement Backtesting Engine 2.0 with event-driven simulation, replay mode, time machine, and professional reports.
 - Implement Strategy Validation Platform with Strategy Passport and Strategy Asset lifecycle.
 - Implement Production Strategy Management Platform for catalog, registry, deployment, portfolio allocation, drift monitoring, and retirement.
+- Implement Autonomous Research Validation for 100+ experiment lifecycle runs, Strategy Asset publishing, Knowledge Base updates, reports, and audit trails.
 - Store experiment lineage, research run metrics, validation results, and analytics.
 - Add Parquet research cache.
 - Define live trading risk checks.

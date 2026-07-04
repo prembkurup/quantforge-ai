@@ -62,6 +62,7 @@ docs/
   backtesting-engine.md
   strategy-validation-platform.md
   production-strategy-management.md
+  autonomous-research-validation.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -82,6 +83,7 @@ The first milestone is a usable research loop:
 9. Assemble candidates through the Strategy Composer.
 10. Search parameters, backtest, validate, and score candidates.
 11. Publish approved strategies with full experiment lineage.
+12. Run autonomous research validation to prove the full lifecycle can publish Strategy Assets without manual intervention.
 
 Generate the first standardized feature vector from CoreUI candles:
 
@@ -147,6 +149,12 @@ Run the Production Strategy Management demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\deploy_strategy.py
+```
+
+Run the Autonomous Research Validation demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\autonomous_research.py
 ```
 
 ## Foundation Setup

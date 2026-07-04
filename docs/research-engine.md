@@ -64,6 +64,7 @@ Calculations are derived inputs used inside features and templates. Indicators a
 20. Ranking
 21. Research Analytics
 22. Strategy Publishing
+23. Autonomous Research Validation
 
 ## Engine Responsibilities
 
@@ -227,6 +228,12 @@ Validated strategies receive a permanent Strategy Passport and become immutable 
 Production treats Strategy Assets like installable apps. The Strategy Catalog stores every asset and version; the Strategy Registry tracks active, inactive, paper, production, deprecated, and retired states; the Deployment Manager installs, upgrades, rolls back, disables, promotes, and archives assets.
 
 The Portfolio Manager activates groups of strategies, the Capital Allocator assigns portfolio weights, the Strategy Scheduler controls sessions and timeframes, the Live Performance Monitor compares research versus live behavior, and the Retirement Manager removes degraded strategies automatically.
+
+### Autonomous Research Validation
+
+Autonomous Research Validation runs the full research lifecycle as one reproducible system. It accepts a research objective, creates hypotheses, plans immutable experiments, selects datasets, composes valid candidate strategies, optimizes stable parameter regions, backtests, validates, ranks, publishes approved Strategy Assets, updates the Knowledge Base, and writes audit-ready reports.
+
+This stage measures platform process quality rather than trading profitability. It proves that QuantForge AI can complete at least 100 experiments without manual intervention, reject invalid or statistically weak candidates, preserve every decision trace, and publish only fully validated Strategy Assets to the catalog.
 
 ### Strategy Ranking Engine
 

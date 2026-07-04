@@ -83,7 +83,9 @@ A strategy plugin declares:
 - risk model hooks
 - validation constraints
 
-The research engine defines experiments, discovers plugins, expands parameter templates, identifies stable parameter regions, runs review gates, backtests, validates results, compares experiment analytics, and ranks candidates. Backtesting is event-driven: the simulator processes market, order, execution, position, portfolio, risk, and journal events rather than idealized candle outcomes. The live engine should consume the same event concepts and only runs approved strategy versions.
+The research engine defines experiments, discovers plugins, expands parameter templates, identifies stable parameter regions, runs review gates, backtests, validates results, compares experiment analytics, and ranks candidates. Backtesting is event-driven: the simulator processes market, order, execution, position, portfolio, risk, and journal events rather than idealized candle outcomes. Validation is a QA platform with walk-forward, out-of-sample, Monte Carlo, cross-pair, cross-timeframe, parameter stability, stress, confidence, and deployment gates. The live engine should consume the same event concepts and only runs approved Strategy Assets.
+
+QuantForge AI treats promoted strategies as immutable Strategy Assets. A Strategy Asset includes the definition, plugin versions, parameters, feature versions, decision trace, optimization report, validation report, Strategy Passport, deployment history, and live performance history.
 
 ## Live Execution
 

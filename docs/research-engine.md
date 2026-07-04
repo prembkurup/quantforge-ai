@@ -218,7 +218,9 @@ Every trade records the entry reason, decision trace, feature vector, market reg
 
 ### Validation Engine
 
-Runs walk-forward testing, out-of-sample testing, Monte Carlo simulation, cross-pair testing, cross-timeframe testing, and stability analysis.
+The Strategy Validation Platform is the QA department for QuantForge AI. It runs walk-forward testing, out-of-sample testing, Monte Carlo simulation, cross-pair testing, cross-timeframe testing, parameter stability checks, stress testing, confidence scoring, and deployment board decisions.
+
+Validated strategies receive a permanent Strategy Passport and become immutable Strategy Assets containing the strategy definition, plugin versions, parameters, feature versions, decision trace, optimization report, validation report, passport, deployment history, and live performance history.
 
 ### Strategy Ranking Engine
 

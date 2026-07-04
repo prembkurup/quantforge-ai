@@ -39,6 +39,7 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Build Optimization Laboratory to find stable parameter regions and run Research Review Board gates.
 - Build first template strategy plugin.
 - Implement Backtesting Engine 2.0 with event-driven simulation, replay mode, time machine, and professional reports.
+- Implement Strategy Validation Platform with Strategy Passport and Strategy Asset lifecycle.
 - Store experiment lineage, research run metrics, validation results, and analytics.
 - Add Parquet research cache.
 - Define live trading risk checks.

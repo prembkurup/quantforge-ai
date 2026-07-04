@@ -60,6 +60,7 @@ docs/
   strategy-composer.md
   optimization-laboratory.md
   backtesting-engine.md
+  strategy-validation-platform.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -133,6 +134,12 @@ Run the event-driven Backtesting Engine demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\backtest.py
+```
+
+Run the Strategy Validation Platform demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\validate_strategy.py
 ```
 
 ## Foundation Setup

@@ -47,6 +47,7 @@
 - Add out-of-sample testing.
 - Add spread and slippage modeling.
 - Add robustness scoring.
+- Add Strategy Validation Platform with Monte Carlo, cross-pair, cross-timeframe, parameter stability, stress testing, confidence scoring, Deployment Board, Strategy Passport, and Strategy Assets.
 - Promote validated candidates.
 
 ## Phase 5: Live Engine

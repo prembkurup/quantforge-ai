@@ -46,6 +46,7 @@ Use this as the first Monday.com board structure for QuantForge AI.
 - Add Parquet research cache.
 - Define live trading risk checks.
 - Implement Live Trading Engine with event bus, Trade Decision Engine, execution manager, state store, recovery, and broker synchronization.
+- Implement Shadow Trading and Paper Trading Platform with virtual exchange, paper portfolio, decision auditing, drift analytics, Digital Twin, and promotion review.
 - Implement OANDA execution adapter dry-run mode.
 - Add Linux server deployment plan.
 - Implement Production Engineering and SRE controls for health, heartbeats, metrics, logs, traces, alerting, and recovery.

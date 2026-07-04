@@ -115,6 +115,12 @@ QuantForge AI includes an SRE layer for production readiness. Services report he
 
 The production platform emits Prometheus-style metrics, structured JSON logs, distributed trace spans, classified alerts, and automatic recovery actions. This protects against lost trading state, duplicate orders, silent service failures, and capital-risk events such as emergency daily-loss kill switches.
 
+## Shadow Trading
+
+Before live capital, approved Strategy Assets pass through Shadow Trading and Paper Trading. The live engine receives market events and produces decisions, but orders are routed to a Virtual Exchange and isolated Paper Portfolio. The platform audits every decision, compares expected research behavior with paper results, tracks prediction, execution, market, feature, and decision drift, and generates daily validation reports plus monthly promotion reviews.
+
+A Digital Twin runs the broker execution path and internal simulation exchange path in parallel against the same market events, Strategy Assets, and feature vectors. If decisions diverge, promotion is frozen for investigation.
+
 ## Safety Rules
 
 - Research code must not place live orders.

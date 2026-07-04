@@ -65,6 +65,7 @@ docs/
   autonomous-research-validation.md
   live-trading-engine.md
   production-engineering-sre.md
+  shadow-trading-platform.md
   experiment-management-system.md
   data-model.md
   roadmap.md
@@ -169,6 +170,12 @@ Run the Production Engineering and SRE demo:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\production_readiness.py
+```
+
+Run the Shadow Trading and Paper Trading demo:
+
+```powershell
+.\.venv\Scripts\python .\scripts\shadow_trading.py
 ```
 
 ## Foundation Setup

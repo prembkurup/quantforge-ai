@@ -77,13 +77,14 @@ def full_history_plan_exhausted(
     state = _load_json(state_file)
     completed = set(state.get("completed", []))
     failed = set(state.get("failed", []))
+    if failed:
+        return False
     running = state.get("running", {})
     if isinstance(running, dict) and running:
         return False
 
     planned_ids = {job.job_id for job in planned}
-    finished_ids = completed | failed
-    return planned_ids <= finished_ids
+    return planned_ids <= completed
 
 
 def automation_already_finished(

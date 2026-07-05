@@ -9,11 +9,17 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from quantforge.research.full_history_scheduler import FullHistoryResearchJob
+from quantforge.research.full_history_scheduler import (
+    FULL_HISTORY_MAX_RETRIES,
+    FULL_HISTORY_RETRY_DELAY_SECONDS,
+    FullHistoryResearchJob,
+    FullHistoryRetryDecision,
+    classify_full_history_failure,
+)
 
 
-DEFAULT_MAX_RETRIES = 3
-DEFAULT_RETRY_DELAY_SECONDS = 300
+DEFAULT_MAX_RETRIES = FULL_HISTORY_MAX_RETRIES
+DEFAULT_RETRY_DELAY_SECONDS = FULL_HISTORY_RETRY_DELAY_SECONDS
 
 
 class WorkflowStatus(StrEnum):
@@ -114,16 +120,9 @@ class WorkflowStateRepository:
 
 class WorkflowRetryManager:
     def status_for_failure(self, error_message: str, attempt: int) -> str:
-        if attempt >= DEFAULT_MAX_RETRIES:
-            return WorkflowStatus.FAILED_PERMANENT.value
-        normalized = error_message.lower()
-        retryable_tokens = ("temporary", "timeout", "network", "oanda", "lock", "worker crash", "database")
-        permanent_tokens = ("invalid configuration", "missing required", "schema mismatch", "manual approval rejected")
-        if any(token in normalized for token in permanent_tokens):
-            return WorkflowStatus.FAILED_PERMANENT.value
-        if any(token in normalized for token in retryable_tokens):
+        if classify_full_history_failure(error_message, attempt) == FullHistoryRetryDecision.RETRYABLE:
             return WorkflowStatus.FAILED_RETRYABLE.value
-        return WorkflowStatus.FAILED_RETRYABLE.value
+        return WorkflowStatus.FAILED_PERMANENT.value
 
 
 class WorkflowApprovalGate:
@@ -344,6 +343,8 @@ class WorkflowStateMachine:
             return "FULL_HISTORY_RUNNING"
         if any(task["stage"] == WorkflowStage.FULL_HISTORY_RESEARCH.value and task["status"] in {WorkflowStatus.PENDING.value, WorkflowStatus.READY.value} for task in tasks):
             return "FULL_HISTORY_RUNNING"
+        if any(task["stage"] == WorkflowStage.FULL_HISTORY_RESEARCH.value and "FAILED" in task["status"] for task in tasks):
+            return "FULL_HISTORY_BLOCKED"
         for stage in (
             WorkflowStage.AUTONOMOUS_RESEARCH,
             WorkflowStage.PAPER_PORTFOLIO_DEPLOYMENT,
@@ -583,12 +584,7 @@ def _logical_task_id(pair: str, timeframe: str, task_type: str) -> str:
 
 def _all_full_history_finished(tasks: list[dict[str, Any]]) -> bool:
     full_history_tasks = [task for task in tasks if task["stage"] == WorkflowStage.FULL_HISTORY_RESEARCH.value]
-    finished_statuses = {
-        WorkflowStatus.COMPLETE.value,
-        WorkflowStatus.FAILED_PERMANENT.value,
-        WorkflowStatus.FAILED_RETRYABLE.value,
-    }
-    return bool(full_history_tasks) and all(task["status"] in finished_statuses for task in full_history_tasks)
+    return bool(full_history_tasks) and all(task["status"] == WorkflowStatus.COMPLETE.value for task in full_history_tasks)
 
 
 def _waiting_reason_for_dependency(dependency: str) -> str:
@@ -613,6 +609,9 @@ def _next_action(tasks: list[dict[str, Any]], approval: WorkflowApproval) -> str
     retryable = next((task for task in tasks if task["status"] == WorkflowStatus.FAILED_RETRYABLE.value), None)
     if retryable:
         return f"Retry {retryable['task_id']}"
+    permanent = next((task for task in tasks if task["status"] == WorkflowStatus.FAILED_PERMANENT.value), None)
+    if permanent:
+        return f"Review permanent failure {permanent['task_id']}"
     ready = next((task for task in tasks if task["status"] == WorkflowStatus.READY.value), None)
     if ready:
         return str(ready["next_action"])

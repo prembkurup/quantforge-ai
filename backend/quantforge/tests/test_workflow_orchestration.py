@@ -80,6 +80,42 @@ def test_workflow_orchestrator_marks_failed_jobs_retryable(tmp_path) -> None:
     assert task["retry_delay_seconds"] == 300
 
 
+def test_workflow_orchestrator_marks_research_quality_failure_permanent(tmp_path) -> None:
+    scheduler = FullHistoryResearchScheduler(
+        config=_config(),
+        state_file=tmp_path / "var" / "full_history_research_state.json",
+        repository_factory=FakeCandleRepository,
+    )
+    planned = scheduler.plan()
+    paths = default_workflow_paths(tmp_path)
+    failed_job = planned[1]
+    paths.full_history_state_file.parent.mkdir(parents=True)
+    paths.full_history_state_file.write_text(
+        json.dumps(
+            {
+                "completed": [],
+                "failed": [failed_job.job_id],
+                "history": [
+                    {
+                        "job_id": failed_job.job_id,
+                        "evidence": "tasks=2/9; candles=137; duplicates=0; successful=NO",
+                        "recorded_at": "2026-01-01T00:00:00+00:00",
+                    }
+                ],
+                "running": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    snapshot = WorkflowOrchestrator(paths).current(planned)
+    task = next(item for item in snapshot["tasks"] if item["task_id"] == failed_job.job_id)
+
+    assert task["status"] == WorkflowStatus.FAILED_PERMANENT.value
+    assert task["waiting_reason"] == "Blocked by permanent failure."
+    assert snapshot["run"]["retryable_tasks"] == 0
+
+
 def _config() -> FullHistorySchedulerConfig:
     return FullHistorySchedulerConfig(
         pairs=("EUR_USD",),

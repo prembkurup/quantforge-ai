@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import json
+from datetime import datetime, timedelta, timezone
 
 from quantforge.research import (
     FullHistoryJobStatus,
     FullHistoryResearchScheduler,
+    FullHistoryRetryDecision,
     FullHistorySchedulerConfig,
     FullHistoryStage,
     claim_pending_jobs,
+    classify_full_history_failure,
     release_running_jobs,
 )
 from quantforge.tests.test_workstream1_pipeline import FakeCandleRepository
@@ -117,6 +120,88 @@ def test_full_history_scheduler_runs_specific_claimed_job(tmp_path) -> None:
     assert result.failed_jobs == 0
     assert result.executed_jobs[0].job_id == claimed[0].job_id
     assert result.executed_jobs[0].status == FullHistoryJobStatus.COMPLETE
+
+
+def test_full_history_scheduler_reclaims_due_retryable_failed_job(tmp_path) -> None:
+    state_file = tmp_path / "full_history_state.json"
+    scheduler = FullHistoryResearchScheduler(
+        config=_config(),
+        state_file=state_file,
+        repository_factory=FakeCandleRepository,
+    )
+    retryable_job = scheduler.plan()[0]
+    state_file.write_text(
+        json.dumps(
+            {
+                "completed": [],
+                "failed": [retryable_job.job_id],
+                "history": [
+                    {
+                        "job_id": retryable_job.job_id,
+                        "stage": retryable_job.stage.value,
+                        "status": FullHistoryJobStatus.FAILED.value,
+                        "evidence": "Timeout while reading OANDA candles",
+                        "recorded_at": (datetime.now(timezone.utc) - timedelta(minutes=6)).isoformat(),
+                    }
+                ],
+                "running": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    claimed = claim_pending_jobs(
+        state_file,
+        scheduler.plan(),
+        limit=1,
+        owner="worker-a",
+        stale_after_seconds=3600,
+    )
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+
+    assert claimed[0].job_id == retryable_job.job_id
+    assert retryable_job.job_id not in state["failed"]
+    assert state["running"][retryable_job.job_id]["retry_attempt"] == 2
+
+
+def test_full_history_scheduler_does_not_retry_research_quality_failure(tmp_path) -> None:
+    state_file = tmp_path / "full_history_state.json"
+    scheduler = FullHistoryResearchScheduler(
+        config=_config(),
+        state_file=state_file,
+        repository_factory=FakeCandleRepository,
+    )
+    failed_job = scheduler.plan()[1]
+    state_file.write_text(
+        json.dumps(
+            {
+                "completed": [],
+                "failed": [failed_job.job_id],
+                "history": [
+                    {
+                        "job_id": failed_job.job_id,
+                        "stage": failed_job.stage.value,
+                        "status": FullHistoryJobStatus.FAILED.value,
+                        "evidence": "tasks=2/9; candles=137; successful=NO",
+                        "recorded_at": (datetime.now(timezone.utc) - timedelta(minutes=60)).isoformat(),
+                    }
+                ],
+                "running": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    claimed = claim_pending_jobs(
+        state_file,
+        scheduler.plan(),
+        limit=4,
+        owner="worker-a",
+        stale_after_seconds=3600,
+    )
+
+    assert failed_job.job_id not in {job.job_id for job in claimed}
+    assert classify_full_history_failure("tasks=2/9; successful=NO", 1) == FullHistoryRetryDecision.PERMANENT
 
 
 def _config() -> FullHistorySchedulerConfig:

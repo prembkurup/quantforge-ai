@@ -71,13 +71,17 @@ from quantforge.research.experiment import (
 )
 from quantforge.research.feature_store import FeatureStore
 from quantforge.research.full_history_scheduler import (
+    FULL_HISTORY_MAX_RETRIES,
+    FULL_HISTORY_RETRY_DELAY_SECONDS,
     FullHistoryJobStatus,
     FullHistoryResearchJob,
     FullHistoryResearchScheduler,
+    FullHistoryRetryDecision,
     FullHistoryRunResult,
     FullHistorySchedulerConfig,
     FullHistoryStage,
     claim_pending_jobs,
+    classify_full_history_failure,
     release_running_jobs,
 )
 from quantforge.research.knowledge_base import (
@@ -234,13 +238,17 @@ __all__ = [
     "ExperimentStatus",
     "ExperimentComparisonSpec",
     "FeatureStore",
+    "FULL_HISTORY_MAX_RETRIES",
+    "FULL_HISTORY_RETRY_DELAY_SECONDS",
     "FullHistoryJobStatus",
     "FullHistoryResearchJob",
     "FullHistoryResearchScheduler",
+    "FullHistoryRetryDecision",
     "FullHistoryRunResult",
     "FullHistorySchedulerConfig",
     "FullHistoryStage",
     "claim_pending_jobs",
+    "classify_full_history_failure",
     "release_running_jobs",
     "ExperimentResultKnowledge",
     "Hypothesis",

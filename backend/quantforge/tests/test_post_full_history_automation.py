@@ -53,6 +53,20 @@ def test_full_history_plan_exhausted_requires_all_planned_jobs_finished(tmp_path
         encoding="utf-8",
     )
 
+    assert full_history_plan_exhausted(state_file, planned) is False
+
+    state_file.write_text(
+        json.dumps(
+            {
+                "completed": [job.job_id for job in planned],
+                "failed": [],
+                "history": [],
+                "running": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
     assert full_history_plan_exhausted(state_file, planned) is True
 
 

@@ -46,6 +46,24 @@ FULL_HISTORY_RESEARCH_PAIRS = (
 )
 FULL_HISTORY_RESEARCH_TIMEFRAMES = ("M5", "M15", "H1", "H4")
 FULL_HISTORY_RESEARCH_START = datetime(2016, 1, 4, tzinfo=timezone.utc)
+FULL_HISTORY_MAX_RETRIES = 3
+FULL_HISTORY_RETRY_DELAY_SECONDS = 300
+FULL_HISTORY_RETRYABLE_TOKENS = (
+    "temporary",
+    "timeout",
+    "network",
+    "oanda",
+    "lock",
+    "worker crash",
+    "database",
+)
+FULL_HISTORY_PERMANENT_TOKENS = (
+    "invalid configuration",
+    "missing required",
+    "schema mismatch",
+    "manual approval rejected",
+    "successful=no",
+)
 
 
 class FullHistoryStage(StrEnum):
@@ -102,6 +120,11 @@ class FullHistoryRunResult:
     skipped_jobs: int
     executed_jobs: tuple[FullHistoryResearchJob, ...]
     state_file: str
+
+
+class FullHistoryRetryDecision(StrEnum):
+    RETRYABLE = "RETRYABLE"
+    PERMANENT = "PERMANENT"
 
 
 class FullHistoryResearchScheduler:
@@ -167,19 +190,16 @@ class FullHistoryResearchScheduler:
         state = _load_state(self.state_file)
         completed = set(state.get("completed", []))
         failed = set(state.get("failed", []))
-        running = set(_running_jobs(state))
         executed: list[FullHistoryResearchJob] = []
         planned = self.plan()
-        pending = [
-            job
-            for job in planned
-            if job.job_id not in completed and job.job_id not in failed and job.job_id not in running
-        ]
+        now = datetime.now(timezone.utc)
+        pending = _pending_or_retryable_jobs(planned, state, now=now)
 
         for job in pending[: max(0, max_jobs)]:
             if dry_run:
                 executed.append(job)
                 continue
+            _mark_retrying(self.state_file, job.job_id)
             result_job = self._run_job(job)
             executed.append(result_job)
             _record_job_result(self.state_file, result_job)
@@ -206,7 +226,16 @@ class FullHistoryResearchScheduler:
         state = _load_state(self.state_file)
         completed = set(state.get("completed", []))
         failed = set(state.get("failed", []))
-        if job_id in completed or job_id in failed:
+        if job_id in completed:
+            return FullHistoryRunResult(
+                planned_jobs=len(planned),
+                completed_jobs=len(completed),
+                failed_jobs=len(failed),
+                skipped_jobs=0,
+                executed_jobs=(),
+                state_file=str(self.state_file),
+            )
+        if job_id in failed and not full_history_retry_due(state, job_id, now=datetime.now(timezone.utc)):
             return FullHistoryRunResult(
                 planned_jobs=len(planned),
                 completed_jobs=len(completed),
@@ -219,6 +248,7 @@ class FullHistoryResearchScheduler:
         if dry_run:
             executed = (job,)
         else:
+            _mark_retrying(self.state_file, job.job_id)
             result_job = self._run_job(job)
             _record_job_result(self.state_file, result_job)
             executed = (result_job,)
@@ -226,12 +256,7 @@ class FullHistoryResearchScheduler:
         state = _load_state(self.state_file)
         completed = set(state.get("completed", []))
         failed = set(state.get("failed", []))
-        running = set(_running_jobs(state))
-        pending = [
-            item
-            for item in planned
-            if item.job_id not in completed and item.job_id not in failed and item.job_id not in running
-        ]
+        pending = _pending_or_retryable_jobs(planned, state, now=datetime.now(timezone.utc))
         return FullHistoryRunResult(
             planned_jobs=len(planned),
             completed_jobs=len(completed),
@@ -340,7 +365,7 @@ def _rolling_windows(start: datetime, end: datetime, years: int) -> tuple[tuple[
 
 def _load_state(path: Path) -> dict[str, object]:
     if not path.exists():
-        return {"completed": [], "failed": [], "history": [], "running": {}}
+        return {"completed": [], "failed": [], "history": [], "retry_policy": _retry_policy_payload(), "running": {}}
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -363,9 +388,16 @@ def claim_pending_jobs(
         for job in planned:
             if len(claimed) >= max(0, limit):
                 break
-            if job.job_id in completed or job.job_id in failed or job.job_id in running:
+            if job.job_id in completed or job.job_id in running:
                 continue
-            running[job.job_id] = {"owner": owner, "claimed_at": now.isoformat()}
+            if job.job_id in failed and not full_history_retry_due(state, job.job_id, now=now):
+                continue
+            failed.discard(job.job_id)
+            running[job.job_id] = {
+                "owner": owner,
+                "claimed_at": now.isoformat(),
+                "retry_attempt": full_history_attempt(state, job.job_id) + 1,
+            }
             claimed.append(job)
 
         _write_state(
@@ -434,6 +466,7 @@ def _write_state(
                 "completed": sorted(completed),
                 "failed": sorted(failed),
                 "history": history,
+                "retry_policy": _retry_policy_payload(),
                 "running": running,
             },
             indent=2,
@@ -475,6 +508,99 @@ def _running_jobs(state: dict[str, object]) -> tuple[str, ...]:
     if not isinstance(running, dict):
         return ()
     return tuple(str(job_id) for job_id in running)
+
+
+def full_history_attempt(state: dict[str, object], job_id: str) -> int:
+    return sum(1 for item in state.get("history", []) if isinstance(item, dict) and item.get("job_id") == job_id)
+
+
+def full_history_retry_due(state: dict[str, object], job_id: str, *, now: datetime) -> bool:
+    history_item = _latest_history_item(state, job_id)
+    if not history_item:
+        return False
+    attempt = full_history_attempt(state, job_id)
+    evidence = str(history_item.get("evidence", ""))
+    if classify_full_history_failure(evidence, attempt) == FullHistoryRetryDecision.PERMANENT:
+        return False
+    recorded_at = _parse_datetime(str(history_item.get("recorded_at", "")))
+    if recorded_at is None:
+        return True
+    return (now - recorded_at).total_seconds() >= FULL_HISTORY_RETRY_DELAY_SECONDS
+
+
+def classify_full_history_failure(error_message: str, attempt: int) -> FullHistoryRetryDecision:
+    if attempt >= FULL_HISTORY_MAX_RETRIES:
+        return FullHistoryRetryDecision.PERMANENT
+    normalized = error_message.lower().replace(" ", "")
+    spaced = error_message.lower()
+    if any(token in spaced for token in FULL_HISTORY_PERMANENT_TOKENS) or "successful=no" in normalized:
+        return FullHistoryRetryDecision.PERMANENT
+    if any(token in spaced for token in FULL_HISTORY_RETRYABLE_TOKENS):
+        return FullHistoryRetryDecision.RETRYABLE
+    return FullHistoryRetryDecision.PERMANENT
+
+
+def _pending_or_retryable_jobs(
+    planned: tuple[FullHistoryResearchJob, ...],
+    state: dict[str, object],
+    *,
+    now: datetime,
+) -> list[FullHistoryResearchJob]:
+    completed = set(state.get("completed", []))
+    failed = set(state.get("failed", []))
+    running = set(_running_jobs(state))
+    return [
+        job
+        for job in planned
+        if job.job_id not in completed
+        and job.job_id not in running
+        and (job.job_id not in failed or full_history_retry_due(state, job.job_id, now=now))
+    ]
+
+
+def _mark_retrying(path: Path, job_id: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _state_lock(path):
+        state = _load_state(path)
+        completed = set(state.get("completed", []))
+        failed = set(state.get("failed", []))
+        running = dict(state.get("running", {}))
+        failed.discard(job_id)
+        _write_state(
+            path,
+            completed=completed,
+            failed=failed,
+            history=list(state.get("history", [])),
+            running=running,
+        )
+
+
+def _latest_history_item(state: dict[str, object], job_id: str) -> dict[str, object]:
+    for item in reversed(list(state.get("history", []))):
+        if isinstance(item, dict) and item.get("job_id") == job_id:
+            return item
+    return {}
+
+
+def _parse_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _retry_policy_payload() -> dict[str, object]:
+    return {
+        "max_retries": FULL_HISTORY_MAX_RETRIES,
+        "retry_delay_seconds": FULL_HISTORY_RETRY_DELAY_SECONDS,
+        "retryable_tokens": list(FULL_HISTORY_RETRYABLE_TOKENS),
+        "permanent_tokens": list(FULL_HISTORY_PERMANENT_TOKENS),
+    }
 
 
 @contextmanager

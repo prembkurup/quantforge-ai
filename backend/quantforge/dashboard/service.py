@@ -389,6 +389,9 @@ class DashboardService:
     def workflow_approval_audit(self) -> list[dict[str, str]]:
         return _approval_service().audit_records()
 
+    def architecture_orphans(self) -> list[dict[str, Any]]:
+        return _orphan_module_report()
+
     def approve_workflow_approval(self, approval_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         self.workflow_current()
         user = str(payload.get("user") or payload.get("approved_by") or "dashboard_user")
@@ -605,6 +608,61 @@ class DashboardService:
                 "review": "APPROVED",
             },
             "demo_mode": asset.demo_mode,
+            "timestamp": self._timestamp,
+        }
+
+    def strategy_trace(self, strategy_id: str) -> dict[str, Any]:
+        asset = self._find_strategy(strategy_id)
+        stored = self._find_approved_strategy(strategy_id)
+        replay = self.paper_replay_status()
+        approvals = self.workflow_current_approvals()
+        approval = approvals[0] if approvals else {}
+        return {
+            "strategy_asset_id": asset.asset_id,
+            "strategy_version": asset.strategy_version,
+            "demo_mode": asset.demo_mode,
+            "source": "ApprovedStrategyAssetStore" if stored else "Demo Strategy Library",
+            "origin": {
+                "source_workflow_id": asset.source_workflow_id,
+                "source_job_id": asset.source_job_id,
+                "source_experiment_id": asset.source_experiment_id,
+                "source_validation_id": asset.source_validation_id,
+                "source_publication_id": asset.source_publication_id,
+                "approved_at": asset.approved_at,
+            },
+            "reports": {
+                "optimization_report_id": stored.optimization_report_id if stored else "",
+                "validation_report_id": stored.validation_report_id if stored else asset.source_validation_id,
+                "strategy_passport_id": stored.strategy_passport_id if stored else asset.asset_id,
+                "decision_trace_id": stored.decision_trace_id if stored else asset.source_experiment_id,
+            },
+            "paper_replay": {
+                "replay_id": replay.get("replay_id", ""),
+                "status": replay.get("status", ""),
+                "pair": replay.get("pair", ""),
+                "timeframe": replay.get("timeframe", ""),
+                "processed_events": replay.get("processed_events", 0),
+                "generated_signals": replay.get("generated_signals", 0),
+                "paper_orders": replay.get("paper_orders", 0),
+                "current_candle_time": replay.get("current_candle_time", ""),
+            },
+            "approval_gate": {
+                "approval_id": approval.get("approval_id", ""),
+                "approval_type": approval.get("approval_type", ""),
+                "status": approval.get("status", ""),
+                "reason": approval.get("reason", ""),
+                "approved_at": approval.get("approved_at", ""),
+                "rejected_at": approval.get("rejected_at", ""),
+            },
+            "trace_steps": [
+                {"step": "Full-history research", "id": asset.source_job_id, "status": "COMPLETE"},
+                {"step": "Autonomous research", "id": asset.source_experiment_id, "status": "COMPLETE"},
+                {"step": "Validation platform", "id": asset.source_validation_id, "status": asset.validation_grade},
+                {"step": "Approved Strategy Asset Store", "id": asset.asset_id, "status": asset.status},
+                {"step": "Strategy Library", "id": asset.asset_id, "status": "VISIBLE"},
+                {"step": "Paper replay", "id": str(replay.get("replay_id", "")), "status": str(replay.get("status", ""))},
+                {"step": "Manual approval gate", "id": str(approval.get("approval_id", "")), "status": str(approval.get("status", ""))},
+            ],
             "timestamp": self._timestamp,
         }
 
@@ -984,6 +1042,43 @@ def _configured_coverage_rows() -> list[dict[str, Any]]:
         for pair in FULL_HISTORY_RESEARCH_PAIRS
         for timeframe in FULL_HISTORY_RESEARCH_TIMEFRAMES
     ]
+
+
+def _orphan_module_report() -> list[dict[str, Any]]:
+    return [
+        _orphan("quantforge.core.config", "MOVE_TO_LEGACY", "Superseded by quantforge.config.settings.", "Document as legacy compatibility config."),
+        _orphan("quantforge.data.repository", "MOVE_TO_LEGACY", "Market data reads now use quantforge.market_data.coreui_repository.", "Keep out of production workflow."),
+        _orphan("quantforge.domain.ownership", "KEEP_FOR_FUTURE", "Domain ownership helpers are not required by current single-team workflow.", "Owner: architecture."),
+        _orphan("quantforge.experiments", "KEEP_FOR_FUTURE", "Facade exports experiment primitives used by research concepts but not active entrypoints.", "Owner: research."),
+        _orphan("quantforge.indicators.dynamic", "WIRE_NOW", "Dynamic indicator registry is aligned with Strategy Composer but not surfaced in production flow.", "Wire into indicator discovery after Milestone 22."),
+        _orphan("quantforge.instruments.model", "WIRE_NOW", "Instrument model should be the canonical source for pair metadata.", "Wire into full-history and strategy asset metadata."),
+        _orphan("quantforge.plugins.components", "WIRE_NOW", "Plugin components match the target entry/confirmation/exit architecture.", "Wire into Strategy Composer templates."),
+        _orphan("quantforge.plugins.registry", "WIRE_NOW", "Plugin registry should back plugin_versions on persisted Strategy Assets.", "Wire into StrategyAssetPersistenceService."),
+        _orphan("quantforge.reporting", "KEEP_FOR_FUTURE", "Reporting facade is harmless but not used by dashboard/API yet.", "Owner: reporting."),
+        _orphan("quantforge.research.engine", "MOVE_TO_LEGACY", "Older research engine path replaced by autonomous/full-history pipeline.", "Move to legacy after confirming no external imports."),
+        _orphan("quantforge.storage.parquet_cache", "KEEP_FOR_FUTURE", "Parquet cache may be useful for large replay summaries but is not needed by current JSON store.", "Owner: storage."),
+        _orphan("quantforge.strategies.discovery", "WIRE_NOW", "Strategy discovery belongs before candidate composition in real research controls.", "Wire into new research-run controls."),
+        _orphan("quantforge.strategies.lifecycle", "WIRE_NOW", "Lifecycle states should govern APPROVED/PAPER_ELIGIBLE/PRODUCTION_ELIGIBLE transitions.", "Wire into approval and deployment gates."),
+    ]
+
+
+def _orphan(module: str, classification: str, reason: str, action: str) -> dict[str, Any]:
+    return {
+        "module": module,
+        "classification": classification,
+        "reason": reason,
+        "action_taken": action,
+        "entrypoint_or_owner": _orphan_owner(classification),
+    }
+
+
+def _orphan_owner(classification: str) -> str:
+    return {
+        "WIRE_NOW": "Milestone 22 integration backlog",
+        "KEEP_FOR_FUTURE": "Architecture owner review",
+        "MOVE_TO_LEGACY": "Legacy cleanup",
+        "DELETE": "Deletion review",
+    }.get(classification, "Architecture review")
 
 
 def _planned_full_history_jobs(state_file: Path) -> tuple[Any, ...]:

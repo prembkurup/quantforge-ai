@@ -114,6 +114,10 @@ def create_app() -> FastAPI:
     def workflow_approval_audit() -> list[dict[str, Any]]:
         return service.workflow_approval_audit()
 
+    @app.get("/api/architecture/orphans")
+    def architecture_orphans() -> list[dict[str, Any]]:
+        return service.architecture_orphans()
+
     @app.get("/api/admin/settings")
     def admin_settings() -> dict[str, Any]:
         return service.admin_settings()
@@ -181,6 +185,10 @@ def create_app() -> FastAPI:
     @app.get("/api/strategies/{strategy_id}/optimization")
     def strategy_optimization(strategy_id: str) -> dict[str, Any]:
         return _strategy_or_404(service.strategy_optimization, strategy_id)
+
+    @app.get("/api/strategies/{strategy_id}/trace")
+    def strategy_trace(strategy_id: str) -> dict[str, Any]:
+        return _strategy_or_404(service.strategy_trace, strategy_id)
 
     @app.get("/api/portfolio/readiness")
     def portfolio_readiness() -> dict[str, Any]:

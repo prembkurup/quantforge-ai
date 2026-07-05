@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
-import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, GitBranch, HeartPulse, Library, LineChart, ListChecks, Menu, Save, ScrollText, Settings, ShieldCheck, X } from "lucide-react";
+import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, GitBranch, HeartPulse, Library, LineChart, ListChecks, Menu, Save, ScrollText, Settings, ShieldCheck, Workflow as WorkflowIcon, X } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
 import "./styles.css";
@@ -76,6 +76,7 @@ function App() {
               <Route path="/logs" element={<Logs />} />
               <Route path="/knowledge" element={<Knowledge />} />
               <Route path="/admin" element={<AdminSettings />} />
+              <Route path="/architecture" element={<Architecture />} />
               <Route path="/help" element={<Help />} />
             </Routes>
           </section>
@@ -100,6 +101,7 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     ["/logs", "Logs", ScrollText],
     ["/knowledge", "Knowledge", Brain],
     ["/admin", "Admin", Settings],
+    ["/architecture", "Architecture", WorkflowIcon],
     ["/help", "Manual / Help", CircleHelp]
   ] as const;
   return (
@@ -309,8 +311,9 @@ function Pipeline() {
 
 function Workflow() {
   const data = useApi<any>("/api/workflow/current");
+  const audit = useApi<Row[]>("/api/workflow/approvals/audit");
   const [taskPage, setTaskPage] = React.useState(1);
-  if (!data) return <Loading />;
+  if (!data || !audit) return <Loading />;
   const run = data.run ?? {};
   const stages = data.stages ?? [];
   const tasks = data.tasks ?? [];
@@ -374,6 +377,7 @@ function Workflow() {
         <KpiCard title="Retryable" value={run.retryable_tasks} tone={run.retryable_tasks ? "warn" : "good"} />
         <KpiCard title="Blocked" value={run.blocked_tasks} tone={run.blocked_tasks ? "warn" : "good"} />
         <KpiCard title="Live Trading" value={run.live_trading_status} tone="warn" />
+        <KpiCard title="Live Gate Reason" value={data.live_gate?.reason ?? "Manual approval required"} tone="warn" />
       </div>
 
       <section className="card panel dashboard-card">
@@ -405,8 +409,9 @@ function Workflow() {
       />
       <div className="grid gap-4 xl:grid-cols-2">
         <DataTable title="Approvals" rows={approvalRows} />
-        <DataTable title="Workflow Events" rows={eventRows} />
+        <DataTable title="Approval Audit Log" rows={audit} />
       </div>
+      <DataTable title="Workflow Events" rows={eventRows} />
     </Page>
   );
 }
@@ -433,7 +438,8 @@ function Strategies() {
 function StrategyDetail() {
   const { id } = useParams();
   const data = useApi<any>(`/api/strategies/${id}`);
-  if (!data) return <Loading />;
+  const trace = useApi<any>(`/api/strategies/${id}/trace`);
+  if (!data || !trace) return <Loading />;
   return (
     <Page title={data.strategy_name}>
       <div className="grid gap-3 md:grid-cols-4">
@@ -441,7 +447,12 @@ function StrategyDetail() {
         <KpiCard title="Timeframe" value={data.timeframe} />
         <KpiCard title="Confidence" value={`${data.confidence}%`} />
         <KpiCard title="Grade" value={data.validation_grade} tone="good" />
+        <KpiCard title="Source Workflow" value={data.source_workflow_id || "n/a"} />
+        <KpiCard title="Paper Replay" value={`${trace.paper_replay?.status ?? "UNKNOWN"} / ${number(trace.paper_replay?.processed_events ?? 0)} events`} tone="good" />
+        <KpiCard title="Approval Gate" value={trace.approval_gate?.status ?? "WAITING"} tone="warn" />
+        <KpiCard title="Demo Mode" value={String(data.demo_mode)} tone={data.demo_mode ? "warn" : "good"} />
       </div>
+      <JsonPanel title="End-to-End Source Trace" data={trace} />
       <JsonPanel title="Strategy Passport" data={data.passport} />
       <JsonPanel title="Decision Trace" data={data.decision_trace} />
       <JsonPanel title="Optimization Report" data={data.optimization_report} />
@@ -527,7 +538,8 @@ function Paper() {
   const summary = useApi<Row>("/api/paper/summary");
   const trades = useApi<Row[]>("/api/paper/trades/open");
   const drift = useApi<any>("/api/paper/drift");
-  if (!summary || !trades || !drift) return <Loading />;
+  const replay = useApi<Row>("/api/paper/replay");
+  if (!summary || !trades || !drift || !replay) return <Loading />;
   return (
     <Page title="Paper Trading">
       <div className="kpi-grid">
@@ -535,7 +547,12 @@ function Paper() {
         <KpiCard title="Paper Equity" value={`$${number(summary.paper_equity)}`} />
         <KpiCard title="Daily P/L" value={`$${summary.daily_pl}`} />
         <KpiCard title="Promotion" value={summary.promotion_readiness} tone="good" />
+        <KpiCard title="Replay Status" value={replay.status} tone={replay.status === "COMPLETE" ? "good" : "warn"} />
+        <KpiCard title="Replay Events" value={number(replay.processed_events)} />
+        <KpiCard title="Replay Signals" value={number(replay.generated_signals)} />
+        <KpiCard title="Replay Orders" value={number(replay.paper_orders)} />
       </div>
+      <JsonPanel title="Real Candle Replay Cursor" data={replay} />
       <DataTable title="Open Paper Trades" rows={trades} />
       <JsonPanel title="Drift" data={drift} />
     </Page>
@@ -640,6 +657,47 @@ function Knowledge() {
       <DataTable title="Feature Rankings" rows={features} />
       <DataTable title="Plugin Rankings" rows={plugins} />
       <DataTable title="Hypothesis Confidence" rows={hypotheses} />
+    </Page>
+  );
+}
+
+function Architecture() {
+  const orphans = useApi<Row[]>("/api/architecture/orphans");
+  const workflow = useApi<any>("/api/workflow/current");
+  const replay = useApi<Row>("/api/paper/replay");
+  if (!orphans || !workflow || !replay) return <Loading />;
+  const wireNow = orphans.filter((row) => row.classification === "WIRE_NOW").length;
+  const legacy = orphans.filter((row) => row.classification === "MOVE_TO_LEGACY").length;
+  const future = orphans.filter((row) => row.classification === "KEEP_FOR_FUTURE").length;
+  return (
+    <Page title="Architecture Integration">
+      <div className="kpi-grid">
+        <KpiCard title="Classified Modules" value={orphans.length} />
+        <KpiCard title="Wire Now" value={wireNow} tone={wireNow ? "warn" : "good"} />
+        <KpiCard title="Move To Legacy" value={legacy} />
+        <KpiCard title="Keep For Future" value={future} />
+        <KpiCard title="Live Gate" value={workflow.live_gate?.status ?? "UNKNOWN"} tone="warn" />
+        <KpiCard title="Paper Replay" value={`${replay.status} / ${number(replay.processed_events)} events`} tone="good" />
+      </div>
+      <JsonPanel
+        title="Production Integration Graph"
+        data={{
+          flow: [
+            "Full-History Research",
+            "Autonomous Research",
+            "Approved Strategy Asset Store",
+            "Strategy Library",
+            "Paper Trading Replay",
+            "Production Certification",
+            "Manual Approval Gate",
+            "Live Trading Blocked / Approved"
+          ],
+          strategy_library_source: "ApprovedStrategyAssetStore",
+          paper_replay_source: "ReplayProgressStore + candle database",
+          approval_source: "WorkflowApprovalGate + ApprovalRepository"
+        }}
+      />
+      <DataTable title="Orphan Module Resolution Report" rows={orphans} />
     </Page>
   );
 }

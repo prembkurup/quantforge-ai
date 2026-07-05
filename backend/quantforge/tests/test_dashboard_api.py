@@ -44,6 +44,10 @@ def test_strategy_library_is_readable_and_traceable() -> None:
     assert detail["passport"]["strategy_id"] == first["strategy_id"]
     assert detail["validation_report"]["grade"] == "A"
     assert detail["decision_trace"]["complete"] is True
+    trace = client.get(f"/api/strategies/{first['strategy_id']}/trace").json()
+    assert trace["strategy_asset_id"] == first["strategy_id"]
+    assert trace["trace_steps"]
+    assert "approval_gate" in trace
 
 
 def test_indicators_are_listed_for_dashboard_reference() -> None:
@@ -117,7 +121,19 @@ def test_workflow_api_exposes_state_machine() -> None:
     assert client.get(f"/api/workflow/runs/{workflow_id}/tasks").json()
     assert client.get(f"/api/workflow/runs/{workflow_id}/events").json()
     assert client.get(f"/api/workflow/runs/{workflow_id}/approvals").json()
+    assert client.get("/api/workflow/approvals").json()
+    assert client.get("/api/workflow/approvals/audit").status_code == 200
     assert client.post("/api/workflow/tasks/example/retry").status_code == 403
+
+
+def test_architecture_orphan_report_classifies_all_audit_findings() -> None:
+    response = client.get("/api/architecture/orphans")
+
+    assert response.status_code == 200
+    rows = response.json()
+    assert len(rows) >= 13
+    assert {row["classification"] for row in rows} >= {"WIRE_NOW", "KEEP_FOR_FUTURE", "MOVE_TO_LEGACY"}
+    assert all(row["module"].startswith("quantforge.") for row in rows)
 
 
 def test_admin_settings_api_exposes_help_defaults_and_updates_values() -> None:
@@ -172,6 +188,7 @@ def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:
     assert client.get("/api/ops/health").json()["platform_status"] == "HEALTHY"
     assert client.get("/api/knowledge/summary").json()["knowledge_records"] == 795_000
     assert client.get("/api/paper/summary").json()["promotion_readiness"] == "PROMOTE"
+    assert client.get("/api/paper/replay").json()["source"] == "ReplayProgressStore"
     assert client.post("/api/dashboard/overview").status_code == 405
 
 

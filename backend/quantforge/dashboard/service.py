@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,7 @@ from quantforge.config.settings import get_settings
 from quantforge.infrastructure.operations import AutonomousOperationsManager
 from quantforge.live.shadow import ShadowTradingPlatform
 from quantforge.market_data.coreui_repository import get_coreui_history_engine
+from quantforge.research.approvals import ApprovalAuditLog, ApprovalRepository, ApprovalService
 from quantforge.research.campaign import ResearchProgramFamily
 from quantforge.research.full_history_scheduler import (
     FULL_HISTORY_RESEARCH_PAIRS,
@@ -21,6 +23,11 @@ from quantforge.research.full_history_scheduler import (
     FULL_HISTORY_RESEARCH_TIMEFRAMES,
     FullHistoryResearchScheduler,
     FullHistorySchedulerConfig,
+)
+from quantforge.research.full_history_summary import (
+    BackgroundSummaryRefresher,
+    FullHistoryResearchSummaryRepository,
+    FullHistorySummaryCache,
 )
 from quantforge.research.library import InstitutionalStrategyLibraryBuilder, StrategyLibraryAsset
 from quantforge.research.strategy_assets import StrategyAssetRepository, StrategyLibraryLoader
@@ -338,24 +345,18 @@ class DashboardService:
 
     def full_history_research(self) -> dict[str, Any]:
         status = self.full_history_scheduler_status()
-        coverage_rows, database_status, error = _full_history_coverage_rows()
-        return {
-            "pair_count": len(FULL_HISTORY_RESEARCH_PAIRS),
-            "timeframe_count": len(FULL_HISTORY_RESEARCH_TIMEFRAMES),
-            "pair_timeframe_count": len(FULL_HISTORY_RESEARCH_PAIRS)
-            * len(FULL_HISTORY_RESEARCH_TIMEFRAMES),
-            "pairs": [
-                {"pair": _display_pair(pair), "symbol": pair, "type": _instrument_type(pair)}
-                for pair in FULL_HISTORY_RESEARCH_PAIRS
-            ],
-            "timeframes": [{"timeframe": timeframe} for timeframe in FULL_HISTORY_RESEARCH_TIMEFRAMES],
-            "scheduler": status,
-            "coverage": coverage_rows,
-            "database_status": database_status,
-            "error": error,
-            "source": "FullHistoryResearchScheduler + CoreUI/OANDA candle database",
-            "timestamp": self._timestamp,
-        }
+        cached = _full_history_summary_cache().get()
+        if cached:
+            cached["scheduler"] = status
+            cached["timestamp"] = self._timestamp
+            return cached
+        return _full_history_research_cache_miss(status, self._timestamp)
+
+    def refresh_full_history_research_summary(self) -> dict[str, Any]:
+        return BackgroundSummaryRefresher(
+            _full_history_summary_cache(),
+            lambda: _build_full_history_research_summary(self.full_history_scheduler_status(), self._timestamp),
+        ).refresh()
 
     def workflow_current(self) -> dict[str, Any]:
         orchestrator = WorkflowOrchestrator(_workflow_paths())
@@ -381,6 +382,24 @@ class DashboardService:
 
     def workflow_approvals(self, workflow_id: str) -> list[dict[str, Any]]:
         return self.workflow_run(workflow_id)["approvals"]
+
+    def workflow_current_approvals(self) -> list[dict[str, Any]]:
+        return self.workflow_current()["approvals"]
+
+    def workflow_approval_audit(self) -> list[dict[str, str]]:
+        return _approval_service().audit_records()
+
+    def approve_workflow_approval(self, approval_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self.workflow_current()
+        user = str(payload.get("user") or payload.get("approved_by") or "dashboard_user")
+        reason = str(payload.get("reason") or "Manual approval recorded from dashboard.")
+        return asdict(_approval_service().approve(approval_id, user=user, reason=reason))
+
+    def reject_workflow_approval(self, approval_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self.workflow_current()
+        user = str(payload.get("user") or payload.get("rejected_by") or "dashboard_user")
+        reason = str(payload.get("reason") or "Manual approval rejected from dashboard.")
+        return asdict(_approval_service().reject(approval_id, user=user, reason=reason))
 
     def admin_settings(self) -> dict[str, Any]:
         return AdminSettingsStore(_admin_settings_file()).current()
@@ -856,6 +875,12 @@ def _workflow_paths():
     return default_workflow_paths(_repo_root())
 
 
+def _approval_service() -> ApprovalService:
+    paths = _workflow_paths()
+    audit_file = paths.approval_file.with_name("workflow_approval_audit.jsonl")
+    return ApprovalService(ApprovalRepository(paths.approval_file), ApprovalAuditLog(audit_file))
+
+
 def _admin_settings_file() -> Path:
     return _repo_root() / "var" / "admin_settings.json"
 
@@ -866,6 +891,14 @@ def _approved_strategy_assets_file() -> Path:
 
 def _paper_replay_progress_file() -> Path:
     return _repo_root() / "var" / "paper_replay_progress.json"
+
+
+def _full_history_research_cache_file() -> Path:
+    return _repo_root() / "var" / "full_history_research_summary.json"
+
+
+def _full_history_summary_cache() -> FullHistorySummaryCache:
+    return FullHistorySummaryCache(FullHistoryResearchSummaryRepository(_full_history_research_cache_file()))
 
 
 def _repo_root() -> Path:
@@ -892,6 +925,65 @@ def _full_history_config() -> FullHistorySchedulerConfig:
         rolling_max_batches=int(admin_setting_value(admin_file, "full_history.rolling_max_batches", 25)),
         full_history_max_batches=int(admin_setting_value(admin_file, "full_history.full_history_max_batches", 100)),
     )
+
+
+def _build_full_history_research_summary(status: dict[str, Any], timestamp: str) -> dict[str, Any]:
+    coverage_rows, database_status, error = _full_history_coverage_rows()
+    return {
+        **_full_history_research_base(status, timestamp),
+        "coverage": coverage_rows,
+        "database_status": database_status,
+        "error": error,
+        "source": "FullHistoryResearchScheduler + CoreUI/OANDA candle database + cached snapshot",
+    }
+
+
+def _full_history_research_cache_miss(status: dict[str, Any], timestamp: str) -> dict[str, Any]:
+    return {
+        **_full_history_research_base(status, timestamp),
+        "coverage": _configured_coverage_rows(),
+        "database_status": "CACHE_PENDING",
+        "error": "",
+        "source": "FullHistoryResearchScheduler + cached summary pending",
+        "cache": {
+            "status": "MISS",
+            "generated_at": "",
+            "source": "FullHistorySummaryCache",
+        },
+    }
+
+
+def _full_history_research_base(status: dict[str, Any], timestamp: str) -> dict[str, Any]:
+    return {
+        "pair_count": len(FULL_HISTORY_RESEARCH_PAIRS),
+        "timeframe_count": len(FULL_HISTORY_RESEARCH_TIMEFRAMES),
+        "pair_timeframe_count": len(FULL_HISTORY_RESEARCH_PAIRS)
+        * len(FULL_HISTORY_RESEARCH_TIMEFRAMES),
+        "pairs": [
+            {"pair": _display_pair(pair), "symbol": pair, "type": _instrument_type(pair)}
+            for pair in FULL_HISTORY_RESEARCH_PAIRS
+        ],
+        "timeframes": [{"timeframe": timeframe} for timeframe in FULL_HISTORY_RESEARCH_TIMEFRAMES],
+        "scheduler": status,
+        "timestamp": timestamp,
+    }
+
+
+def _configured_coverage_rows() -> list[dict[str, Any]]:
+    return [
+        {
+            "pair": pair,
+            "timeframe": timeframe,
+            "candles": 0,
+            "first_candle": "",
+            "last_candle": "",
+            "years": 0.0,
+            "scheduler_start": FULL_HISTORY_RESEARCH_START.date().isoformat(),
+            "status": "CACHE_PENDING",
+        }
+        for pair in FULL_HISTORY_RESEARCH_PAIRS
+        for timeframe in FULL_HISTORY_RESEARCH_TIMEFRAMES
+    ]
 
 
 def _planned_full_history_jobs(state_file: Path) -> tuple[Any, ...]:

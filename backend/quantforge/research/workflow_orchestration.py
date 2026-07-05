@@ -9,6 +9,12 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from quantforge.research.approvals import (
+    ApprovalRecord,
+    ApprovalRepository,
+    ApprovalStatus,
+    ApprovalType,
+)
 from quantforge.research.full_history_scheduler import (
     FULL_HISTORY_MAX_RETRIES,
     FULL_HISTORY_RETRY_DELAY_SECONDS,
@@ -128,28 +134,43 @@ class WorkflowRetryManager:
 class WorkflowApprovalGate:
     def __init__(self, approval_file: Path) -> None:
         self.approval_file = approval_file
+        self.repository = ApprovalRepository(approval_file)
 
     def approval(self, workflow_id: str, *, certification_complete: bool) -> WorkflowApproval:
         requested_at = _now() if certification_complete else ""
-        status = "WAITING" if certification_complete else "NOT_REQUIRED"
+        status = ApprovalStatus.WAITING.value if certification_complete else ApprovalStatus.NOT_REQUIRED.value
         approval = WorkflowApproval(
             approval_id=f"APPROVAL-{workflow_id}",
             workflow_id=workflow_id,
             stage=WorkflowStage.MANUAL_APPROVAL.value,
-            approval_type="LIVE_TRADING",
+            approval_type=ApprovalType.LIVE_TRADING_APPROVAL.value,
             requested_at=requested_at,
             requested_by="workflow_orchestrator",
             status=status,
         )
-        stored = _load_json(self.approval_file)
-        if stored.get("workflow_id") == workflow_id and stored.get("status") in {"APPROVED", "REJECTED", "EXPIRED"}:
-            return WorkflowApproval(**{**asdict(approval), **stored})
+        stored = self.repository.load()
+        if stored and stored.workflow_id == workflow_id:
+            return _approval_record_to_workflow_approval(stored)
+        if certification_complete:
+            self.repository.save(
+                ApprovalRecord(
+                    approval_id=approval.approval_id,
+                    workflow_id=approval.workflow_id,
+                    approval_type=approval.approval_type,
+                    stage=approval.stage,
+                    requested_at=approval.requested_at,
+                    requested_by=approval.requested_by,
+                    status=approval.status,
+                    reason=approval.reason,
+                    trace_id=workflow_id,
+                )
+            )
         return approval
 
     def live_trading_status(self, approval: WorkflowApproval) -> str:
-        if approval.status == "APPROVED":
+        if approval.status == ApprovalStatus.APPROVED.value:
             return "APPROVED_NOT_STARTED"
-        if approval.status == "WAITING":
+        if approval.status == ApprovalStatus.WAITING.value:
             return "WAITING_APPROVAL"
         return "BLOCKED_BY_POLICY"
 
@@ -360,8 +381,10 @@ class WorkflowStateMachine:
         ):
             if any(task["stage"] == stage.value and task["status"] in {WorkflowStatus.READY.value, WorkflowStatus.RUNNING.value} for task in tasks):
                 return stage.value + "_RUNNING"
-        if approval.status == "WAITING":
+        if approval.status == ApprovalStatus.WAITING.value:
             return "WAITING_FOR_MANUAL_APPROVAL"
+        if approval.status == ApprovalStatus.APPROVED.value:
+            return "LIVE_TRADING_GATE"
         return "LIVE_TRADING_BLOCKED"
 
     def run_status(self, tasks: list[dict[str, Any]], approval: WorkflowApproval) -> str:
@@ -373,7 +396,7 @@ class WorkflowStateMachine:
             for task in tasks
         ):
             return WorkflowStatus.RUNNING.value
-        if approval.status == "WAITING":
+        if approval.status == ApprovalStatus.WAITING.value:
             return WorkflowStatus.WAITING_APPROVAL.value
         if any(task["status"] in {WorkflowStatus.FAILED_PERMANENT.value, WorkflowStatus.BLOCKED.value} for task in tasks):
             return WorkflowStatus.BLOCKED.value
@@ -429,7 +452,7 @@ class WorkflowOrchestrator:
             "approvals": approvals,
             "live_gate": {
                 "status": run["live_trading_status"],
-                "reason": "Manual approval required" if approval.status == "WAITING" else "Live trading blocked by policy",
+                "reason": _live_gate_reason(approval),
             },
             "source": "WorkflowOrchestrator + full-history/post-pipeline state",
             "timestamp": now,
@@ -540,21 +563,40 @@ def _stage_status(tasks: list[dict[str, Any]]) -> str:
 
 
 def _approval_tasks(workflow_id: str, approval: WorkflowApproval) -> list[dict[str, Any]]:
-    manual_status = WorkflowStatus.WAITING_APPROVAL.value if approval.status == "WAITING" else WorkflowStatus.BLOCKED.value
+    if approval.status == ApprovalStatus.APPROVED.value:
+        manual_status = WorkflowStatus.COMPLETE.value
+        live_status = WorkflowStatus.READY.value
+        manual_waiting = ""
+        live_waiting = "Manual approval recorded; live trading has not been started."
+    elif approval.status == ApprovalStatus.WAITING.value:
+        manual_status = WorkflowStatus.WAITING_APPROVAL.value
+        live_status = WorkflowStatus.BLOCKED.value
+        manual_waiting = "Waiting for manual approval"
+        live_waiting = "Manual approval required"
+    elif approval.status == ApprovalStatus.REJECTED.value:
+        manual_status = WorkflowStatus.BLOCKED.value
+        live_status = WorkflowStatus.BLOCKED.value
+        manual_waiting = "Manual approval was rejected"
+        live_waiting = "Live trading blocked by rejected approval"
+    else:
+        manual_status = WorkflowStatus.BLOCKED.value
+        live_status = WorkflowStatus.BLOCKED.value
+        manual_waiting = "Waiting for production certification"
+        live_waiting = "Live trading blocked by policy"
     return [
         _control_task(
             workflow_id,
             "MANUAL_APPROVAL_GATE",
             WorkflowStage.MANUAL_APPROVAL.value,
             manual_status,
-            "Waiting for manual approval" if approval.status == "WAITING" else "Waiting for production certification",
+            manual_waiting,
         ),
         _control_task(
             workflow_id,
             "LIVE_TRADING_GATE",
             WorkflowStage.LIVE_TRADING_GATE.value,
-            WorkflowStatus.BLOCKED.value,
-            "Live trading blocked by policy",
+            live_status,
+            live_waiting,
         ),
     ]
 
@@ -621,17 +663,48 @@ def _next_action(tasks: list[dict[str, Any]], approval: WorkflowApproval) -> str
     ready = next((task for task in tasks if task["status"] == WorkflowStatus.READY.value), None)
     if ready:
         return str(ready["next_action"])
-    if approval.status == "WAITING":
+    if approval.status == ApprovalStatus.APPROVED.value:
+        return "Live trading approved but not started"
+    if approval.status == ApprovalStatus.WAITING.value:
         return "Manual approval required before live trading"
+    if approval.status == ApprovalStatus.REJECTED.value:
+        return "Live trading blocked by rejected manual approval"
     return "Live trading blocked by policy"
 
 
 def _live_trading_status(approval: WorkflowApproval) -> str:
-    if approval.status == "APPROVED":
+    if approval.status == ApprovalStatus.APPROVED.value:
         return "APPROVED_NOT_STARTED"
-    if approval.status == "WAITING":
+    if approval.status == ApprovalStatus.WAITING.value:
         return "WAITING_APPROVAL"
     return "BLOCKED_BY_POLICY"
+
+
+def _live_gate_reason(approval: WorkflowApproval) -> str:
+    if approval.status == ApprovalStatus.APPROVED.value:
+        return "Manual approval recorded; live trading not started"
+    if approval.status == ApprovalStatus.WAITING.value:
+        return "Manual approval required"
+    if approval.status == ApprovalStatus.REJECTED.value:
+        return "Manual approval rejected"
+    return "Live trading blocked by policy"
+
+
+def _approval_record_to_workflow_approval(record: ApprovalRecord) -> WorkflowApproval:
+    return WorkflowApproval(
+        approval_id=record.approval_id,
+        workflow_id=record.workflow_id,
+        stage=record.stage,
+        approval_type=record.approval_type,
+        requested_at=record.requested_at,
+        requested_by=record.requested_by,
+        status=record.status,
+        approved_by=record.approved_by,
+        approved_at=record.approved_at,
+        rejected_by=record.rejected_by,
+        rejected_at=record.rejected_at,
+        reason=record.reason,
+    )
 
 
 def _events_for_change(previous: dict[str, Any], snapshot: dict[str, Any]) -> list[dict[str, Any]]:

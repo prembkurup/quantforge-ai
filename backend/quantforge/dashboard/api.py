@@ -106,6 +106,14 @@ def create_app() -> FastAPI:
     def workflow_approvals(workflow_id: str) -> list[dict[str, Any]]:
         return service.workflow_approvals(workflow_id)
 
+    @app.get("/api/workflow/approvals")
+    def workflow_current_approvals() -> list[dict[str, Any]]:
+        return service.workflow_current_approvals()
+
+    @app.get("/api/workflow/approvals/audit")
+    def workflow_approval_audit() -> list[dict[str, Any]]:
+        return service.workflow_approval_audit()
+
     @app.get("/api/admin/settings")
     def admin_settings() -> dict[str, Any]:
         return service.admin_settings()
@@ -128,13 +136,23 @@ def create_app() -> FastAPI:
     def workflow_cancel_disabled(task_id: str) -> dict[str, str]:
         return {"status": "disabled", "task_id": task_id, "reason": "MVP workflow mutation requires authentication"}
 
-    @app.post("/api/workflow/approvals/{approval_id}/approve", status_code=403)
-    def workflow_approve_disabled(approval_id: str) -> dict[str, str]:
-        return {"status": "disabled", "approval_id": approval_id, "reason": "MVP approval requires authentication"}
+    @app.post("/api/workflow/approvals/{approval_id}/approve")
+    def workflow_approve(approval_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        try:
+            return service.approve_workflow_approval(approval_id, payload or {})
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Approval not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    @app.post("/api/workflow/approvals/{approval_id}/reject", status_code=403)
-    def workflow_reject_disabled(approval_id: str) -> dict[str, str]:
-        return {"status": "disabled", "approval_id": approval_id, "reason": "MVP approval requires authentication"}
+    @app.post("/api/workflow/approvals/{approval_id}/reject")
+    def workflow_reject(approval_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        try:
+            return service.reject_workflow_approval(approval_id, payload or {})
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Approval not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @app.get("/api/strategies")
     def strategies() -> list[dict[str, Any]]:

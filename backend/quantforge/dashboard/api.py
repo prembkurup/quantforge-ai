@@ -106,6 +106,20 @@ def create_app() -> FastAPI:
     def workflow_approvals(workflow_id: str) -> list[dict[str, Any]]:
         return service.workflow_approvals(workflow_id)
 
+    @app.get("/api/admin/settings")
+    def admin_settings() -> dict[str, Any]:
+        return service.admin_settings()
+
+    @app.post("/api/admin/settings")
+    def update_admin_settings(payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            values = payload.get("values", {})
+            if not isinstance(values, dict):
+                raise ValueError("values must be an object")
+            return service.update_admin_settings(values)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.post("/api/workflow/tasks/{task_id}/retry", status_code=403)
     def workflow_retry_disabled(task_id: str) -> dict[str, str]:
         return {"status": "disabled", "task_id": task_id, "reason": "MVP workflow mutation requires authentication"}

@@ -8,6 +8,7 @@ import time
 from datetime import date, datetime, time as datetime_time, timedelta, timezone
 from pathlib import Path
 
+from quantforge.admin.settings import admin_setting_value
 from quantforge.research.full_history_scheduler import (
     FULL_HISTORY_RESEARCH_PAIRS,
     FULL_HISTORY_RESEARCH_START,
@@ -26,14 +27,15 @@ from quantforge.research.workflow_orchestration import WorkflowOrchestrator, Wor
 
 
 def parse_args() -> argparse.Namespace:
+    admin_file = Path(__file__).resolve().parents[1] / "var" / "admin_settings.json"
     parser = argparse.ArgumentParser(
         description="Run the full-history scheduler continuously, one job at a time."
     )
-    parser.add_argument("--max-jobs", type=int, default=1)
-    parser.add_argument("--sleep-seconds", type=int, default=30)
-    parser.add_argument("--error-sleep-seconds", type=int, default=300)
-    parser.add_argument("--idle-sleep-seconds", type=int, default=900)
-    parser.add_argument("--running-stale-seconds", type=int, default=21600)
+    parser.add_argument("--max-jobs", type=int, default=int(admin_setting_value(admin_file, "full_history.max_parallel_jobs", 3)))
+    parser.add_argument("--sleep-seconds", type=int, default=int(admin_setting_value(admin_file, "full_history.sleep_seconds", 30)))
+    parser.add_argument("--error-sleep-seconds", type=int, default=int(admin_setting_value(admin_file, "full_history.error_sleep_seconds", 300)))
+    parser.add_argument("--idle-sleep-seconds", type=int, default=int(admin_setting_value(admin_file, "full_history.idle_sleep_seconds", 900)))
+    parser.add_argument("--running-stale-seconds", type=int, default=int(admin_setting_value(admin_file, "full_history.running_stale_seconds", 21600)))
     parser.add_argument("--state-file", default="var/full_history_research_state.json")
     parser.add_argument("--post-pipeline-state-file", default="var/post_full_history_pipeline_state.json")
     parser.add_argument("--workflow-state-file", default="var/workflow_state.json")
@@ -197,12 +199,24 @@ def _now() -> str:
 
 
 def _scheduler_config() -> FullHistorySchedulerConfig:
+    admin_file = Path(__file__).resolve().parents[1] / "var" / "admin_settings.json"
     return FullHistorySchedulerConfig(
         pairs=FULL_HISTORY_RESEARCH_PAIRS,
         timeframes=FULL_HISTORY_RESEARCH_TIMEFRAMES,
         start=FULL_HISTORY_RESEARCH_START,
         end=datetime.combine(date.today(), datetime_time.min, tzinfo=timezone.utc)
         + timedelta(days=1),
+        window_candles=int(admin_setting_value(admin_file, "full_history.window_candles", 300)),
+        smoke_window_candles_by_timeframe={
+            "M5": 300,
+            "M15": 300,
+            "H1": 300,
+            "H4": int(admin_setting_value(admin_file, "full_history.h4_smoke_window_candles", 120)),
+        },
+        smoke_days=int(admin_setting_value(admin_file, "full_history.smoke_days", 31)),
+        smoke_max_batches=int(admin_setting_value(admin_file, "full_history.smoke_max_batches", 2)),
+        rolling_max_batches=int(admin_setting_value(admin_file, "full_history.rolling_max_batches", 25)),
+        full_history_max_batches=int(admin_setting_value(admin_file, "full_history.full_history_max_batches", 100)),
     )
 
 

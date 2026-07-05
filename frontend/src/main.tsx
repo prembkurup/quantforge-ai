@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
-import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, GitBranch, HeartPulse, Library, LineChart, ListChecks, Menu, ScrollText, ShieldCheck, X } from "lucide-react";
+import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, GitBranch, HeartPulse, Library, LineChart, ListChecks, Menu, Save, ScrollText, Settings, ShieldCheck, X } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
 import "./styles.css";
@@ -13,6 +13,16 @@ type Row = Record<string, string | number | boolean>;
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${apiBase}${path}`);
+  if (!response.ok) throw new Error(`Request failed: ${path}`);
+  return response.json() as Promise<T>;
+}
+
+async function postJson<T>(path: string, payload: unknown): Promise<T> {
+  const response = await fetch(`${apiBase}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
   if (!response.ok) throw new Error(`Request failed: ${path}`);
   return response.json() as Promise<T>;
 }
@@ -65,6 +75,7 @@ function App() {
               <Route path="/operations" element={<Operations />} />
               <Route path="/logs" element={<Logs />} />
               <Route path="/knowledge" element={<Knowledge />} />
+              <Route path="/admin" element={<AdminSettings />} />
               <Route path="/help" element={<Help />} />
             </Routes>
           </section>
@@ -88,6 +99,7 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     ["/operations", "Operations", HeartPulse],
     ["/logs", "Logs", ScrollText],
     ["/knowledge", "Knowledge", Brain],
+    ["/admin", "Admin", Settings],
     ["/help", "Manual / Help", CircleHelp]
   ] as const;
   return (
@@ -847,6 +859,217 @@ function Help() {
       </div>
     </Page>
   );
+}
+
+type AdminSetting = {
+  setting_id: string;
+  group: string;
+  label: string;
+  kind: "boolean" | "integer" | "number" | "text" | "select" | "multi_select" | "password" | "path";
+  value: any;
+  default: any;
+  description: string;
+  help: string;
+  editable: boolean;
+  restart_required: boolean;
+  options: string[];
+  minimum: number | null;
+  maximum: number | null;
+  source: string;
+  is_default: boolean;
+};
+
+type AdminSettingsPayload = {
+  groups: { group: string; settings: AdminSetting[] }[];
+  updated_at: string;
+  source: string;
+};
+
+function AdminSettings() {
+  const [data, setData] = React.useState<AdminSettingsPayload | null>(null);
+  const [draft, setDraft] = React.useState<Record<string, any>>({});
+  const [saving, setSaving] = React.useState(false);
+  const [notice, setNotice] = React.useState("");
+
+  const load = React.useCallback(() => {
+    getJson<AdminSettingsPayload>("/api/admin/settings").then((payload) => {
+      setData(payload);
+      setDraft(_draftFromAdminPayload(payload));
+    });
+  }, []);
+
+  React.useEffect(() => {
+    load();
+  }, [load]);
+
+  if (!data) return <Loading />;
+
+  const settings = data.groups.flatMap((group) => group.settings);
+  const editableCount = settings.filter((setting) => setting.editable).length;
+  const changedCount = settings.filter((setting) => setting.editable && draft[setting.setting_id] !== setting.value).length;
+  const restartCount = settings.filter((setting) => setting.restart_required).length;
+
+  const save = async () => {
+    setSaving(true);
+    setNotice("");
+    try {
+      const values: Record<string, any> = {};
+      settings.forEach((setting) => {
+        if (setting.editable) values[setting.setting_id] = draft[setting.setting_id];
+      });
+      const updated = await postJson<AdminSettingsPayload>("/api/admin/settings", { values });
+      setData(updated);
+      setDraft(_draftFromAdminPayload(updated));
+      setNotice("Saved");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Page title="Admin Settings">
+      <div className="kpi-grid">
+        <KpiCard title="Settings" value={settings.length} />
+        <KpiCard title="Editable" value={editableCount} tone="good" />
+        <KpiCard title="Changed" value={changedCount} tone={changedCount ? "warn" : "good"} />
+        <KpiCard title="Restart Notes" value={restartCount} />
+      </div>
+
+      <section className="card panel dashboard-card">
+        <div className="admin-toolbar">
+          <div className="admin-source">
+            <div className="mini-fact-label">Source</div>
+            <div className="mini-fact-value">{data.source}</div>
+          </div>
+          <div className="admin-actions">
+            {notice && <span className="admin-notice">{notice}</span>}
+            <button className="pagination-button" onClick={() => { setDraft(_draftFromAdminPayload(data)); setNotice("Reset"); }} type="button">
+              Reset
+            </button>
+            <button className="admin-save-button" disabled={saving || changedCount === 0} onClick={save} type="button">
+              <Save size={16} />
+              {saving ? "Saving" : "Save"}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div className="admin-settings-grid">
+        {data.groups.map((group) => (
+          <section className="card panel dashboard-card admin-group" key={group.group}>
+            <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{group.group}</div>
+            <div className="admin-setting-list">
+              {group.settings.map((setting) => (
+                <AdminSettingControl
+                  key={setting.setting_id}
+                  setting={setting}
+                  value={draft[setting.setting_id]}
+                  onChange={(value) => setDraft((current) => ({ ...current, [setting.setting_id]: value }))}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </Page>
+  );
+}
+
+function AdminSettingControl({
+  setting,
+  value,
+  onChange
+}: {
+  setting: AdminSetting;
+  value: any;
+  onChange: (value: any) => void;
+}) {
+  const inputId = `admin-${setting.setting_id.replace(/[^a-zA-Z0-9]/g, "-")}`;
+  return (
+    <div className={`admin-setting ${setting.editable ? "" : "readonly"}`}>
+      <div className="admin-setting-label-row">
+        <label className="admin-setting-label" htmlFor={inputId}>{setting.label}</label>
+        <button className="help-mark" title={setting.help} type="button" aria-label={`${setting.label} help`}>
+          ?
+        </button>
+      </div>
+      <AdminSettingInput inputId={inputId} setting={setting} value={value} onChange={onChange} />
+      <div className="admin-setting-meta">
+        <span>Default: {_displayAdminValue(setting.default)}</span>
+        <span>{setting.editable ? "Editable" : `Read-only / ${setting.source}`}</span>
+        {setting.restart_required && <span>Restart required</span>}
+      </div>
+    </div>
+  );
+}
+
+function AdminSettingInput({
+  inputId,
+  setting,
+  value,
+  onChange
+}: {
+  inputId: string;
+  setting: AdminSetting;
+  value: any;
+  onChange: (value: any) => void;
+}) {
+  if (setting.kind === "boolean") {
+    return (
+      <label className="admin-toggle" htmlFor={inputId}>
+        <input
+          checked={Boolean(value)}
+          disabled={!setting.editable}
+          id={inputId}
+          onChange={(event) => onChange(event.target.checked)}
+          type="checkbox"
+        />
+        <span>{value ? "Enabled" : "Disabled"}</span>
+      </label>
+    );
+  }
+  if (setting.kind === "select") {
+    return (
+      <select
+        className="input admin-input"
+        disabled={!setting.editable}
+        id={inputId}
+        onChange={(event) => onChange(event.target.value)}
+        value={String(value ?? "")}
+      >
+        {setting.options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    );
+  }
+  const type = setting.kind === "integer" || setting.kind === "number" ? "number" : "text";
+  return (
+    <input
+      className="input admin-input"
+      disabled={!setting.editable}
+      id={inputId}
+      max={setting.maximum ?? undefined}
+      min={setting.minimum ?? undefined}
+      onChange={(event) => onChange(type === "number" ? Number(event.target.value) : event.target.value)}
+      type={type}
+      value={String(value ?? "")}
+    />
+  );
+}
+
+function _draftFromAdminPayload(payload: AdminSettingsPayload): Record<string, any> {
+  return Object.fromEntries(
+    payload.groups.flatMap((group) => group.settings.map((setting) => [setting.setting_id, setting.value]))
+  );
+}
+
+function _displayAdminValue(value: any): string {
+  if (value === "") return "empty";
+  if (Array.isArray(value)) return value.join(", ");
+  return String(value);
 }
 
 function WorkloadPanel({ rows }: { rows: Row[] }) {

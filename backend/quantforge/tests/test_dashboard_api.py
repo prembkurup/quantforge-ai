@@ -116,6 +116,37 @@ def test_workflow_api_exposes_state_machine() -> None:
     assert client.post("/api/workflow/tasks/example/retry").status_code == 403
 
 
+def test_admin_settings_api_exposes_help_defaults_and_updates_values() -> None:
+    response = client.get("/api/admin/settings")
+
+    assert response.status_code == 200
+    payload = response.json()
+    settings = [
+        setting
+        for group in payload["groups"]
+        for setting in group["settings"]
+    ]
+    h4_smoke = next(setting for setting in settings if setting["setting_id"] == "full_history.h4_smoke_window_candles")
+    assert h4_smoke["default"] == 120
+    assert "Default:" in h4_smoke["help"]
+    assert h4_smoke["editable"] is True
+
+    update = client.post("/api/admin/settings", json={"values": {"full_history.h4_smoke_window_candles": 120}})
+
+    assert update.status_code == 200
+    updated_settings = [
+        setting
+        for group in update.json()["groups"]
+        for setting in group["settings"]
+    ]
+    updated_h4_smoke = next(setting for setting in updated_settings if setting["setting_id"] == "full_history.h4_smoke_window_candles")
+    assert updated_h4_smoke["value"] == 120
+    assert updated_h4_smoke["default"] == 120
+
+    readonly = client.post("/api/admin/settings", json={"values": {"dashboard.api_port": 9000}})
+    assert readonly.status_code == 400
+
+
 def test_full_history_research_lists_configured_pairs_timeframes_and_jobs() -> None:
     response = client.get("/api/full-history/research")
 

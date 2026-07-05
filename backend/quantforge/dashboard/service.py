@@ -7,6 +7,8 @@ from typing import Any
 
 from sqlalchemy import text
 
+from quantforge.admin import AdminSettingsStore
+from quantforge.admin.settings import admin_setting_value
 from quantforge.config.settings import get_settings
 from quantforge.infrastructure.operations import AutonomousOperationsManager
 from quantforge.live.shadow import ShadowTradingPlatform
@@ -367,6 +369,12 @@ class DashboardService:
 
     def workflow_approvals(self, workflow_id: str) -> list[dict[str, Any]]:
         return self.workflow_run(workflow_id)["approvals"]
+
+    def admin_settings(self) -> dict[str, Any]:
+        return AdminSettingsStore(_admin_settings_file()).current()
+
+    def update_admin_settings(self, values: dict[str, Any]) -> dict[str, Any]:
+        return AdminSettingsStore(_admin_settings_file()).update(values)
 
     def engine_status(self, full_history: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         full_history = full_history or self.full_history_scheduler_status()
@@ -752,20 +760,40 @@ class DashboardService:
 
 
 def _full_history_state_file() -> Path:
-    return Path(__file__).resolve().parents[3] / "var" / "full_history_research_state.json"
+    return _repo_root() / "var" / "full_history_research_state.json"
 
 
 def _workflow_paths():
-    return default_workflow_paths(Path(__file__).resolve().parents[3])
+    return default_workflow_paths(_repo_root())
+
+
+def _admin_settings_file() -> Path:
+    return _repo_root() / "var" / "admin_settings.json"
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
 
 
 def _full_history_config() -> FullHistorySchedulerConfig:
     today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    admin_file = _admin_settings_file()
     return FullHistorySchedulerConfig(
         pairs=FULL_HISTORY_RESEARCH_PAIRS,
         timeframes=FULL_HISTORY_RESEARCH_TIMEFRAMES,
         start=FULL_HISTORY_RESEARCH_START,
         end=today_start + timedelta(days=1),
+        window_candles=int(admin_setting_value(admin_file, "full_history.window_candles", 300)),
+        smoke_window_candles_by_timeframe={
+            "M5": 300,
+            "M15": 300,
+            "H1": 300,
+            "H4": int(admin_setting_value(admin_file, "full_history.h4_smoke_window_candles", 120)),
+        },
+        smoke_days=int(admin_setting_value(admin_file, "full_history.smoke_days", 31)),
+        smoke_max_batches=int(admin_setting_value(admin_file, "full_history.smoke_max_batches", 2)),
+        rolling_max_batches=int(admin_setting_value(admin_file, "full_history.rolling_max_batches", 25)),
+        full_history_max_batches=int(admin_setting_value(admin_file, "full_history.full_history_max_batches", 100)),
     )
 
 

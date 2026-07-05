@@ -4,6 +4,7 @@ import argparse
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
+from quantforge.admin.settings import admin_setting_value
 from quantforge.config.settings import get_settings
 from quantforge.market_data.coreui_repository import CoreUiCandleRepository, get_coreui_history_engine
 from quantforge.research.full_history_scheduler import (
@@ -15,6 +16,7 @@ from quantforge.research.full_history_scheduler import (
 
 
 def parse_args() -> argparse.Namespace:
+    admin_file = Path(__file__).resolve().parents[1] / "var" / "admin_settings.json"
     parser = argparse.ArgumentParser(
         description="Run resumable staged research over the full CoreUI/OANDA candle history."
     )
@@ -25,12 +27,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--state-file", default="var/full_history_research_state.json")
     parser.add_argument("--max-jobs", type=int, default=1)
     parser.add_argument("--job-id", default="")
-    parser.add_argument("--window-candles", type=int, default=300)
+    parser.add_argument("--window-candles", type=int, default=int(admin_setting_value(admin_file, "full_history.window_candles", 300)))
     parser.add_argument("--stride-candles", type=int, default=100)
-    parser.add_argument("--smoke-days", type=int, default=31)
-    parser.add_argument("--smoke-max-batches", type=int, default=2)
-    parser.add_argument("--rolling-max-batches", type=int, default=25)
-    parser.add_argument("--full-history-max-batches", type=int, default=100)
+    parser.add_argument("--h4-smoke-window-candles", type=int, default=int(admin_setting_value(admin_file, "full_history.h4_smoke_window_candles", 120)))
+    parser.add_argument("--smoke-days", type=int, default=int(admin_setting_value(admin_file, "full_history.smoke_days", 31)))
+    parser.add_argument("--smoke-max-batches", type=int, default=int(admin_setting_value(admin_file, "full_history.smoke_max_batches", 2)))
+    parser.add_argument("--rolling-max-batches", type=int, default=int(admin_setting_value(admin_file, "full_history.rolling_max_batches", 25)))
+    parser.add_argument("--full-history-max-batches", type=int, default=int(admin_setting_value(admin_file, "full_history.full_history_max_batches", 100)))
     parser.add_argument("--max-assets-to-validate", type=int, default=10)
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
@@ -45,6 +48,12 @@ def main() -> None:
         start=parse_datetime(args.start, end_of_date=False),
         end=parse_datetime(args.end, end_of_date=True),
         window_candles=args.window_candles,
+        smoke_window_candles_by_timeframe={
+            "M5": args.window_candles,
+            "M15": args.window_candles,
+            "H1": args.window_candles,
+            "H4": args.h4_smoke_window_candles,
+        },
         stride_candles=args.stride_candles,
         smoke_days=args.smoke_days,
         smoke_max_batches=args.smoke_max_batches,

@@ -18,23 +18,21 @@ from quantforge.research.strategy_assets import default_strategy_asset_repositor
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run paper/shadow trading.")
-    parser.add_argument("--source", choices=("demo", "candles"), default="demo")
+    parser.add_argument("--source", choices=("candles",), default="candles")
     parser.add_argument("--pair", default="EUR_USD", help="Single pair or comma-separated pairs.")
     parser.add_argument("--timeframe", default="H1", help="Single timeframe or comma-separated timeframes.")
-    parser.add_argument("--from", dest="start", help="Replay start date/time.")
-    parser.add_argument("--to", dest="end", help="Replay end date/time; date-only is inclusive.")
+    parser.add_argument("--from", dest="start", default="2024-01-01", help="Replay start date/time.")
+    parser.add_argument("--to", dest="end", default="2024-12-31", help="Replay end date/time; date-only is inclusive.")
     parser.add_argument("--strategy-asset-id", help="Persisted approved Strategy Asset ID. Defaults to latest.")
-    parser.add_argument("--demo", action="store_true", help="Explicit alias for --source demo.")
+    parser.add_argument("--demo", action="store_true", help="Explicitly use seeded synthetic demo events.")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    if args.demo or args.source == "demo":
+    if args.demo:
         result = ShadowTradingPlatform().run()
     else:
-        if not args.start or not args.end:
-            raise SystemExit("--source candles requires --from and --to.")
         pairs = tuple(item.strip().upper() for item in args.pair.split(",") if item.strip())
         timeframes = tuple(item.strip().upper() for item in args.timeframe.split(",") if item.strip())
         session = ReplaySession(

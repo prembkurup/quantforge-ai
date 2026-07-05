@@ -16,7 +16,7 @@ from quantforge.infrastructure.operations import AutonomousOperationsManager
 from quantforge.live.shadow import ShadowTradingPlatform
 from quantforge.market_data.coreui_repository import get_coreui_history_engine
 from quantforge.research.approvals import ApprovalAuditLog, ApprovalRepository, ApprovalService
-from quantforge.research.campaign import ResearchProgramFamily
+from quantforge.research.families import ResearchProgramFamily
 from quantforge.research.full_history_scheduler import (
     FULL_HISTORY_RESEARCH_PAIRS,
     FULL_HISTORY_RESEARCH_START,

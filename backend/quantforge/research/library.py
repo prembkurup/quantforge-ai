@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from enum import StrEnum
 
-from quantforge.research.campaign import ResearchProgramFamily
+from quantforge.research.families import ResearchProgramFamily
 
 
 class StrategyLibraryStatus(StrEnum):

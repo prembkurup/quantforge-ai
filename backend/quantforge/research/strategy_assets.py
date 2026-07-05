@@ -415,7 +415,7 @@ def _library_asset_from_record(record: ApprovedStrategyAsset):
 
 
 def _family(value: str):
-    from quantforge.research.campaign import ResearchProgramFamily
+    from quantforge.research.families import ResearchProgramFamily
 
     normalized = value.upper()
     if normalized in ResearchProgramFamily.__members__:

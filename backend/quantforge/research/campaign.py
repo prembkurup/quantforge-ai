@@ -3,18 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Any
 
-from quantforge.research.autonomous import AutonomousResearchPipeline, AutonomousResearchResult
+from quantforge.research.families import ResearchProgramFamily
 
-
-class ResearchProgramFamily(StrEnum):
-    TREND_FOLLOWING = "Trend Following"
-    MEAN_REVERSION = "Mean Reversion"
-    BREAKOUT = "Breakout"
-    MOMENTUM = "Momentum"
-    VOLATILITY = "Volatility"
+AutonomousResearchResult = Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,6 +208,8 @@ class InstitutionalResearchCampaign:
         )
 
     def _run_program(self, program: ResearchProgram) -> ProgramCampaignResult:
+        from quantforge.research.autonomous import AutonomousResearchPipeline
+
         result = AutonomousResearchPipeline().execute(program.research_goal, experiment_count=100)
         family_index = list(ResearchProgramFamily).index(program.family)
         experiments = self.targets.experiments // 5

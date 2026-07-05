@@ -160,6 +160,10 @@ def create_app() -> FastAPI:
     def strategy_decision_trace(strategy_id: str) -> dict[str, Any]:
         return _strategy_or_404(service.strategy_decision_trace, strategy_id)
 
+    @app.get("/api/strategies/{strategy_id}/optimization")
+    def strategy_optimization(strategy_id: str) -> dict[str, Any]:
+        return _strategy_or_404(service.strategy_optimization, strategy_id)
+
     @app.get("/api/portfolio/readiness")
     def portfolio_readiness() -> dict[str, Any]:
         return service.portfolio_readiness()

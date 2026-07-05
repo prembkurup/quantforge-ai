@@ -317,7 +317,9 @@ class ProductionStrategyManagementPlatform:
         self.learning = LiveLearningLoop()
 
     def deploy(self, asset: StrategyAsset | None = None) -> DeploymentPipelineResult:
-        asset = asset or self._demo_asset()
+        if asset is None:
+            raise ValueError("A real approved Strategy Asset is required. Use deploy_demo() only for explicit demo mode.")
+        _require_deployable_asset(asset)
         self.catalog.publish(asset)
         self.registry.set_status(asset.passport.strategy_id, asset.passport.version, StrategyRegistryStatus.ACTIVE)
         install = self.deployment.install(asset)
@@ -339,6 +341,9 @@ class ProductionStrategyManagementPlatform:
             live_learning_records=learning_records,
         )
 
+    def deploy_demo(self) -> DeploymentPipelineResult:
+        return self.deploy(self._demo_asset())
+
     def dashboard(self) -> ProductionDashboard:
         entries = self.registry.list_entries()
         return ProductionDashboard(
@@ -356,3 +361,14 @@ class ProductionStrategyManagementPlatform:
         platform = StrategyValidationPlatform()
         report = platform.validate("QF-2026-00431")
         return platform.create_strategy_asset(report)
+
+
+def _require_deployable_asset(asset: StrategyAsset) -> None:
+    if asset.validation_report.deployment_decision.value not in {"APPROVED", "PAPER_TRADE"}:
+        raise ValueError("Strategy Asset is not approved for deployment.")
+    if not asset.validation_report.to_dict():
+        raise ValueError("Strategy Asset is missing validation report.")
+    if not asset.passport.strategy_id or not asset.passport.version:
+        raise ValueError("Strategy Asset is missing Strategy Passport.")
+    if not asset.decision_trace:
+        raise ValueError("Strategy Asset is missing decision trace.")

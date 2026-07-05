@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quantforge.research.full_history_scheduler import FullHistoryResearchJob
+from quantforge.research.strategy_assets import default_strategy_asset_repository
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,8 +178,12 @@ def _run_stage(
         if not env.get("PYTHONPATH")
         else backend_path + os.pathsep + str(env["PYTHONPATH"])
     )
+    command = [str(python_exe), str(script)]
+    if stage.stage_id == "DEPLOY_PAPER_PORTFOLIO":
+        latest = _latest_approved_strategy_asset_id(repo_root)
+        command.extend(["--strategy-asset-id", latest])
     process = subprocess.run(
-        [str(python_exe), str(script)],
+        command,
         cwd=repo_root,
         env=env,
         stderr=subprocess.STDOUT,
@@ -203,6 +208,13 @@ def _run_stage(
 def full_history_plan_hash(planned: tuple[FullHistoryResearchJob, ...]) -> str:
     job_ids = "\n".join(job.job_id for job in planned)
     return hashlib.sha256(job_ids.encode("utf-8")).hexdigest()
+
+
+def _latest_approved_strategy_asset_id(repo_root: Path) -> str:
+    assets = default_strategy_asset_repository(repo_root).list()
+    if not assets:
+        raise RuntimeError("No persisted approved Strategy Assets are available for deployment.")
+    return assets[0].strategy_asset_id
 
 
 def _load_json(path: Path) -> dict[str, object]:

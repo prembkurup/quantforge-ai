@@ -1,3 +1,5 @@
+import pytest
+
 from quantforge.strategies import (
     CapitalAllocator,
     DriftDetector,
@@ -48,7 +50,10 @@ def test_drift_detector_flags_live_underperformance() -> None:
 
 
 def test_production_platform_deploys_asset_from_catalog_to_production() -> None:
-    result = ProductionStrategyManagementPlatform().deploy()
+    validation = StrategyValidationPlatform()
+    asset = validation.create_strategy_asset(validation.validate("QF-2026-00431"))
+
+    result = ProductionStrategyManagementPlatform().deploy(asset)
 
     assert result.approved is True
     assert result.installed is True
@@ -59,3 +64,15 @@ def test_production_platform_deploys_asset_from_catalog_to_production() -> None:
     assert result.production is True
     assert result.dashboard.production == 1
     assert result.live_learning_records[0]["target"] == "knowledge_base"
+
+
+def test_production_platform_blocks_silent_demo_fallback() -> None:
+    with pytest.raises(ValueError, match="real approved Strategy Asset"):
+        ProductionStrategyManagementPlatform().deploy()
+
+
+def test_production_platform_demo_requires_explicit_method() -> None:
+    result = ProductionStrategyManagementPlatform().deploy_demo()
+
+    assert result.approved is True
+    assert result.production is True

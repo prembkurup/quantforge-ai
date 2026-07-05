@@ -1,4 +1,8 @@
+import os
+
 from fastapi.testclient import TestClient
+
+os.environ["QUANTFORGE_DEMO_MODE"] = "1"
 
 from quantforge.dashboard.api import create_app
 

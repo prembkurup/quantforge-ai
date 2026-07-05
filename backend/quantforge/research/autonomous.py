@@ -20,6 +20,11 @@ from quantforge.research.orchestrator import (
     ResearchOrchestrationRequest,
     ResearchOrchestrator,
 )
+from quantforge.research.strategy_assets import (
+    ApprovedStrategyAssetStore,
+    StrategyAssetRepository,
+    default_strategy_asset_repository,
+)
 from quantforge.strategies import (
     ConstraintBasedStrategyComposer,
     ProductionStrategyManagementPlatform,
@@ -300,22 +305,44 @@ class ExperimentRunner:
 
 
 class StrategyAssetPublisher:
-    def __init__(self, catalog_platform: ProductionStrategyManagementPlatform | None = None) -> None:
+    def __init__(
+        self,
+        catalog_platform: ProductionStrategyManagementPlatform | None = None,
+        repository: StrategyAssetRepository | None = None,
+    ) -> None:
         self._platform = catalog_platform or ProductionStrategyManagementPlatform()
+        self._store = ApprovedStrategyAssetStore(repository or default_strategy_asset_repository())
 
     @property
     def strategy_catalog_count(self) -> int:
         return len(self._platform.catalog.list_assets())
 
-    def publish(self, base_report: ValidationReport, count: int) -> tuple[StrategyAsset, ...]:
+    def publish(
+        self,
+        base_report: ValidationReport,
+        count: int,
+        *,
+        source_workflow_id: str = "",
+        source_experiment_ids: tuple[str, ...] = (),
+        strategy_metadata: dict[str, Any] | None = None,
+    ) -> tuple[StrategyAsset, ...]:
         validation_platform = StrategyValidationPlatform()
         assets: list[StrategyAsset] = []
+        metadata = strategy_metadata or {}
         for index in range(1, count + 1):
             strategy_id = f"QF-2026-13{index:03d}"
             passport = replace(base_report.passport, strategy_id=strategy_id, version=f"13.{index}")
             report = replace(base_report, strategy_id=strategy_id, passport=passport)
             asset = validation_platform.create_strategy_asset(report)
+            if metadata:
+                asset = replace(asset, strategy_definition={**asset.strategy_definition, **metadata})
             self._platform.catalog.publish(asset)
+            self._store.publish(
+                asset,
+                source_workflow_id=source_workflow_id,
+                source_experiment_id=source_experiment_ids[index - 1] if index - 1 < len(source_experiment_ids) else "",
+                source_publication_id=f"{strategy_id}:autonomous_publication",
+            )
             assets.append(asset)
         return tuple(assets)
 
@@ -431,7 +458,17 @@ class AutonomousResearchPipeline:
         plan = self._build_plan(goal, hypotheses, dataset)
         schedule = self.scheduler.schedule(plan, experiment_count)
         stage_outputs = self._stage_outputs(goal, hypotheses[0], dataset)
-        published_assets = self.publisher.publish(stage_outputs["validation"], count=12)
+        published_assets = self.publisher.publish(
+            stage_outputs["validation"],
+            count=12,
+            source_workflow_id=plan.plan_id,
+            source_experiment_ids=tuple(item.experiment_id for item in schedule[:12]),
+            strategy_metadata={
+                "pair": dataset.instruments[0],
+                "timeframe": dataset.timeframes[0],
+                "family": "TREND_FOLLOWING",
+            },
+        )
 
         results = tuple(
             self.runner.run(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ from quantforge.research.full_history_scheduler import (
     FullHistorySchedulerConfig,
 )
 from quantforge.research.library import InstitutionalStrategyLibraryBuilder, StrategyLibraryAsset
+from quantforge.research.strategy_assets import StrategyAssetRepository, StrategyLibraryLoader
 from quantforge.research.workflow_orchestration import WorkflowOrchestrator, default_workflow_paths
 
 
@@ -29,7 +31,13 @@ class DashboardService:
     """Read-only DTO provider for the QuantForge dashboard MVP."""
 
     def __init__(self) -> None:
-        self._library = InstitutionalStrategyLibraryBuilder().build()
+        self._demo_mode = os.getenv("QUANTFORGE_DEMO_MODE", "").lower() in {"1", "true", "yes"}
+        self._strategy_asset_repository = StrategyAssetRepository(_approved_strategy_assets_file())
+        self._library = (
+            InstitutionalStrategyLibraryBuilder().build()
+            if self._demo_mode
+            else StrategyLibraryLoader(self._strategy_asset_repository).load()
+        )
         self._operations = AutonomousOperationsManager().run_validation()
         self._paper = ShadowTradingPlatform().run()
         self._timestamp = datetime.now(UTC).isoformat()
@@ -54,7 +62,9 @@ class DashboardService:
             "max_drawdown": round(kpis.max_observed_drawdown * 100, 1),
             "decision_banner": "READY_FOR_PORTFOLIO_CONSTRUCTION",
             "critical_alerts": 0,
-            "source": "Workstream 1 Strategy Library + Operations Validation",
+            "source": "Demo Strategy Library + Operations Validation"
+            if self._demo_mode
+            else "ApprovedStrategyAssetStore + Operations Validation",
             "timestamp": self._timestamp,
         }
 
@@ -70,7 +80,8 @@ class DashboardService:
                 "profit_factor_distribution": [1.8, 2.0, 2.1, 2.21, 2.35],
                 "drawdown_distribution": [5.8, 7.2, 8.5, 9.1, 9.8],
             },
-            "source": "InstitutionalStrategyLibraryBuilder",
+            "source": "InstitutionalStrategyLibraryBuilder" if self._demo_mode else "ApprovedStrategyAssetStore",
+            "demo_mode": self._demo_mode,
             "timestamp": self._timestamp,
         }
 
@@ -477,11 +488,14 @@ class DashboardService:
 
     def strategy(self, strategy_id: str) -> dict[str, Any]:
         asset = self._find_strategy(strategy_id)
+        stored = self._find_approved_strategy(strategy_id)
         return {
             **_strategy_row(asset),
             "passport": self.strategy_passport(strategy_id),
             "decision_trace": self.strategy_decision_trace(strategy_id),
-            "optimization_report": {
+            "optimization_report": stored.optimization_report
+            if stored
+            else {
                 "stable_regions": 7,
                 "best_region": {"ema_fast": "18-26", "ema_slow": "60-90", "atr": "1.8-2.3"},
                 "review": "APPROVED",
@@ -494,6 +508,13 @@ class DashboardService:
             },
             "paper_trading_status": "READY",
             "deployment_status": "PAPER_SHADOW_GATE",
+            "source_workflow_id": asset.source_workflow_id,
+            "source_job_id": asset.source_job_id,
+            "source_experiment_id": asset.source_experiment_id,
+            "source_validation_id": asset.source_validation_id,
+            "source_publication_id": asset.source_publication_id,
+            "approved_at": asset.approved_at,
+            "demo_mode": asset.demo_mode,
             "timestamp": self._timestamp,
         }
 
@@ -507,6 +528,11 @@ class DashboardService:
             "confidence": round(asset.confidence * 100, 1),
             "production": asset.production_grade,
             "passport_present": asset.strategy_passport_present,
+            "strategy_version": asset.strategy_version,
+            "source_workflow_id": asset.source_workflow_id,
+            "source_experiment_id": asset.source_experiment_id,
+            "approved_at": asset.approved_at,
+            "demo_mode": asset.demo_mode,
             "source": "Strategy Library",
             "timestamp": self._timestamp,
         }
@@ -522,6 +548,8 @@ class DashboardService:
             "stress_test": asset.stress_test,
             "grade": asset.validation_grade,
             "confidence": round(asset.confidence * 100, 1),
+            "source_validation_id": asset.source_validation_id,
+            "demo_mode": asset.demo_mode,
             "timestamp": self._timestamp,
         }
 
@@ -539,6 +567,24 @@ class DashboardService:
                 "validation_gates_passed",
                 "strategy_asset_published",
             ),
+            "source_experiment_id": asset.source_experiment_id,
+            "demo_mode": asset.demo_mode,
+            "timestamp": self._timestamp,
+        }
+
+    def strategy_optimization(self, strategy_id: str) -> dict[str, Any]:
+        asset = self._find_strategy(strategy_id)
+        stored = self._find_approved_strategy(strategy_id)
+        return {
+            "strategy_id": asset.asset_id,
+            "optimization_report": stored.optimization_report
+            if stored
+            else {
+                "stable_regions": 7,
+                "best_region": {"ema_fast": "18-26", "ema_slow": "60-90", "atr": "1.8-2.3"},
+                "review": "APPROVED",
+            },
+            "demo_mode": asset.demo_mode,
             "timestamp": self._timestamp,
         }
 
@@ -758,6 +804,14 @@ class DashboardService:
                 return asset
         raise KeyError(strategy_id)
 
+    def _find_approved_strategy(self, strategy_id: str):
+        if self._demo_mode:
+            return None
+        try:
+            return self._strategy_asset_repository.get(strategy_id)
+        except KeyError:
+            return None
+
 
 def _full_history_state_file() -> Path:
     return _repo_root() / "var" / "full_history_research_state.json"
@@ -769,6 +823,10 @@ def _workflow_paths():
 
 def _admin_settings_file() -> Path:
     return _repo_root() / "var" / "admin_settings.json"
+
+
+def _approved_strategy_assets_file() -> Path:
+    return _repo_root() / "var" / "approved_strategy_assets.json"
 
 
 def _repo_root() -> Path:
@@ -922,8 +980,16 @@ def _strategy_row(asset: StrategyLibraryAsset) -> dict[str, Any]:
         "profit_factor": asset.profit_factor,
         "max_drawdown": round(asset.max_drawdown * 100, 1),
         "validation_grade": asset.validation_grade,
-        "status": "PRODUCTION_GRADE" if asset.production_grade else "VALIDATED",
-        "source": "Strategy Library",
+        "status": asset.status if asset.status else "PRODUCTION_GRADE" if asset.production_grade else "VALIDATED",
+        "source": "Demo Strategy Library" if asset.demo_mode else "ApprovedStrategyAssetStore",
+        "demo_mode": asset.demo_mode,
+        "source_workflow_id": asset.source_workflow_id,
+        "source_job_id": asset.source_job_id,
+        "source_experiment_id": asset.source_experiment_id,
+        "source_validation_id": asset.source_validation_id,
+        "source_publication_id": asset.source_publication_id,
+        "approved_at": asset.approved_at,
+        "strategy_version": asset.strategy_version,
     }
 
 

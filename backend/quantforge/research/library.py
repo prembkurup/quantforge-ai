@@ -58,6 +58,15 @@ class StrategyLibraryAsset:
     strategy_passport_present: bool
     reproducibility_key: str
     production_grade: bool
+    status: str = "PRODUCTION_GRADE"
+    source_workflow_id: str = ""
+    source_job_id: str = ""
+    source_experiment_id: str = ""
+    source_validation_id: str = ""
+    source_publication_id: str = ""
+    approved_at: str = ""
+    strategy_version: str = ""
+    demo_mode: bool = True
 
 
 @dataclass(frozen=True, slots=True)

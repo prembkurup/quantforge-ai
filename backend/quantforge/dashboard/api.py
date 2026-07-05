@@ -50,6 +50,34 @@ def create_app() -> FastAPI:
     def research_rejections() -> list[dict[str, Any]]:
         return service.research_rejections()
 
+    @app.get("/api/research/matrix")
+    def research_matrix() -> list[dict[str, Any]]:
+        return service.research_matrix()
+
+    @app.get("/api/research/programs")
+    def research_program_fanout() -> list[dict[str, Any]]:
+        return service.research_program_fanout()
+
+    @app.get("/api/research/programs/{program_id}")
+    def research_program_detail(program_id: str) -> dict[str, Any]:
+        return _or_404(service.research_program_detail, program_id, "Research program not found")
+
+    @app.get("/api/research/rejected")
+    def research_rejected() -> list[dict[str, Any]]:
+        return service.research_rejected()
+
+    @app.get("/api/research/coverage")
+    def research_coverage() -> dict[str, Any]:
+        return service.research_coverage()
+
+    @app.get("/api/research/diversity")
+    def research_diversity() -> dict[str, Any]:
+        return service.research_diversity()
+
+    @app.get("/api/research/productivity")
+    def research_productivity() -> list[dict[str, Any]]:
+        return service.research_productivity()
+
     @app.get("/api/pipeline/summary")
     def pipeline_summary() -> dict[str, Any]:
         return service.pipeline_summary()

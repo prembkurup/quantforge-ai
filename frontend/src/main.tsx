@@ -199,18 +199,41 @@ function Overview() {
 
 function Research() {
   const progress = useApi<any>("/api/dashboard/research/progress");
-  const programs = useApi<Row[]>("/api/dashboard/research/programs");
+  const programs = useApi<Row[]>("/api/research/programs");
   const rejections = useApi<Row[]>("/api/dashboard/research/rejections");
-  if (!progress || !programs || !rejections) return <Loading />;
+  const coverage = useApi<any>("/api/research/coverage");
+  const diversity = useApi<any>("/api/research/diversity");
+  const productivity = useApi<Row[]>("/api/research/productivity");
+  const matrix = useApi<Row[]>("/api/research/matrix");
+  const rejected = useApi<Row[]>("/api/research/rejected");
+  if (!progress || !programs || !rejections || !coverage || !diversity || !productivity || !matrix || !rejected) return <Loading />;
+  const productivityRows = productivity.slice(0, 30);
+  const matrixRows = matrix.slice(0, 30);
+  const rejectedRows = rejected.slice(0, 30);
   return (
     <Page title="Research Progress">
+      <div className="kpi-grid">
+        <KpiCard title="Usable Datasets" value={`${coverage.usable_datasets}/${coverage.total_datasets}`} tone="good" />
+        <KpiCard title="Research Coverage" value={`${coverage.coverage_percent}%`} tone="good" />
+        <KpiCard title="Programs" value={coverage.research_programs} />
+        <KpiCard title="Candidates" value={number(coverage.candidate_count)} />
+        <KpiCard title="Approved Assets" value={number(coverage.approved_asset_count)} tone="good" />
+        <KpiCard title="Efficiency" value={`${coverage.candidate_efficiency}%`} />
+        <KpiCard title="Pairs" value={diversity.pair_count} />
+        <KpiCard title="Timeframes" value={diversity.timeframe_count} />
+        <KpiCard title="Families" value={diversity.family_count} />
+        <KpiCard title="Regimes" value={diversity.regime_count} />
+      </div>
       <div className="grid gap-4 xl:grid-cols-2">
         <LinePanel title="Experiments completed" data={progress.charts.experiments_over_time} />
         <LinePanel title="Knowledge growth" data={progress.charts.knowledge_growth} />
         <BarPanel title="Profit factor distribution" data={progress.charts.profit_factor_distribution} />
         <BarPanel title="Drawdown distribution" data={progress.charts.drawdown_distribution} />
       </div>
-      <DataTable title="Research Programs" rows={programs} />
+      <DataTable title="Multi-Market Research Programs" rows={programs} />
+      <DataTable title={`Research Productivity by Dataset (${productivity.length})`} rows={productivityRows} />
+      <DataTable title={`Full-History Research Matrix (${matrix.length})`} rows={matrixRows} />
+      <DataTable title={`Rejected Strategy Candidates (${rejected.length})`} rows={rejectedRows} />
       <DataTable title="Rejected Strategy Reasons" rows={rejections} />
     </Page>
   );

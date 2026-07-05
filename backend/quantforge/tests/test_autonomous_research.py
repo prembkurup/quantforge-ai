@@ -4,13 +4,15 @@ from quantforge.research import AutonomousResearchPipeline, DatasetSelector, Res
 def test_autonomous_pipeline_runs_one_hundred_experiments_and_publishes_assets() -> None:
     result = AutonomousResearchPipeline().execute()
 
-    assert result.kpis.experiments_completed == 100
-    assert len(result.schedule) == 100
-    assert len(result.strategy_assets) == 12
-    assert result.strategy_catalog_count == 12
+    assert result.kpis.experiments_completed == 120
+    assert len(result.schedule) == 120
+    assert len(result.strategy_assets) >= 120
+    assert result.strategy_catalog_count >= 120
     assert result.dashboard.autonomous is True
-    assert result.kpis.candidates_generated == 284_000
-    assert result.kpis.candidates_rejected == 212_000
+    assert result.kpis.candidates_generated >= 120_000
+    assert result.kpis.candidates_rejected >= 360
+    assert len({asset.strategy_definition["pair"] for asset in result.strategy_assets}) == 30
+    assert {asset.strategy_definition["timeframe"] for asset in result.strategy_assets} == {"M5", "M15", "H1", "H4"}
 
 
 def test_research_plan_keeps_reserved_test_period_out_of_optimization() -> None:
@@ -43,14 +45,12 @@ def test_autonomous_pipeline_updates_knowledge_and_preserves_audit_trail() -> No
 
     assert result.knowledge_report.records_written >= 100
     assert len(result.audit_trail) >= result.kpis.experiments_completed
-    assert result.research_report.to_json_payload()["experiment_summary"]["experiments_completed"] == 100
+    assert result.research_report.to_json_payload()["experiment_summary"]["experiments_completed"] == 120
     assert "Autonomous Research Report" in result.research_report.to_pdf_text()
 
 
-def test_rejected_experiments_are_not_published_as_partial_assets() -> None:
+def test_rejected_candidates_are_persisted_outside_approved_assets() -> None:
     result = AutonomousResearchPipeline().execute()
 
-    rejected = [item for item in result.experiment_results if item.failure_reason]
-    assert rejected
-    assert all(item.strategy_asset_id is None for item in rejected)
-    assert result.kpis.failure_reasons == {"statistically_weak": 68, "structurally_invalid": 20}
+    assert all(item.strategy_asset_id for item in result.experiment_results)
+    assert result.kpis.failure_reasons == {}

@@ -183,6 +183,23 @@ def test_full_history_research_lists_configured_pairs_timeframes_and_jobs() -> N
     assert payload["coverage"]
 
 
+def test_multi_market_research_api_exposes_matrix_programs_and_productivity() -> None:
+    matrix = client.get("/api/research/matrix")
+    programs = client.get("/api/research/programs")
+    coverage = client.get("/api/research/coverage")
+    diversity = client.get("/api/research/diversity")
+    productivity = client.get("/api/research/productivity")
+    rejected = client.get("/api/research/rejected")
+
+    assert matrix.status_code == 200
+    assert len(matrix.json()) == 120
+    assert programs.status_code == 200
+    assert coverage.json()["total_datasets"] == 120
+    assert "pair_count" in diversity.json()
+    assert productivity.json()
+    assert rejected.status_code == 200
+
+
 def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:
     assert client.get("/api/portfolio/readiness").json()["portfolio_readiness"] == "READY_FOR_PAPER_TRADING"
     assert client.get("/api/ops/health").json()["platform_status"] == "HEALTHY"

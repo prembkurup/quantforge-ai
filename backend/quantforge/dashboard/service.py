@@ -30,6 +30,14 @@ from quantforge.research.full_history_summary import (
     FullHistorySummaryCache,
 )
 from quantforge.research.library import InstitutionalStrategyLibraryBuilder, StrategyLibraryAsset
+from quantforge.research.multi_market import (
+    MultiMarketResearchPlanner,
+    ResearchMatrixBuilder,
+    coverage_report,
+    default_rejected_strategy_repository,
+    diversity_report,
+    productivity_rows,
+)
 from quantforge.research.strategy_assets import StrategyAssetRepository, StrategyLibraryLoader
 from quantforge.research.workflow_orchestration import WorkflowOrchestrator, default_workflow_paths
 from quantforge.live import ReplayProgressStore
@@ -115,12 +123,88 @@ class DashboardService:
         return rows
 
     def research_rejections(self) -> list[dict[str, Any]]:
+        rejected = self.research_rejected()
+        if rejected:
+            counts: dict[str, int] = {}
+            for item in rejected:
+                reason = str(item["failure_reason"])
+                counts[reason] = counts.get(reason, 0) + 1
+            return [
+                {"reason": reason, "count": count, "severity": "high" if "Failure" in reason else "medium"}
+                for reason, count in sorted(counts.items(), key=lambda row: row[1], reverse=True)
+            ]
         return [
             {"reason": "Parameter instability", "count": 18_240, "severity": "medium"},
             {"reason": "Drawdown above limit", "count": 12_760, "severity": "high"},
             {"reason": "Low cross-pair robustness", "count": 9_410, "severity": "medium"},
             {"reason": "Decision trace incomplete", "count": 1_128, "severity": "high"},
         ]
+
+    def research_matrix(self) -> list[dict[str, Any]]:
+        return [asdict(row) for row in self._research_matrix_rows()]
+
+    def research_program_fanout(self) -> list[dict[str, Any]]:
+        programs = MultiMarketResearchPlanner().plan(
+            tuple(row_to_dataset for row_to_dataset in self._research_matrix_builder().datasets())
+        )
+        assets = self._strategy_asset_repository.list()
+        rejected = default_rejected_strategy_repository(_repo_root()).list()
+        rows: list[dict[str, Any]] = []
+        for program in programs:
+            approved = sum(
+                1
+                for asset in assets
+                if asset.pair == program.dataset.pair and asset.timeframe == program.dataset.timeframe
+            )
+            rejected_count = sum(
+                1
+                for item in rejected
+                if item.pair == program.dataset.pair and item.timeframe == program.dataset.timeframe
+            )
+            rows.append(
+                {
+                    "program_id": program.program_id,
+                    "dataset_id": program.dataset.dataset_id,
+                    "pair": program.dataset.pair,
+                    "timeframe": program.dataset.timeframe,
+                    "status": "COMPLETE" if approved else program.status.value,
+                    "experiment_count": program.experiment_count,
+                    "candidate_count": program.candidate_count,
+                    "approved_asset_count": approved,
+                    "rejected_candidate_count": rejected_count,
+                    "quality_score": program.dataset.quality_score,
+                }
+            )
+        return rows
+
+    def research_program_detail(self, program_id: str) -> dict[str, Any]:
+        for program in self.research_program_fanout():
+            if program["program_id"] == program_id:
+                return {
+                    **program,
+                    "templates": ("Trend Pullback", "Donchian Breakout", "ATR Expansion"),
+                    "hypotheses": (
+                        f"{program['pair']} {program['timeframe']} trend pullbacks remain stable across rolling windows.",
+                        f"{program['pair']} {program['timeframe']} volatility expansion improves continuation filtering.",
+                    ),
+                    "source": "ResearchMatrixBuilder",
+                    "timestamp": self._timestamp,
+                }
+        raise KeyError(program_id)
+
+    def research_rejected(self) -> list[dict[str, Any]]:
+        return [asdict(item) for item in default_rejected_strategy_repository(_repo_root()).list()]
+
+    def research_coverage(self) -> dict[str, Any]:
+        rows = self._research_matrix_rows()
+        programs = MultiMarketResearchPlanner().plan(self._research_matrix_builder().datasets())
+        return {**coverage_report(rows, programs), "timestamp": self._timestamp}
+
+    def research_diversity(self) -> dict[str, Any]:
+        return {**diversity_report(self._strategy_asset_repository.list()), "timestamp": self._timestamp}
+
+    def research_productivity(self) -> list[dict[str, Any]]:
+        return productivity_rows(self._research_matrix_rows())
 
     def pipeline_summary(self) -> dict[str, Any]:
         tasks = self.pipeline_tasks()
@@ -695,11 +779,12 @@ class DashboardService:
         }
 
     def portfolio_coverage(self) -> dict[str, Any]:
+        diversity = self.research_diversity()
         return {
             "regimes": {"trending": 0.96, "ranging": 0.82, "breakout": 0.88, "volatile": 0.91},
-            "pairs": {"EUR_USD": 0.22, "GBP_USD": 0.18, "USD_JPY": 0.17, "AUD_USD": 0.13},
-            "timeframes": {"M15": 0.32, "H1": 0.43, "H4": 0.25},
-            "families": {family.value: 0.20 for family in ResearchProgramFamily},
+            "pairs": _ratio_map(diversity.get("pairs", {})),
+            "timeframes": _ratio_map(diversity.get("timeframes", {})),
+            "families": _ratio_map(diversity.get("families", {})) or {family.value: 0.20 for family in ResearchProgramFamily},
             "timestamp": self._timestamp,
         }
 
@@ -909,6 +994,18 @@ class DashboardService:
             {"hypothesis": "ATR expansion improves breakout filtering.", "confidence": 0.91},
             {"hypothesis": "Mean reversion weakens during high-volatility news windows.", "confidence": 0.88},
         ]
+
+    def _research_matrix_builder(self) -> ResearchMatrixBuilder:
+        state_file = _full_history_state_file()
+        return ResearchMatrixBuilder(
+            _planned_full_history_jobs(state_file),
+            state_file,
+            asset_repository=self._strategy_asset_repository,
+            rejection_repository=default_rejected_strategy_repository(_repo_root()),
+        )
+
+    def _research_matrix_rows(self):
+        return self._research_matrix_builder().rows()
 
     def _find_strategy(self, strategy_id: str) -> StrategyLibraryAsset:
         for asset in self._library.production_grade_strategies:
@@ -1244,6 +1341,13 @@ def _ranked(kind: str, values: dict[str, float]) -> list[dict[str, Any]]:
             start=1,
         )
     ]
+
+
+def _ratio_map(values: Any) -> dict[str, float]:
+    if not isinstance(values, dict):
+        return {}
+    total = sum(int(value) for value in values.values()) or 1
+    return {str(key): round(int(value) / total, 3) for key, value in values.items()}
 
 
 def _engine(

@@ -13,6 +13,7 @@ from quantforge.research import (
     classify_full_history_failure,
     release_running_jobs,
 )
+from quantforge.research.full_history_scheduler import _window_candles_for_job
 from quantforge.tests.test_workstream1_pipeline import FakeCandleRepository
 
 
@@ -202,6 +203,25 @@ def test_full_history_scheduler_does_not_retry_research_quality_failure(tmp_path
 
     assert failed_job.job_id not in {job.job_id for job in claimed}
     assert classify_full_history_failure("tasks=2/9; successful=NO", 1) == FullHistoryRetryDecision.PERMANENT
+
+
+def test_full_history_scheduler_uses_timeframe_aware_smoke_window_candles() -> None:
+    scheduler = FullHistoryResearchScheduler(
+        config=FullHistorySchedulerConfig(
+            pairs=("EUR_USD",),
+            timeframes=("H4",),
+            start=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            end=datetime(2026, 4, 1, tzinfo=timezone.utc),
+            window_candles=300,
+        ),
+        state_file=_unused_state_path(),
+        repository_factory=FakeCandleRepository,
+    )
+    smoke_job = next(job for job in scheduler.plan() if job.stage == FullHistoryStage.SMOKE)
+    full_history_job = next(job for job in scheduler.plan() if job.stage == FullHistoryStage.FULL_HISTORY)
+
+    assert _window_candles_for_job(smoke_job, scheduler.config) == 120
+    assert _window_candles_for_job(full_history_job, scheduler.config) == 300
 
 
 def _config() -> FullHistorySchedulerConfig:

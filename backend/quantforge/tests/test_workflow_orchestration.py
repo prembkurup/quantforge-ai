@@ -116,6 +116,50 @@ def test_workflow_orchestrator_marks_research_quality_failure_permanent(tmp_path
     assert snapshot["run"]["retryable_tasks"] == 0
 
 
+def test_workflow_orchestrator_maps_autonomous_stage_to_strategy_publication(tmp_path) -> None:
+    scheduler = FullHistoryResearchScheduler(
+        config=_config(),
+        state_file=tmp_path / "var" / "full_history_research_state.json",
+        repository_factory=FakeCandleRepository,
+    )
+    planned = scheduler.plan()
+    paths = default_workflow_paths(tmp_path)
+    paths.full_history_state_file.parent.mkdir(parents=True)
+    paths.full_history_state_file.write_text(
+        json.dumps(
+            {
+                "completed": [job.job_id for job in planned],
+                "failed": [],
+                "history": [{"job_id": job.job_id, "recorded_at": "2026-01-01T00:00:00+00:00"} for job in planned],
+                "running": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    paths.post_pipeline_state_file.write_text(
+        json.dumps(
+            {
+                "status": "COMPLETE",
+                "stages": [
+                    {"stage_id": "AUTONOMOUS_RESEARCH", "status": "COMPLETE"},
+                    {"stage_id": "DEPLOY_PAPER_PORTFOLIO", "status": "COMPLETE"},
+                    {"stage_id": "SHADOW_TRADING_REVIEW", "status": "COMPLETE"},
+                    {"stage_id": "PRODUCTION_READINESS", "status": "COMPLETE"},
+                    {"stage_id": "PRODUCTION_CERTIFICATION", "status": "COMPLETE"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    snapshot = WorkflowOrchestrator(paths).current(planned)
+    strategy_publication = next(item for item in snapshot["tasks"] if item["task_id"] == "STRATEGY_PUBLICATION")
+
+    assert strategy_publication["status"] == WorkflowStatus.COMPLETE.value
+    assert snapshot["run"]["current_stage"] == "WAITING_FOR_MANUAL_APPROVAL"
+    assert snapshot["run"]["next_action"] == "Manual approval required before live trading"
+
+
 def _config() -> FullHistorySchedulerConfig:
     return FullHistorySchedulerConfig(
         pairs=("EUR_USD",),

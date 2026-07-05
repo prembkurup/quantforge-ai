@@ -91,6 +91,7 @@ class FullHistorySchedulerConfig:
     end: datetime
     rolling_years: int = 1
     window_candles: int = 300
+    smoke_window_candles_by_timeframe: dict[str, int] | None = None
     stride_candles: int = 100
     smoke_days: int = 31
     smoke_max_batches: int = 2
@@ -274,7 +275,7 @@ class FullHistoryResearchScheduler:
                 timeframes=(job.timeframe,),
                 start=job.start,
                 end=job.end,
-                window_candles=self.config.window_candles,
+                window_candles=_window_candles_for_job(job, self.config),
                 stride_candles=self.config.stride_candles,
                 max_batches=max_batches,
                 max_assets_to_validate=self.config.max_assets_to_validate,
@@ -316,6 +317,22 @@ def _job(
         end=end,
         max_batches=max_batches,
     )
+
+
+def _window_candles_for_job(job: FullHistoryResearchJob, config: FullHistorySchedulerConfig) -> int:
+    if job.stage != FullHistoryStage.SMOKE:
+        return config.window_candles
+    smoke_windows = config.smoke_window_candles_by_timeframe or _default_smoke_window_candles_by_timeframe()
+    return smoke_windows.get(job.timeframe.upper(), config.window_candles)
+
+
+def _default_smoke_window_candles_by_timeframe() -> dict[str, int]:
+    return {
+        "M5": 300,
+        "M15": 300,
+        "H1": 300,
+        "H4": 120,
+    }
 
 
 def _result_job(job: FullHistoryResearchJob, result: WorkstreamPipelineResult) -> FullHistoryResearchJob:

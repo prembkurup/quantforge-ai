@@ -246,17 +246,20 @@ class WorkflowPlanner:
         definitions = (
             (
                 "AUTONOMOUS_RESEARCH",
+                "AUTONOMOUS_RESEARCH",
                 WorkflowStage.AUTONOMOUS_RESEARCH.value,
                 "autonomous_research.py",
                 "FULL_HISTORY_RESEARCH",
             ),
             (
                 "STRATEGY_PUBLICATION",
+                "AUTONOMOUS_RESEARCH",
                 WorkflowStage.STRATEGY_PUBLICATION.value,
                 "autonomous_research.py",
                 "AUTONOMOUS_RESEARCH",
             ),
             (
+                "DEPLOY_PAPER_PORTFOLIO",
                 "DEPLOY_PAPER_PORTFOLIO",
                 WorkflowStage.PAPER_PORTFOLIO_DEPLOYMENT.value,
                 "deploy_strategy.py",
@@ -264,17 +267,20 @@ class WorkflowPlanner:
             ),
             (
                 "SHADOW_TRADING_REVIEW",
+                "SHADOW_TRADING_REVIEW",
                 WorkflowStage.SHADOW_TRADING_REVIEW.value,
                 "shadow_trading.py",
                 "DEPLOY_PAPER_PORTFOLIO",
             ),
             (
                 "PRODUCTION_READINESS",
+                "PRODUCTION_READINESS",
                 WorkflowStage.PRODUCTION_READINESS.value,
                 "production_readiness.py",
                 "SHADOW_TRADING_REVIEW",
             ),
             (
+                "PRODUCTION_CERTIFICATION",
                 "PRODUCTION_CERTIFICATION",
                 WorkflowStage.PRODUCTION_CERTIFICATION.value,
                 "certify_production.py",
@@ -283,8 +289,8 @@ class WorkflowPlanner:
         )
         previous_complete = full_history_complete
         rows: list[dict[str, Any]] = []
-        for task_id, stage, script, dependency in definitions:
-            source = stage_map.get(task_id, {})
+        for task_id, source_stage_id, stage, script, dependency in definitions:
+            source = stage_map.get(source_stage_id, {})
             source_status = str(source.get("status", ""))
             if not previous_complete:
                 status = WorkflowStatus.BLOCKED.value

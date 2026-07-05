@@ -200,6 +200,10 @@ def create_app() -> FastAPI:
     def paper_promotion() -> dict[str, Any]:
         return service.paper_promotion()
 
+    @app.get("/api/paper/replay")
+    def paper_replay_status() -> dict[str, Any]:
+        return service.paper_replay_status()
+
     @app.get("/api/ops/health")
     def ops_health() -> dict[str, Any]:
         return service.ops_health()

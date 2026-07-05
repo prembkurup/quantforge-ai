@@ -276,6 +276,7 @@ class SignalGenerator:
         regime: MarketRegimeSnapshot,
         selection: StrategySelection,
         decision: TradeDecisionResult,
+        signal_id: str = "SIG-LIVE-0001",
     ) -> TradingSignal:
         action = SignalAction.HOLD
         reason = "Trade decision engine blocked actionable trading."
@@ -283,7 +284,7 @@ class SignalGenerator:
             action = SignalAction.BUY
             reason = "Trend pullback feature vector is actionable in TRENDING regime."
         return TradingSignal(
-            signal_id="SIG-LIVE-0001",
+            signal_id=signal_id,
             strategy_id=selection.strategy_id,
             action=action,
             instrument=features.instrument,
@@ -424,17 +425,26 @@ class LiveTradingEngine:
     def register_strategy(self, strategy: StrategyPlugin) -> None:
         self._registered_strategies.append(strategy)
 
-    def run(self, asset: StrategyAsset | None = None) -> LiveTradingRunResult:
-        asset = asset or ProductionStrategyManagementPlatform()._demo_asset()
+    def run(
+        self,
+        asset: StrategyAsset | None = None,
+        *,
+        events: tuple[LiveEvent, ...] | None = None,
+        demo: bool = True,
+    ) -> LiveTradingRunResult:
+        if asset is None:
+            if not demo:
+                raise ValueError("A real Strategy Asset is required when demo mode is disabled.")
+            asset = ProductionStrategyManagementPlatform()._demo_asset()
         portfolio = self.portfolio.build(asset)
-        seeded_events = self.market_stream.seed(self.bus)
-        events = self.bus.drain()
+        seeded_events = self.market_stream.seed(self.bus) if events is None else ()
+        events = self.bus.drain() if events is None else events
         signals: list[TradingSignal] = []
         executions: list[ExecutionReceipt] = []
         risk_blocks = 0
         regimes: dict[str, str] = {}
 
-        for event in events:
+        for index, event in enumerate(events, start=1):
             feature_vector = self.features.build(event)
             if feature_vector is None:
                 continue
@@ -442,7 +452,13 @@ class LiveTradingEngine:
             regimes[feature_vector.instrument] = regime.regime
             selection = self.selector.select(asset, portfolio, regime)
             decision = self.decisions.evaluate(feature_vector, selection, portfolio.total_allocation)
-            signal = self.signals.generate(feature_vector, regime, selection, decision)
+            signal = self.signals.generate(
+                feature_vector,
+                regime,
+                selection,
+                decision,
+                signal_id=f"SIG-REPLAY-{index:06d}" if seeded_events == () else "SIG-LIVE-0001",
+            )
             risk_decision = self.risk.approve(signal)
             risk_blocks += int(not risk_decision.approved)
             receipt = self.execution.execute(signal, risk_decision)

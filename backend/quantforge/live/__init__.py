@@ -47,6 +47,7 @@ from quantforge.live.shadow import (
     KnowledgeUpdater,
     MonthlyPromotionReview,
     PaperAccountSnapshot,
+    PaperTradingReplayRunner,
     PaperPortfolio,
     PredictionAnalysis,
     PredictionAnalyzer,
@@ -62,6 +63,17 @@ from quantforge.live.shadow import (
     VirtualExchange,
     VirtualFill,
     VirtualOrder,
+    default_replay_progress_store,
+)
+from quantforge.live.replay import (
+    HistoricalCandleReplayStream,
+    ReplayCursor,
+    ReplayEventFactory,
+    ReplayMode,
+    ReplayProgressStore,
+    ReplaySession,
+    ReplayStatus,
+    infer_replay_mode,
 )
 
 __all__ = [
@@ -109,6 +121,7 @@ __all__ = [
     "KnowledgeUpdater",
     "MonthlyPromotionReview",
     "PaperAccountSnapshot",
+    "PaperTradingReplayRunner",
     "PaperPortfolio",
     "PredictionAnalysis",
     "PredictionAnalyzer",
@@ -124,4 +137,13 @@ __all__ = [
     "VirtualExchange",
     "VirtualFill",
     "VirtualOrder",
+    "default_replay_progress_store",
+    "HistoricalCandleReplayStream",
+    "ReplayCursor",
+    "ReplayEventFactory",
+    "ReplayMode",
+    "ReplayProgressStore",
+    "ReplaySession",
+    "ReplayStatus",
+    "infer_replay_mode",
 ]

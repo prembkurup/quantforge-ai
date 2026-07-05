@@ -1,9 +1,19 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 from quantforge.live.engine import LiveTradingEngine, SignalAction, TradingSignal
+from quantforge.live.replay import (
+    HistoricalCandleReplayStream,
+    ReplayProgressStore,
+    ReplaySession,
+    ReplayStatus,
+    completed_session,
+    replay_cursor,
+)
 from quantforge.research.knowledge_base import ExperimentResultKnowledge, KnowledgeEngine, KnowledgeOutcome
+from quantforge.research.strategy_assets import StrategyAssetLoader, default_strategy_asset_repository
 
 
 class ShadowOrderType(StrEnum):
@@ -167,6 +177,7 @@ class ShadowTradingRunResult:
     dashboard: ShadowTradingDashboard
     knowledge_updates: int
     audit_trail: tuple[str, ...]
+    replay_cursor: Any | None = None
 
 
 class ShadowExecutionEngine:
@@ -183,7 +194,7 @@ class ShadowExecutionEngine:
                     action=signal.action,
                     instrument=signal.instrument,
                     units=signal.units,
-                    expected_price=1.10240,
+                    expected_price=signal.feature_vector.trend_strength + 1.0,
                     spread=signal.feature_vector.spread,
                     slippage=0.00002,
                     latency_ms=42,
@@ -216,7 +227,7 @@ class PaperPortfolio:
 
     def apply_fills(self, fills: tuple[VirtualFill, ...]) -> PaperAccountSnapshot:
         exposure = round(sum(fill.filled_units for fill in fills) / self.starting_balance, 4)
-        equity = self.starting_balance + 190.0 if fills else self.starting_balance
+        equity = self.starting_balance + round(len(fills) * 1.9, 2) if fills else self.starting_balance
         return PaperAccountSnapshot(
             account_id="PAPER-USD-0001",
             balance=self.starting_balance,
@@ -452,6 +463,135 @@ class ShadowTradingPlatform:
             knowledge_updates=knowledge_updates,
             audit_trail=audit_trail,
         )
+
+
+class PaperTradingReplayRunner:
+    def __init__(
+        self,
+        stream: HistoricalCandleReplayStream,
+        progress_store: ReplayProgressStore,
+        strategy_asset_loader: StrategyAssetLoader | None = None,
+    ) -> None:
+        self.stream = stream
+        self.progress_store = progress_store
+        self.strategy_asset_loader = strategy_asset_loader or StrategyAssetLoader(default_strategy_asset_repository())
+        self.live = LiveTradingEngine()
+        self.execution = ShadowExecutionEngine()
+        self.exchange = VirtualExchange()
+        self.portfolio = PaperPortfolio()
+        self.auditor = DecisionAuditor()
+        self.prediction = PredictionAnalyzer()
+        self.execution_analyzer = ExecutionAnalyzer()
+        self.drift = DriftAnalytics()
+        self.replay = TradeReplay()
+        self.validation = ContinuousValidationEngine()
+        self.promotion = PromotionEngine()
+        self.twin = DigitalTwin()
+        self.knowledge = KnowledgeUpdater()
+
+    def run(
+        self,
+        session: ReplaySession,
+        *,
+        strategy_asset_id: str,
+        days_observed: int = 60,
+    ) -> ShadowTradingRunResult:
+        cursor = replay_cursor(session, status=ReplayStatus.RUNNING)
+        self.progress_store.save(cursor)
+        try:
+            asset = self.strategy_asset_loader.load_strategy_asset(strategy_asset_id)
+            events = self.stream.events(session)
+            live_result = self.live.run(asset, events=events, demo=False)
+            paper_orders = self.execution.execute(live_result.signals)
+            fills = self.exchange.fill(paper_orders)
+            portfolio = self.portfolio.apply_fills(fills)
+            audits = self.auditor.audit(live_result.signals)
+            prediction = self.prediction.compare()
+            execution = _execution_analysis(self.execution_analyzer, paper_orders, fills)
+            drift = self.drift.evaluate()
+            replay = _replay_frames(self.replay, paper_orders, fills, audits)
+            daily_report = self.validation.daily(fills, drift, execution, portfolio)
+            monthly_review = self.promotion.review(days_observed, prediction, drift)
+            digital_twin = self.twin.compare(live_result.signals, live_result.signals)
+            knowledge_updates = self.knowledge.update(daily_report)
+            last_event_time = events[-1].timestamp.isoformat() if events else ""
+            cursor = replay_cursor(
+                completed_session(session),
+                current_candle_time=last_event_time,
+                processed_events=len(events),
+                generated_signals=len(live_result.signals),
+                paper_orders=len(paper_orders),
+                status=ReplayStatus.COMPLETE,
+            )
+            self.progress_store.save(cursor)
+            dashboard = ShadowTradingDashboard(
+                live_market=f"{','.join(session.pairs)} {','.join(session.timeframes)} replay",
+                paper_orders=len(paper_orders),
+                paper_equity=portfolio.equity,
+                expected_vs_actual="within_tolerance" if prediction.within_tolerance else "investigate",
+                strategy_drift=_drift_status(drift, DriftType.PREDICTION),
+                execution_drift=_drift_status(drift, DriftType.EXECUTION),
+                performance=f"paper_pf={prediction.paper_profit_factor}",
+                promotion_status=monthly_review.decision,
+            )
+            audit_trail = tuple(
+                f"{audit.signal_id}:{reason}"
+                for audit in audits
+                for reason in audit.reasons
+            ) + (
+                f"replay_events_processed:{len(events)}",
+                f"paper_orders:{len(paper_orders)}",
+                f"promotion_decision:{monthly_review.decision.value}",
+            )
+            return ShadowTradingRunResult(
+                live_market_received=bool(events),
+                signals_generated=len(live_result.signals),
+                paper_orders=paper_orders,
+                fills=fills,
+                paper_portfolio=portfolio,
+                decision_audits=audits,
+                prediction_analysis=prediction,
+                execution_analysis=execution,
+                drift_metrics=drift,
+                replay=replay,
+                daily_report=daily_report,
+                monthly_review=monthly_review,
+                digital_twin=digital_twin,
+                dashboard=dashboard,
+                knowledge_updates=knowledge_updates,
+                audit_trail=audit_trail,
+                replay_cursor=cursor,
+            )
+        except Exception as exc:
+            cursor = replay_cursor(session, status=ReplayStatus.FAILED, last_error=str(exc))
+            self.progress_store.save(cursor)
+            raise
+
+
+def default_replay_progress_store(repo_root: Path | None = None) -> ReplayProgressStore:
+    root = repo_root or Path(__file__).resolve().parents[3]
+    return ReplayProgressStore(root / "var" / "paper_replay_progress.json")
+
+
+def _execution_analysis(
+    analyzer: ExecutionAnalyzer,
+    orders: tuple[VirtualOrder, ...],
+    fills: tuple[VirtualFill, ...],
+) -> ExecutionAnalysis:
+    if orders and fills:
+        return analyzer.analyze(orders[0], fills[0])
+    return ExecutionAnalysis(0.0, 0.0, 0.0, 0.0, 0, 1.0, True)
+
+
+def _replay_frames(
+    replay: TradeReplay,
+    orders: tuple[VirtualOrder, ...],
+    fills: tuple[VirtualFill, ...],
+    audits: tuple[DecisionAudit, ...],
+) -> tuple[TradeReplayFrame, ...]:
+    if orders and fills and audits:
+        return replay.build(orders[0], fills[0], audits[0])
+    return ()
 
 
 def _drift_status(metrics: tuple[DriftMetric, ...], drift_type: DriftType) -> str:

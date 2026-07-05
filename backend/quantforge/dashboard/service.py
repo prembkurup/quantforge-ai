@@ -25,6 +25,7 @@ from quantforge.research.full_history_scheduler import (
 from quantforge.research.library import InstitutionalStrategyLibraryBuilder, StrategyLibraryAsset
 from quantforge.research.strategy_assets import StrategyAssetRepository, StrategyLibraryLoader
 from quantforge.research.workflow_orchestration import WorkflowOrchestrator, default_workflow_paths
+from quantforge.live import ReplayProgressStore
 
 
 class DashboardService:
@@ -687,6 +688,40 @@ class DashboardService:
             "timestamp": self._timestamp,
         }
 
+    def paper_replay_status(self) -> dict[str, Any]:
+        cursor = ReplayProgressStore(_paper_replay_progress_file()).load()
+        if cursor is None:
+            return {
+                "status": "NOT_STARTED",
+                "replay_id": "",
+                "pair": "",
+                "timeframe": "",
+                "current_candle_time": "",
+                "start_time": "",
+                "end_time": "",
+                "processed_events": 0,
+                "generated_signals": 0,
+                "paper_orders": 0,
+                "last_error": "",
+                "source": "ReplayProgressStore",
+                "timestamp": self._timestamp,
+            }
+        return {
+            "status": cursor.status.value,
+            "replay_id": cursor.replay_id,
+            "pair": cursor.pair,
+            "timeframe": cursor.timeframe,
+            "current_candle_time": cursor.current_candle_time,
+            "start_time": cursor.start_time,
+            "end_time": cursor.end_time,
+            "processed_events": cursor.processed_events,
+            "generated_signals": cursor.generated_signals,
+            "paper_orders": cursor.paper_orders,
+            "last_error": cursor.last_error,
+            "source": "ReplayProgressStore",
+            "timestamp": self._timestamp,
+        }
+
     def ops_health(self) -> dict[str, Any]:
         return {
             "platform_status": "HEALTHY",
@@ -827,6 +862,10 @@ def _admin_settings_file() -> Path:
 
 def _approved_strategy_assets_file() -> Path:
     return _repo_root() / "var" / "approved_strategy_assets.json"
+
+
+def _paper_replay_progress_file() -> Path:
+    return _repo_root() / "var" / "paper_replay_progress.json"
 
 
 def _repo_root() -> Path:

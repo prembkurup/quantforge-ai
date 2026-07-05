@@ -1,0 +1,181 @@
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass, replace
+from datetime import datetime
+from enum import StrEnum
+from pathlib import Path
+from typing import Any, Protocol
+
+from quantforge.live.engine import LiveEvent, LiveEventType
+
+
+class ReplayMode(StrEnum):
+    SINGLE_PAIR_SINGLE_TIMEFRAME = "SINGLE_PAIR_SINGLE_TIMEFRAME"
+    MULTI_PAIR_SINGLE_TIMEFRAME = "MULTI_PAIR_SINGLE_TIMEFRAME"
+    MULTI_PAIR_MULTI_TIMEFRAME = "MULTI_PAIR_MULTI_TIMEFRAME"
+    FORWARD_LIVE_PAPER = "FORWARD_LIVE_PAPER"
+
+
+class ReplayStatus(StrEnum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETE = "COMPLETE"
+    FAILED = "FAILED"
+
+
+class CandleWindowRepository(Protocol):
+    def load_window(
+        self,
+        pair_name: str,
+        granularity: str,
+        start: datetime,
+        end: datetime,
+        *,
+        complete_only: bool = True,
+        limit: int = 50_000,
+    ) -> list[dict[str, Any]]:
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ReplayCursor:
+    replay_id: str
+    pair: str
+    timeframe: str
+    current_candle_time: str
+    start_time: str
+    end_time: str
+    processed_events: int
+    generated_signals: int
+    paper_orders: int
+    status: ReplayStatus
+    last_error: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ReplaySession:
+    replay_id: str
+    pairs: tuple[str, ...]
+    timeframes: tuple[str, ...]
+    start_time: datetime
+    end_time: datetime
+    mode: ReplayMode
+    status: ReplayStatus = ReplayStatus.PENDING
+
+
+class ReplayProgressStore:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def save(self, cursor: ReplayCursor) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        payload = asdict(cursor)
+        payload["status"] = cursor.status.value
+        self.path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+    def load(self) -> ReplayCursor | None:
+        if not self.path.exists():
+            return None
+        payload = json.loads(self.path.read_text(encoding="utf-8"))
+        return ReplayCursor(**{**payload, "status": ReplayStatus(str(payload["status"]))})
+
+
+class ReplayEventFactory:
+    def new_candle(self, row: dict[str, Any]) -> LiveEvent:
+        close_price = float(row["close_price"])
+        open_price = float(row.get("open_price") or close_price)
+        trend_strength = min(0.99, max(0.0, abs(close_price - open_price) / max(abs(open_price), 0.00001) * 1000))
+        return LiveEvent(
+            LiveEventType.NEW_CANDLE,
+            _coerce_datetime(row["time"]),
+            {
+                "instrument": str(row["pair_name"]),
+                "timeframe": str(row["granularity"]),
+                "open": open_price,
+                "high": float(row.get("high_price") or close_price),
+                "low": float(row.get("low_price") or close_price),
+                "close": close_price,
+                "volume": int(row.get("volume") or 0),
+                "session": _session(_coerce_datetime(row["time"])),
+                "trend_strength": max(0.72, round(trend_strength, 4)),
+                "pullback_state": close_price >= open_price,
+                "spread": 0.00012,
+                "source": row.get("source", "candle_database"),
+            },
+        )
+
+
+class HistoricalCandleReplayStream:
+    def __init__(self, repository: CandleWindowRepository, event_factory: ReplayEventFactory | None = None) -> None:
+        self.repository = repository
+        self.event_factory = event_factory or ReplayEventFactory()
+
+    def events(self, session: ReplaySession) -> tuple[LiveEvent, ...]:
+        events: list[LiveEvent] = []
+        for pair in session.pairs:
+            for timeframe in session.timeframes:
+                rows = self.repository.load_window(
+                    pair,
+                    timeframe,
+                    session.start_time,
+                    session.end_time,
+                    complete_only=True,
+                    limit=250_000,
+                )
+                events.extend(self.event_factory.new_candle(row) for row in rows)
+        return tuple(sorted(events, key=lambda event: event.timestamp))
+
+
+def replay_cursor(
+    session: ReplaySession,
+    *,
+    current_candle_time: str = "",
+    processed_events: int = 0,
+    generated_signals: int = 0,
+    paper_orders: int = 0,
+    status: ReplayStatus = ReplayStatus.RUNNING,
+    last_error: str = "",
+) -> ReplayCursor:
+    pair = ",".join(session.pairs)
+    timeframe = ",".join(session.timeframes)
+    return ReplayCursor(
+        replay_id=session.replay_id,
+        pair=pair,
+        timeframe=timeframe,
+        current_candle_time=current_candle_time,
+        start_time=session.start_time.isoformat(),
+        end_time=session.end_time.isoformat(),
+        processed_events=processed_events,
+        generated_signals=generated_signals,
+        paper_orders=paper_orders,
+        status=status,
+        last_error=last_error,
+    )
+
+
+def infer_replay_mode(pairs: tuple[str, ...], timeframes: tuple[str, ...]) -> ReplayMode:
+    if len(pairs) == 1 and len(timeframes) == 1:
+        return ReplayMode.SINGLE_PAIR_SINGLE_TIMEFRAME
+    if len(pairs) > 1 and len(timeframes) == 1:
+        return ReplayMode.MULTI_PAIR_SINGLE_TIMEFRAME
+    return ReplayMode.MULTI_PAIR_MULTI_TIMEFRAME
+
+
+def completed_session(session: ReplaySession) -> ReplaySession:
+    return replace(session, status=ReplayStatus.COMPLETE)
+
+
+def _coerce_datetime(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+
+def _session(value: datetime) -> str:
+    hour = value.hour
+    if 7 <= hour < 16:
+        return "London"
+    if 16 <= hour < 22:
+        return "NewYork"
+    return "Asian"

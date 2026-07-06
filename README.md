@@ -204,6 +204,18 @@ Run the Live Trading Engine demo:
 .\.venv\Scripts\python .\scripts\live_trading.py
 ```
 
+Run the Version 2.0 intraday daily operations snapshot:
+
+```powershell
+.\.venv\Scripts\python .\scripts\intraday_daily_operations.py
+```
+
+Or use the Windows launcher:
+
+```powershell
+.\scripts\start_intraday_daily_operations.bat
+```
+
 Run the Production Engineering and SRE demo:
 
 ```powershell

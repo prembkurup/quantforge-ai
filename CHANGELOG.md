@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Added Version 2.0 / Milestone 23 Intraday Trading Framework design specification.
+- Extended Milestone 23 with intraday metrics, certification, portfolio construction, daily dashboard, reporting, learning loop, deliverables, and exit criteria.
 - Restored QuantForge AI repo-facing metadata and documented the intraday-only strategy policy.
 - Added Admin live trading master switch through `risk.live_trading_enabled`.
 - Connected the dashboard header to live platform health and live trading status.

@@ -109,6 +109,68 @@ class IntradayCertificationResult:
     reasons: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class IntradayPerformanceMetrics:
+    average_daily_profit: float
+    winning_days: int
+    losing_days: int
+    average_trades_per_day: float
+    average_trade_duration_minutes: float
+    profit_per_trading_hour: float
+    daily_expectancy: float
+
+
+@dataclass(frozen=True, slots=True)
+class IntradayRiskMetrics:
+    maximum_daily_drawdown: float
+    average_daily_drawdown: float
+    daily_risk_utilization: float
+
+
+@dataclass(frozen=True, slots=True)
+class IntradayOperationalMetrics:
+    average_daily_signals: float
+    average_daily_executions: float
+    average_daily_exposure: float
+    average_daily_slippage: float
+
+
+@dataclass(frozen=True, slots=True)
+class IntradayMetrics:
+    performance: IntradayPerformanceMetrics
+    risk: IntradayRiskMetrics
+    operational: IntradayOperationalMetrics
+
+
+@dataclass(frozen=True, slots=True)
+class DailyOperationsSnapshot:
+    current_session: IntradaySession
+    todays_pl: float
+    todays_trades: int
+    open_positions: int
+    remaining_daily_risk: float
+    daily_drawdown: float
+    session_portfolio: str
+    active_strategies: tuple[str, ...]
+    trading_status: IntradayTradingStatus
+    timestamp: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class DailyTradingReport:
+    report_id: str
+    trading_day: str
+    daily_performance: dict[str, Any]
+    strategy_performance: dict[str, Any]
+    session_performance: dict[str, Any]
+    risk_utilization: dict[str, Any]
+    trade_summary: dict[str, Any]
+    execution_summary: dict[str, Any]
+    drift_summary: dict[str, Any]
+    knowledge_updates: tuple[str, ...]
+    improvement_recommendations: tuple[str, ...]
+
+
 class SessionEngine:
     def current_session(self, timestamp: datetime) -> IntradaySession:
         hour = timestamp.astimezone(UTC).hour
@@ -272,6 +334,162 @@ class IntradayCertificationEngine:
         return IntradayCertificationResult(certified, "PASS" if certified else "FAIL", checks, tuple(reasons))
 
 
+class IntradayMetricsCalculator:
+    def calculate(
+        self,
+        daily_results: tuple[dict[str, Any], ...],
+        *,
+        daily_signals: tuple[int, ...] = (),
+        daily_executions: tuple[int, ...] = (),
+        daily_exposure: tuple[float, ...] = (),
+        daily_slippage: tuple[float, ...] = (),
+    ) -> IntradayMetrics:
+        profits = [float(item.get("profit", 0.0)) for item in daily_results]
+        trades = [int(item.get("trades", 0)) for item in daily_results]
+        durations = [float(item.get("average_trade_duration_minutes", 0.0)) for item in daily_results]
+        drawdowns = [float(item.get("drawdown", 0.0)) for item in daily_results]
+        trading_hours = [float(item.get("trading_hours", 0.0)) for item in daily_results]
+        return IntradayMetrics(
+            performance=IntradayPerformanceMetrics(
+                average_daily_profit=round(_avg(profits), 2),
+                winning_days=sum(1 for profit in profits if profit > 0),
+                losing_days=sum(1 for profit in profits if profit < 0),
+                average_trades_per_day=round(_avg(trades), 2),
+                average_trade_duration_minutes=round(_avg(durations), 2),
+                profit_per_trading_hour=round(sum(profits) / max(sum(trading_hours), 1.0), 2),
+                daily_expectancy=round(sum(profits) / max(sum(trades), 1), 2),
+            ),
+            risk=IntradayRiskMetrics(
+                maximum_daily_drawdown=round(max(drawdowns, default=0.0), 4),
+                average_daily_drawdown=round(_avg(drawdowns), 4),
+                daily_risk_utilization=round(max(drawdowns, default=0.0), 4),
+            ),
+            operational=IntradayOperationalMetrics(
+                average_daily_signals=round(_avg(daily_signals), 2),
+                average_daily_executions=round(_avg(daily_executions), 2),
+                average_daily_exposure=round(_avg(daily_exposure), 4),
+                average_daily_slippage=round(_avg(daily_slippage), 4),
+            ),
+        )
+
+
+class DailyOperationsDashboardBuilder:
+    def snapshot(
+        self,
+        profile: IntradayStrategyProfile,
+        risk_state: DailyRiskState,
+        portfolios: tuple[SessionPortfolio, ...],
+        timestamp: datetime,
+        *,
+        todays_pl: float = 0.0,
+        open_positions: int = 0,
+        risk_paused: bool = False,
+    ) -> DailyOperationsSnapshot:
+        session_engine = SessionEngine()
+        active_portfolio = SessionPortfolioManager().active_portfolio(portfolios, timestamp, session_engine)
+        status = session_engine.trading_status(timestamp, profile.force_close_time_utc, risk_paused=risk_paused)
+        remaining_daily_risk = max(profile.daily_risk_profile.max_daily_loss - risk_state.realized_daily_loss, 0.0)
+        return DailyOperationsSnapshot(
+            current_session=session_engine.current_session(timestamp),
+            todays_pl=round(todays_pl, 2),
+            todays_trades=risk_state.trades_today,
+            open_positions=open_positions,
+            remaining_daily_risk=round(remaining_daily_risk, 4),
+            daily_drawdown=risk_state.current_daily_drawdown,
+            session_portfolio=active_portfolio.session.value,
+            active_strategies=active_portfolio.strategy_asset_ids,
+            trading_status=status,
+            timestamp=timestamp.astimezone(UTC),
+        )
+
+
+class DailyReportGenerator:
+    def generate(
+        self,
+        snapshot: DailyOperationsSnapshot,
+        metrics: IntradayMetrics,
+        *,
+        strategy_performance: dict[str, Any] | None = None,
+        drift_summary: dict[str, Any] | None = None,
+    ) -> DailyTradingReport:
+        trading_day = snapshot.timestamp.date().isoformat()
+        return DailyTradingReport(
+            report_id=f"INTRADAY-DAILY-{trading_day}",
+            trading_day=trading_day,
+            daily_performance={
+                "todays_pl": snapshot.todays_pl,
+                "average_daily_profit": metrics.performance.average_daily_profit,
+                "daily_expectancy": metrics.performance.daily_expectancy,
+            },
+            strategy_performance=strategy_performance or {},
+            session_performance={
+                "current_session": snapshot.current_session.value,
+                "session_portfolio": snapshot.session_portfolio,
+                "active_strategies": list(snapshot.active_strategies),
+            },
+            risk_utilization={
+                "remaining_daily_risk": snapshot.remaining_daily_risk,
+                "daily_drawdown": snapshot.daily_drawdown,
+                "daily_risk_utilization": metrics.risk.daily_risk_utilization,
+            },
+            trade_summary={
+                "todays_trades": snapshot.todays_trades,
+                "open_positions": snapshot.open_positions,
+                "average_trade_duration_minutes": metrics.performance.average_trade_duration_minutes,
+            },
+            execution_summary={
+                "average_daily_executions": metrics.operational.average_daily_executions,
+                "average_daily_slippage": metrics.operational.average_daily_slippage,
+            },
+            drift_summary=drift_summary or {},
+            knowledge_updates=("daily_report_recorded", "intraday_metrics_available"),
+            improvement_recommendations=("Prioritize sessions with positive daily expectancy.",),
+        )
+
+
+class DailyLearningLoop:
+    def update_priorities(self, report: DailyTradingReport) -> dict[str, Any]:
+        expectancy = float(report.daily_performance.get("daily_expectancy", 0.0))
+        if expectancy <= 0:
+            priority = "Review intraday filters and reduce low-quality entries."
+        else:
+            priority = "Expand research around profitable session-compatible intraday setups."
+        return {
+            "knowledge_updates": report.knowledge_updates,
+            "research_priorities": (priority,),
+            "future_campaigns": ("intraday_session_portfolio_refinement",),
+        }
+
+
+def default_intraday_profile() -> IntradayStrategyProfile:
+    return IntradayStrategyProfile(
+        trading_style=TradingStyle.INTRADAY,
+        preferred_session=IntradaySession.LONDON,
+        allowed_sessions=(
+            IntradaySession.LONDON_OPEN,
+            IntradaySession.LONDON,
+            IntradaySession.LONDON_NEW_YORK_OVERLAP,
+            IntradaySession.NEW_YORK,
+        ),
+        blocked_sessions=(IntradaySession.ASIAN, IntradaySession.LATE_NEW_YORK),
+        maximum_trade_duration_minutes=180,
+        force_close_time_utc=time(21, 45),
+        earliest_entry_time_utc=time(7, 0),
+        latest_entry_time_utc=time(19, 30),
+        daily_risk_profile=DailyRiskProfile(
+            max_daily_loss=0.02,
+            max_daily_drawdown=0.03,
+            max_trades_per_day=12,
+            max_consecutive_losses=3,
+            max_daily_exposure=0.60,
+            max_strategy_allocation=0.20,
+            max_currency_exposure=0.35,
+        ),
+        intraday_score=0.94,
+        session_compatibility="PASS",
+    )
+
+
 def intraday_profile_from_strategy_definition(definition: dict[str, Any]) -> IntradayStrategyProfile | None:
     payload = definition.get("intraday_profile")
     if not isinstance(payload, dict):
@@ -313,3 +531,7 @@ def _utc_time(value: datetime) -> time:
 
 def _naive_time(value: time) -> time:
     return value.replace(tzinfo=None)
+
+
+def _avg(values: list[float] | tuple[float, ...] | tuple[int, ...]) -> float:
+    return sum(values) / len(values) if values else 0.0

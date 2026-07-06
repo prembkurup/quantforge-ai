@@ -5,8 +5,12 @@ from quantforge.live import (
     DailyRiskController,
     DailyRiskProfile,
     DailyRiskState,
+    DailyLearningLoop,
+    DailyOperationsDashboardBuilder,
+    DailyReportGenerator,
     ForcedCloseManager,
     IntradayCertificationEngine,
+    IntradayMetricsCalculator,
     IntradayPolicyEngine,
     IntradaySession,
     IntradayStrategyProfile,
@@ -162,3 +166,34 @@ def test_intraday_profile_can_be_loaded_from_strategy_definition() -> None:
     assert profile is not None
     assert profile.trading_style == TradingStyle.INTRADAY
     assert IntradaySession.LONDON_NEW_YORK_OVERLAP in profile.allowed_sessions
+
+
+def test_intraday_metrics_report_and_learning_loop_support_daily_operations() -> None:
+    profile = intraday_profile()
+    portfolios = SessionPortfolioManager().build({"QF-INTRADAY-1": profile})
+    snapshot = DailyOperationsDashboardBuilder().snapshot(
+        profile,
+        DailyRiskState(realized_daily_loss=0.004, current_daily_drawdown=0.006, trades_today=4),
+        portfolios,
+        datetime(2026, 7, 6, 12, 30, tzinfo=UTC),
+        todays_pl=420.50,
+        open_positions=1,
+    )
+    metrics = IntradayMetricsCalculator().calculate(
+        (
+            {"profit": 420.50, "trades": 4, "average_trade_duration_minutes": 64, "drawdown": 0.006, "trading_hours": 5.5},
+            {"profit": -95.10, "trades": 2, "average_trade_duration_minutes": 72, "drawdown": 0.012, "trading_hours": 3.5},
+        ),
+        daily_signals=(9, 5),
+        daily_executions=(4, 2),
+        daily_exposure=(0.18, 0.11),
+        daily_slippage=(0.2, 0.3),
+    )
+    report = DailyReportGenerator().generate(snapshot, metrics)
+    learning = DailyLearningLoop().update_priorities(report)
+
+    assert snapshot.trading_status == IntradayTradingStatus.ACTIVE
+    assert metrics.performance.winning_days == 1
+    assert metrics.risk.maximum_daily_drawdown == 0.012
+    assert report.report_id == "INTRADAY-DAILY-2026-07-06"
+    assert "intraday_session_portfolio_refinement" in learning["future_campaigns"]

@@ -50,7 +50,16 @@ from quantforge.research.orchestrator import (
 )
 from quantforge.research.strategy_assets import StrategyAssetRepository, StrategyLibraryLoader
 from quantforge.research.workflow_orchestration import WorkflowOrchestrator, default_workflow_paths
-from quantforge.live import ReplayProgressStore
+from quantforge.live import (
+    DailyLearningLoop,
+    DailyOperationsDashboardBuilder,
+    DailyReportGenerator,
+    DailyRiskState,
+    IntradayMetricsCalculator,
+    SessionPortfolioManager,
+    default_intraday_profile,
+    ReplayProgressStore,
+)
 
 
 class DashboardService:
@@ -600,6 +609,85 @@ class DashboardService:
 
     def engine_workload(self) -> list[dict[str, Any]]:
         return self._engine_workload_from(self.engine_status())
+
+    def intraday_daily(self) -> dict[str, Any]:
+        profile = default_intraday_profile()
+        timestamp = datetime.now(UTC)
+        portfolios = SessionPortfolioManager().build({"QF-INTRADAY-DEMO": profile})
+        risk_state = DailyRiskState(
+            realized_daily_loss=0.004,
+            current_daily_drawdown=0.006,
+            trades_today=4,
+            daily_exposure=0.18,
+            strategy_allocation=0.12,
+            currency_exposure=0.16,
+        )
+        snapshot = DailyOperationsDashboardBuilder().snapshot(
+            profile,
+            risk_state,
+            portfolios,
+            timestamp,
+            todays_pl=420.50,
+            open_positions=1,
+        )
+        metrics = IntradayMetricsCalculator().calculate(
+            (
+                {"profit": 420.50, "trades": 4, "average_trade_duration_minutes": 64, "drawdown": 0.006, "trading_hours": 5.5},
+                {"profit": 185.25, "trades": 3, "average_trade_duration_minutes": 58, "drawdown": 0.004, "trading_hours": 4.0},
+                {"profit": -95.10, "trades": 2, "average_trade_duration_minutes": 72, "drawdown": 0.012, "trading_hours": 3.5},
+            ),
+            daily_signals=(9, 7, 5),
+            daily_executions=(4, 3, 2),
+            daily_exposure=(0.18, 0.14, 0.11),
+            daily_slippage=(0.2, 0.1, 0.3),
+        )
+        report = DailyReportGenerator().generate(snapshot, metrics)
+        learning = DailyLearningLoop().update_priorities(report)
+        return {
+            "current_session": snapshot.current_session.value,
+            "todays_pl": snapshot.todays_pl,
+            "todays_trades": snapshot.todays_trades,
+            "open_positions": snapshot.open_positions,
+            "remaining_daily_risk": snapshot.remaining_daily_risk,
+            "daily_drawdown": snapshot.daily_drawdown,
+            "session_portfolio": snapshot.session_portfolio,
+            "active_strategies": list(snapshot.active_strategies),
+            "trading_status": snapshot.trading_status.value,
+            "metrics": {
+                "performance": {
+                    "average_daily_profit": metrics.performance.average_daily_profit,
+                    "winning_days": metrics.performance.winning_days,
+                    "losing_days": metrics.performance.losing_days,
+                    "average_trades_per_day": metrics.performance.average_trades_per_day,
+                    "average_trade_duration_minutes": metrics.performance.average_trade_duration_minutes,
+                    "profit_per_trading_hour": metrics.performance.profit_per_trading_hour,
+                    "daily_expectancy": metrics.performance.daily_expectancy,
+                },
+                "risk": {
+                    "maximum_daily_drawdown": metrics.risk.maximum_daily_drawdown,
+                    "average_daily_drawdown": metrics.risk.average_daily_drawdown,
+                    "daily_risk_utilization": metrics.risk.daily_risk_utilization,
+                },
+                "operational": {
+                    "average_daily_signals": metrics.operational.average_daily_signals,
+                    "average_daily_executions": metrics.operational.average_daily_executions,
+                    "average_daily_exposure": metrics.operational.average_daily_exposure,
+                    "average_daily_slippage": metrics.operational.average_daily_slippage,
+                },
+            },
+            "daily_report": {
+                "report_id": report.report_id,
+                "trading_day": report.trading_day,
+                "knowledge_updates": list(report.knowledge_updates),
+                "improvement_recommendations": list(report.improvement_recommendations),
+            },
+            "learning_loop": {
+                "knowledge_updates": list(learning["knowledge_updates"]),
+                "research_priorities": list(learning["research_priorities"]),
+                "future_campaigns": list(learning["future_campaigns"]),
+            },
+            "timestamp": snapshot.timestamp.isoformat(),
+        }
 
     def _engine_workload_from(self, engines: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [

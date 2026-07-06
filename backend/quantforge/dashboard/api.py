@@ -170,6 +170,10 @@ def create_app() -> FastAPI:
     def pipeline_engines() -> list[dict[str, Any]]:
         return service.engine_status()
 
+    @app.get("/api/intraday/daily")
+    def intraday_daily() -> dict[str, Any]:
+        return service.intraday_daily()
+
     @app.get("/api/pipeline/workload")
     def pipeline_workload() -> list[dict[str, Any]]:
         return service.engine_workload()

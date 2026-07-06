@@ -83,6 +83,32 @@ def test_pipeline_page_data_shows_tasks_engines_and_current_work() -> None:
     assert len(workload) == len(engines)
 
 
+def test_intraday_daily_endpoint_exposes_version_2_dashboard_status() -> None:
+    response = client.get("/api/intraday/daily")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["current_session"] in {
+        "Asian",
+        "London Open",
+        "London",
+        "London-New York Overlap",
+        "New York",
+        "Late New York",
+        "No Trading",
+    }
+    assert payload["trading_status"] in {
+        "ACTIVE",
+        "PAUSED (Risk Limit)",
+        "FINISHED (End Of Day)",
+        "NO TRADING",
+    }
+    assert "remaining_daily_risk" in payload
+    assert payload["metrics"]["performance"]["daily_expectancy"] != 0
+    assert payload["daily_report"]["report_id"].startswith("INTRADAY-DAILY-")
+    assert payload["learning_loop"]["future_campaigns"]
+
+
 def test_pipeline_snapshot_combines_page_payload_for_fast_loading() -> None:
     snapshot = client.get("/api/pipeline/snapshot").json()
 

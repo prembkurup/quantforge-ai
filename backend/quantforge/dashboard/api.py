@@ -314,6 +314,10 @@ def create_app() -> FastAPI:
     def portfolio_risk() -> dict[str, Any]:
         return service.portfolio_risk()
 
+    @app.get("/api/portfolio/intelligence")
+    def portfolio_intelligence() -> dict[str, Any]:
+        return service.portfolio_intelligence()
+
     @app.get("/api/paper/summary")
     def paper_summary() -> dict[str, Any]:
         return service.paper_summary()

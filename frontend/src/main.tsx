@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
-import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, GitBranch, HeartPulse, Library, LineChart, ListChecks, Menu, Save, ScrollText, Settings, ShieldCheck, Workflow as WorkflowIcon, X } from "lucide-react";
+import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, GitBranch, HeartPulse, Library, LineChart, ListChecks, Menu, PieChart, Save, ScrollText, Settings, ShieldCheck, Workflow as WorkflowIcon, X } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
 import "./styles.css";
@@ -75,6 +75,7 @@ function App() {
               <Route path="/strategies/:id" element={<StrategyDetail />} />
               <Route path="/indicators" element={<Indicators />} />
               <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/portfolio-intelligence" element={<PortfolioIntelligence />} />
               <Route path="/intraday" element={<IntradayDaily />} />
               <Route path="/decision-intelligence" element={<DecisionIntelligence />} />
               <Route path="/paper" element={<Paper />} />
@@ -103,6 +104,7 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     ["/strategies", "Strategies", Library],
     ["/indicators", "Indicators", BookOpen],
     ["/portfolio", "Portfolio", ShieldCheck],
+    ["/portfolio-intelligence", "Portfolio Intel", PieChart],
     ["/intraday", "Intraday", Activity],
     ["/decision-intelligence", "Decision Intel", Brain],
     ["/paper", "Paper", CandlestickChart],
@@ -640,6 +642,83 @@ function Portfolio() {
         <LinePanel title="Expected Drawdown" data={risk.expected_drawdown_curve} />
         <LinePanel title="Validation Equity Curve" data={risk.portfolio_equity_curve} />
       </div>
+    </Page>
+  );
+}
+
+function PortfolioIntelligence() {
+  const data = useApi<any>("/api/portfolio/intelligence");
+  if (!data) return <Loading />;
+  const health = data.health ?? {};
+  const kpis = data.kpis ?? {};
+  const allocation = data.allocation ?? {};
+  const drift = data.drift ?? {};
+  const stress = data.stress ?? {};
+  const review = data.daily_review ?? {};
+  const lifecycle = data.lifecycle ?? {};
+  const acceptance = data.acceptance ?? {};
+  const exposureRows = Object.entries(allocation.instrument_exposure ?? {}).map(([instrument, exposure]) => ({
+    instrument,
+    exposure,
+  }));
+  const familyRows = Object.entries(allocation.family_exposure ?? {}).map(([family, exposure]) => ({
+    family,
+    exposure,
+  }));
+  return (
+    <Page title="Portfolio Intelligence">
+      <ReadinessBanner value={String(health.status ?? "UNKNOWN")} source={String(data.source ?? "PortfolioIntelligenceEngine")} />
+      <div className="kpi-grid">
+        <KpiCard title="Health Score" value={`${health.score ?? 0}/100`} tone={health.status === "READY" ? "good" : "warn"} />
+        <KpiCard title="Allocation" value={allocation.approved ? "APPROVED" : "REBALANCE"} tone={allocation.approved ? "good" : "warn"} />
+        <KpiCard title="Acceptance" value={acceptance.accepted ? "PASS" : "FAIL"} tone={acceptance.accepted ? "good" : "warn"} />
+        <KpiCard title="Lifecycle" value={lifecycle.stage ?? "UNKNOWN"} />
+        <KpiCard title="Strategies" value={kpis.strategy_count ?? 0} />
+        <KpiCard title="Families" value={kpis.family_count ?? 0} />
+        <KpiCard title="Instruments" value={kpis.instrument_count ?? 0} />
+        <KpiCard title="Regimes" value={kpis.regime_count ?? 0} />
+        <KpiCard title="Expected PF" value={kpis.expected_profit_factor ?? 0} />
+        <KpiCard title="Expected DD" value={kpis.expected_drawdown ?? 0} tone={Number(kpis.expected_drawdown ?? 0) > 0.1 ? "warn" : "good"} />
+        <KpiCard title="Avg Correlation" value={data.correlation?.average_correlation ?? 0} />
+        <KpiCard title="Worst Stress DD" value={stress.worst_expected_drawdown ?? 0} tone={stress.passed ? "good" : "warn"} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Daily Review</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Review" value={review.review_id ?? "UNKNOWN"} />
+            <MiniFact label="Trading Day" value={review.trading_day ?? ""} />
+            <MiniFact label="Status" value={review.status ?? "UNKNOWN"} />
+            <MiniFact label="Watchlist" value={(review.watchlist ?? []).join(", ") || "None"} />
+          </div>
+        </section>
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Drift Detection</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Status" value={drift.status ?? "UNKNOWN"} />
+            <MiniFact label="Degraded" value={(drift.degraded_strategies ?? []).join(", ") || "None"} />
+            <MiniFact label="Reasons" value={(drift.reasons ?? []).join(", ") || "No drift detected"} />
+          </div>
+        </section>
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Lifecycle</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Portfolio" value={lifecycle.portfolio_id ?? data.portfolio_id} />
+            <MiniFact label="Stage" value={lifecycle.stage ?? "UNKNOWN"} />
+            <MiniFact label="Promotion Ready" value={lifecycle.promotion_ready ? "YES" : "NO"} />
+            <MiniFact label="Retirement" value={(lifecycle.retirement_candidates ?? []).join(", ") || "None"} />
+          </div>
+        </section>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <DataTable title="Instrument Exposure" rows={exposureRows as Row[]} />
+        <DataTable title="Family Exposure" rows={familyRows as Row[]} />
+      </div>
+      <JsonPanel title="Allocation Decision Trace" data={data.decision_trace ?? {}} />
+      <JsonPanel title="Stress Tests" data={stress} />
+      <JsonPanel title="Acceptance Criteria" data={acceptance} />
     </Page>
   );
 }

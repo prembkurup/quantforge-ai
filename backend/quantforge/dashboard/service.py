@@ -81,6 +81,8 @@ from quantforge.live import (
     TradeJournalStore,
     default_intraday_profile,
     default_trade_journal_path,
+    PortfolioIntelligenceEngine,
+    demo_portfolio_strategy_inputs,
     intraday_profile_from_strategy_definition,
     ReplayProgressStore,
 )
@@ -840,9 +842,10 @@ class DashboardService:
                 broker_healthy=True,
             )
         )
+        active_strategies = daily.get("active_strategies") or ["QF-INTRADAY-DEMO"]
         decision = IntradayTradeDecisionEngine().decide(
             instrument="EUR_USD",
-            strategy_asset_id=str(next(iter(daily.get("active_strategies", ["QF-INTRADAY-DEMO"])))),
+            strategy_asset_id=str(next(iter(active_strategies))),
             feature_vector_id=f"FV-{timestamp.strftime('%Y%m%d')}-INTRADAY",
             market_regime=readiness_inputs.market_regime,
             signal=IntradayTradeDecision.BUY,
@@ -1234,6 +1237,14 @@ class DashboardService:
             "max_strategy_allocation": 0.05,
             "max_pair_exposure": 0.22,
             "timestamp": self._timestamp,
+        }
+
+    def portfolio_intelligence(self) -> dict[str, Any]:
+        snapshot = PortfolioIntelligenceEngine().analyze(demo_portfolio_strategy_inputs())
+        return {
+            **snapshot.to_payload(),
+            "source": "PortfolioIntelligenceEngine",
+            "demo_mode": self._demo_mode,
         }
 
     def paper_summary(self) -> dict[str, Any]:

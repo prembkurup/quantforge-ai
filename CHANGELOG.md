@@ -14,6 +14,7 @@
 - Added the daily market readiness gate that scores pre-trade conditions from 0-100 before any new intraday trades are considered.
 - Added Milestone 24 Decision Intelligence Platform primitives, API, dashboard page, scripts, tests, and specification.
 - Extended Milestone 24 with dashboard decision fields, daily trading journal, decision timeline, and decision quality metrics.
+- Added Milestone 25 Portfolio Intelligence primitives, API, dashboard page, scripts, tests, and specification.
 - Restored QuantForge AI repo-facing metadata and documented the intraday-only strategy policy.
 - Added Admin live trading master switch through `risk.live_trading_enabled`.
 - Connected the dashboard header to live platform health and live trading status.

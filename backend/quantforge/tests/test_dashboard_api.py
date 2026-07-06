@@ -330,11 +330,19 @@ def test_history_validation_api_exposes_queue_results_and_improvements() -> None
 
 def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:
     assert client.get("/api/portfolio/readiness").json()["portfolio_readiness"] == "READY_FOR_PAPER_TRADING"
+    portfolio_intelligence = client.get("/api/portfolio/intelligence")
+    assert portfolio_intelligence.status_code == 200
+    payload = portfolio_intelligence.json()
+    assert payload["health"]["status"] == "READY"
+    assert payload["allocation"]["approved"] is True
+    assert payload["daily_review"]["review_id"].startswith("PORT-REVIEW-")
+    assert payload["acceptance"]["accepted"] is True
     assert client.get("/api/ops/health").json()["platform_status"] == "HEALTHY"
     assert client.get("/api/knowledge/summary").json()["knowledge_records"] == 795_000
     assert client.get("/api/paper/summary").json()["promotion_readiness"] == "PROMOTE"
     assert client.get("/api/paper/replay").json()["source"] == "ReplayProgressStore"
     assert client.post("/api/dashboard/overview").status_code == 405
+    assert client.post("/api/portfolio/intelligence").status_code == 405
 
 
 def test_process_logs_endpoint_is_paginated_and_filterable() -> None:

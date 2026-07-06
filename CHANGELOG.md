@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added Version 2.0 / Milestone 23 Intraday Trading Framework design specification.
+- Restored QuantForge AI repo-facing metadata and documented the intraday-only strategy policy.
 - Added Admin live trading master switch through `risk.live_trading_enabled`.
 - Connected the dashboard header to live platform health and live trading status.
 - Added 30-row pagination to Workflow Events.

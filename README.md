@@ -1,10 +1,8 @@
-# AutobotFX
+# QuantForge AI
 
 AI-powered quantitative Forex strategy discovery, validation, and automated trading platform.
 
-AutobotFX is designed around permanent raw market data, reproducible research, plugin-driven strategy discovery, and a separate live trading engine for OANDA execution.
-
-> Internal Python modules still use the `quantforge` package name while the app is published as AutobotFX.
+QuantForge AI is designed around permanent raw market data, reproducible research, plugin-driven strategy discovery, and a separate live trading engine for OANDA execution.
 
 ## Core Decisions
 
@@ -22,6 +20,8 @@ AutobotFX is designed around permanent raw market data, reproducible research, p
 
 ## Current App Status
 
+- Version 2.0 / Milestone 23 is now defined as the Intraday Trading Framework design specification.
+- Version 2.0 focuses on intraday-only strategies, daily capital rotation, no overnight exposure, session-aware portfolios, daily risk controls, and forced end-of-day exits.
 - Dashboard header now reads live platform health and live trading state from `GET /api/dashboard/overview`.
 - Admin includes a `risk.live_trading_enabled` master switch for controlled live trading.
 - Workflow shows the live gate reason, full-history workflow progress, tasks, and events.
@@ -90,8 +90,24 @@ docs/
   dashboard-mvp.md
   experiment-management-system.md
   data-model.md
+  milestone-23-intraday-trading-framework.md
   roadmap.md
 ```
+
+## Version 2.0 Direction
+
+Milestone 23 moves QuantForge AI toward an institutional intraday trading platform.
+
+Production strategy work must now align with the Intraday Trading Policy:
+
+- Trading style: intraday only
+- Overnight positions: not allowed
+- Weekend positions: not allowed
+- Force close: required
+- Daily risk limits: required
+- Session awareness: required
+
+The full Version 2.0 design specification is in `docs/milestone-23-intraday-trading-framework.md`.
 
 ## Near-Term Milestone
 
@@ -333,7 +349,7 @@ Start local services:
 docker compose up -d postgres redis
 ```
 
-Or point AutobotFX at an existing PostgreSQL server:
+Or point QuantForge AI at an existing PostgreSQL server:
 
 ```powershell
 Copy-Item .env.example .env

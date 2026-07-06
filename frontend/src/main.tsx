@@ -76,6 +76,7 @@ function App() {
               <Route path="/indicators" element={<Indicators />} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/portfolio-intelligence" element={<PortfolioIntelligence />} />
+              <Route path="/performance-learning" element={<PerformanceLearning />} />
               <Route path="/intraday" element={<IntradayDaily />} />
               <Route path="/decision-intelligence" element={<DecisionIntelligence />} />
               <Route path="/paper" element={<Paper />} />
@@ -105,6 +106,7 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     ["/indicators", "Indicators", BookOpen],
     ["/portfolio", "Portfolio", ShieldCheck],
     ["/portfolio-intelligence", "Portfolio Intel", PieChart],
+    ["/performance-learning", "Learning", Brain],
     ["/intraday", "Intraday", Activity],
     ["/decision-intelligence", "Decision Intel", Brain],
     ["/paper", "Paper", CandlestickChart],
@@ -719,6 +721,77 @@ function PortfolioIntelligence() {
       <JsonPanel title="Allocation Decision Trace" data={data.decision_trace ?? {}} />
       <JsonPanel title="Stress Tests" data={stress} />
       <JsonPanel title="Acceptance Criteria" data={acceptance} />
+    </Page>
+  );
+}
+
+function PerformanceLearning() {
+  const data = useApi<any>("/api/performance/learning");
+  if (!data) return <Loading />;
+  const attribution = data.attribution ?? {};
+  const learning = data.learning ?? {};
+  const quality = data.decision_quality ?? {};
+  const daily = data.daily_report ?? {};
+  const weekly = data.weekly_review ?? {};
+  const monthly = data.monthly_review ?? {};
+  return (
+    <Page title="Performance Learning">
+      <ReadinessBanner value="ADAPTIVE INTELLIGENCE" source={String(data.source ?? "PerformanceLearningEngine")} />
+      <div className="kpi-grid">
+        <KpiCard title="Total P/L" value={`$${number(attribution.total_profit_loss ?? 0)}`} tone={Number(attribution.total_profit_loss ?? 0) >= 0 ? "good" : "warn"} />
+        <KpiCard title="Knowledge Updates" value={learning.knowledge_records_written ?? 0} tone="good" />
+        <KpiCard title="Decision Accuracy" value={`${Math.round(Number(quality.decision_accuracy ?? 0) * 100)}%`} />
+        <KpiCard title="Opportunity Accuracy" value={`${Math.round(Number(quality.opportunity_accuracy ?? 0) * 100)}%`} />
+        <KpiCard title="Acceptance Quality" value={`${Math.round(Number(quality.trade_acceptance_quality ?? 0) * 100)}%`} />
+        <KpiCard title="Rejection Quality" value={`${Math.round(Number(quality.trade_rejection_quality ?? 0) * 100)}%`} />
+        <KpiCard title="Risk Quality" value={`${Math.round(Number(quality.risk_decision_quality ?? 0) * 100)}%`} />
+        <KpiCard title="Portfolio Quality" value={`${Math.round(Number(quality.portfolio_decision_quality ?? 0) * 100)}%`} />
+        <KpiCard title="Daily Report" value={daily.report_id ?? "UNKNOWN"} />
+        <KpiCard title="Weekly Review" value={weekly.review_id ?? "UNKNOWN"} />
+        <KpiCard title="Monthly Review" value={monthly.review_id ?? "UNKNOWN"} />
+        <KpiCard title="KB Maturity" value={`${Math.round(Number(monthly.knowledge_base_maturity ?? 0) * 100)}%`} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <DataTable title="Strategy Attribution" rows={(attribution.strategy ?? []) as Row[]} />
+        <DataTable title="Market Regime Attribution" rows={(attribution.market_regime ?? []) as Row[]} />
+        <DataTable title="Session Attribution" rows={(attribution.session ?? []) as Row[]} />
+        <DataTable title="Feature Attribution" rows={(attribution.feature ?? []) as Row[]} />
+        <DataTable title="Plugin Attribution" rows={(attribution.plugin ?? []) as Row[]} />
+        <DataTable title="Portfolio Attribution" rows={(attribution.portfolio_allocation ?? []) as Row[]} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Research Priorities</div>
+          <div className="pipeline-detail-grid">
+            {(data.research_priorities ?? []).map((priority: any) => (
+              <MiniFact key={priority.priority_id} label={priority.theme} value={priority.action} />
+            ))}
+          </div>
+        </section>
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Strategy Evolution</div>
+          <div className="pipeline-detail-grid">
+            {(data.strategy_evolution ?? []).slice(0, 6).map((item: any) => (
+              <MiniFact key={item.strategy_id} label={item.strategy_id} value={item.action} />
+            ))}
+          </div>
+        </section>
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Portfolio Evolution</div>
+          <div className="pipeline-detail-grid">
+            {(data.portfolio_evolution ?? []).map((item: any) => (
+              <MiniFact key={item.decision_id} label={item.decision_id} value={item.action} />
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <JsonPanel title="Daily Learning Report" data={daily} />
+      <JsonPanel title="Weekly Research Review" data={weekly} />
+      <JsonPanel title="Monthly Intelligence Review" data={monthly} />
+      <JsonPanel title="Hypothesis Confidence" data={learning.hypothesis_confidence ?? {}} />
     </Page>
   );
 }

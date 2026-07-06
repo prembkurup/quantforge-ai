@@ -27,6 +27,7 @@ QuantForge AI is designed around permanent raw market data, reproducible researc
 - Milestone 24 adds Decision Intelligence through `GET /api/intraday/decision-intelligence`, separating signal generation from the final decision to trade.
 - Decision Intelligence now exposes the dashboard decision timeline, daily trading journal, and decision quality metrics for evaluating trades avoided as well as trades executed.
 - Milestone 25 adds Portfolio Intelligence through `GET /api/portfolio/intelligence`, scoring portfolio health, allocation, drift, stress, lifecycle, and daily review state.
+- Milestone 26 adds Performance Attribution and Continuous Learning through `GET /api/performance/learning`, explaining strategy, regime, session, feature, plugin, risk, and portfolio contribution while generating research priorities.
 - Forced end-of-day closes now create execution receipts and Trade Journal evidence.
 - Dashboard header now reads live platform health and live trading state from `GET /api/dashboard/overview`.
 - Admin includes a `risk.live_trading_enabled` master switch for controlled live trading.
@@ -99,6 +100,7 @@ docs/
   milestone-23-intraday-trading-framework.md
   milestone-24-intraday-decision-intelligence-platform.md
   milestone-25-portfolio-intelligence-platform.md
+  milestone-26-performance-attribution-continuous-learning-platform.md
   roadmap.md
 ```
 
@@ -120,6 +122,8 @@ The full Version 2.0 design specification is in `docs/milestone-23-intraday-trad
 The Milestone 24 Decision Intelligence specification is in `docs/milestone-24-intraday-decision-intelligence-platform.md`.
 
 The Milestone 25 Portfolio Intelligence specification is in `docs/milestone-25-portfolio-intelligence-platform.md`.
+
+The Milestone 26 Performance Attribution and Continuous Learning specification is in `docs/milestone-26-performance-attribution-continuous-learning-platform.md`.
 
 ## Near-Term Milestone
 
@@ -244,6 +248,12 @@ Run the Milestone 25 Portfolio Intelligence snapshot:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\portfolio_intelligence.py
+```
+
+Run the Milestone 26 Performance Attribution and Continuous Learning snapshot:
+
+```powershell
+.\.venv\Scripts\python .\scripts\performance_learning.py
 ```
 
 Run start-of-day or end-of-day intraday automation:

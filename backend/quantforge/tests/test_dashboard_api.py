@@ -345,6 +345,23 @@ def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:
     assert client.post("/api/portfolio/intelligence").status_code == 405
 
 
+def test_performance_learning_endpoint_exposes_milestone_26_layers() -> None:
+    response = client.get("/api/performance/learning")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["attribution"]["total_profit_loss"] == 1900.0
+    assert payload["learning"]["knowledge_updates"]
+    assert payload["research_priorities"]
+    assert payload["strategy_evolution"]
+    assert payload["portfolio_evolution"]
+    assert payload["decision_quality"]["decision_accuracy"] >= 0
+    assert payload["daily_report"]["report_id"].startswith("LEARNING-DAILY-")
+    assert payload["weekly_review"]["review_id"].startswith("LEARNING-WEEK-")
+    assert payload["monthly_review"]["review_id"].startswith("INTEL-MONTH-")
+    assert client.post("/api/performance/learning").status_code == 405
+
+
 def test_process_logs_endpoint_is_paginated_and_filterable() -> None:
     response = client.get("/api/logs?page=1&page_size=30")
 

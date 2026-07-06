@@ -82,7 +82,10 @@ from quantforge.live import (
     default_intraday_profile,
     default_trade_journal_path,
     PortfolioIntelligenceEngine,
+    PerformanceLearningEngine,
     demo_portfolio_strategy_inputs,
+    demo_portfolio_decision_inputs,
+    demo_trade_performance_inputs,
     intraday_profile_from_strategy_definition,
     ReplayProgressStore,
 )
@@ -1244,6 +1247,17 @@ class DashboardService:
         return {
             **snapshot.to_payload(),
             "source": "PortfolioIntelligenceEngine",
+            "demo_mode": self._demo_mode,
+        }
+
+    def performance_learning(self) -> dict[str, Any]:
+        snapshot = PerformanceLearningEngine().analyze(
+            demo_trade_performance_inputs(),
+            demo_portfolio_decision_inputs(),
+        )
+        return {
+            **snapshot.to_payload(),
+            "source": "PerformanceLearningEngine",
             "demo_mode": self._demo_mode,
         }
 

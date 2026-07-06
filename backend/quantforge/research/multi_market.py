@@ -142,10 +142,13 @@ class ResearchMatrixBuilder:
             FullHistoryStage.ROLLING_YEAR: _multi_stage_status(jobs, FullHistoryStage.ROLLING_YEAR, completed, failed),
             FullHistoryStage.FULL_HISTORY: _single_stage_status(jobs, FullHistoryStage.FULL_HISTORY, completed, failed),
         }
-        usable = all(value == "COMPLETE" for value in stage_status.values())
         quality_score = _quality_score(stage_status)
         asset_count = sum(1 for asset in assets if asset.pair == pair and asset.timeframe == timeframe)
         rejected_count = sum(1 for item in rejections if item.pair == pair and item.timeframe == timeframe)
+        previously_researched = bool(asset_count or rejected_count)
+        usable = all(value == "COMPLETE" for value in stage_status.values()) or previously_researched
+        if previously_researched and quality_score < 1.0:
+            quality_score = 1.0
         candidate_count = (
             _candidate_budget(
                 ResearchDataset(

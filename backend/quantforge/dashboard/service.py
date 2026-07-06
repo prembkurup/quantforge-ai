@@ -29,6 +29,11 @@ from quantforge.research.full_history_summary import (
     FullHistoryResearchSummaryRepository,
     FullHistorySummaryCache,
 )
+from quantforge.research.history_validation import (
+    HistoricalValidationEngine,
+    default_historical_validation_paths,
+    historical_validation_config_from_env,
+)
 from quantforge.research.library import InstitutionalStrategyLibraryBuilder, StrategyLibraryAsset
 from quantforge.research.multi_market import (
     MultiMarketResearchPlanner,
@@ -37,6 +42,11 @@ from quantforge.research.multi_market import (
     default_rejected_strategy_repository,
     diversity_report,
     productivity_rows,
+)
+from quantforge.research.orchestrator import (
+    AlwaysOnAutonomousResearchOrchestrator,
+    AlwaysOnResearchThresholds,
+    default_always_on_orchestrator_paths,
 )
 from quantforge.research.strategy_assets import StrategyAssetRepository, StrategyLibraryLoader
 from quantforge.research.workflow_orchestration import WorkflowOrchestrator, default_workflow_paths
@@ -60,13 +70,14 @@ class DashboardService:
 
     def overview(self) -> dict[str, Any]:
         kpis = self._library.kpis
+        live = _live_trading_admin_state()
         return {
             "platform_status": "HEALTHY",
             "research_status": self._library.dashboard.status.value,
             "architecture_freeze": "VERSION_1_STABLE",
             "portfolio_readiness": self._library.dashboard.portfolio_readiness,
             "paper_trading_status": "READY_FOR_WORKSTREAM_2",
-            "live_trading_status": "DISABLED",
+            "live_trading_status": live["status"],
             "experiments": kpis.experiments_executed,
             "candidate_strategies": kpis.candidate_strategies,
             "optimized_strategies": kpis.optimized_strategies,
@@ -205,6 +216,63 @@ class DashboardService:
 
     def research_productivity(self) -> list[dict[str, Any]]:
         return productivity_rows(self._research_matrix_rows())
+
+    def research_orchestrator_status(self) -> dict[str, Any]:
+        return self._always_on_research_orchestrator().current_status()
+
+    def research_orchestrator_runs(self) -> list[dict[str, Any]]:
+        return self._always_on_research_orchestrator().runs()
+
+    def research_orchestrator_idle_reasons(self) -> list[dict[str, Any]]:
+        return self._always_on_research_orchestrator().idle_reasons()
+
+    def research_orchestrator_idle_reason(self) -> dict[str, Any]:
+        return self._always_on_research_orchestrator().latest_idle_reason()
+
+    def research_orchestrator_guardrails(self) -> list[dict[str, Any]]:
+        return self._always_on_research_orchestrator().guardrails()
+
+    def wake_research_orchestrator(self) -> dict[str, Any]:
+        record = self._always_on_research_orchestrator().run_once(trigger="manual_wake")
+        payload = asdict(record)
+        payload["state"] = record.state.value
+        return payload
+
+    def stop_research_orchestrator(self) -> dict[str, Any]:
+        return self._always_on_research_orchestrator().stop()
+
+    def start_research_orchestrator(self) -> dict[str, Any]:
+        return self._always_on_research_orchestrator().start()
+
+    def fine_tuning_status(self) -> dict[str, Any]:
+        return self._always_on_research_orchestrator().fine_tuning_status()
+
+    def history_validation_status(self) -> dict[str, Any]:
+        return self._history_validation_engine().status()
+
+    def history_validation_balance_sheet(self) -> dict[str, Any]:
+        return self._history_validation_engine().balance_sheet()
+
+    def history_validation_queue(self) -> list[dict[str, Any]]:
+        return self._history_validation_engine().queue()
+
+    def history_validation_running(self) -> list[dict[str, Any]]:
+        return self._history_validation_engine().running()
+
+    def history_validation_results(self) -> list[dict[str, Any]]:
+        return self._history_validation_engine().results()
+
+    def history_validation_result(self, validation_id: str) -> dict[str, Any]:
+        return self._history_validation_engine().result(validation_id)
+
+    def history_validation_improvements(self) -> list[dict[str, Any]]:
+        return self._history_validation_engine().improvements()
+
+    def history_validation_spreads(self) -> list[dict[str, Any]]:
+        return self._history_validation_engine().spread_profile()
+
+    def run_history_validation_batch(self) -> dict[str, Any]:
+        return self._history_validation_engine().run_next_batch()
 
     def pipeline_summary(self) -> dict[str, Any]:
         tasks = self.pipeline_tasks()
@@ -497,6 +565,7 @@ class DashboardService:
     def engine_status(self, full_history: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         full_history = full_history or self.full_history_scheduler_status()
         pipeline_done = _full_history_pipeline_done(full_history)
+        live = _live_trading_admin_state()
         if pipeline_done:
             return [
                 _engine("Market Data Engine", "IDLE", "HEALTHY", 0, 0, "Full-history candle windows complete"),
@@ -510,7 +579,7 @@ class DashboardService:
                 _engine("Strategy Validation Engine", "IDLE", "HEALTHY", 0, 0, "Validation batches complete"),
                 _engine("Portfolio Engine", "IDLE", "HEALTHY", 0, 0, "Portfolio readiness available"),
                 _engine("Shadow Trading Engine", "IDLE", "HEALTHY", 0, 0, "Paper trading review available"),
-                _engine("Live Trading Engine", "DISABLED", "SAFE", 0, 0, "Live execution intentionally disabled"),
+                _engine("Live Trading Engine", live["engine_status"], live["health"], 0, 0, live["message"]),
                 _engine("Operations Manager", "RUNNING", "HEALTHY", 18, 0, "Monitoring services and workload"),
             ]
         return [
@@ -525,7 +594,7 @@ class DashboardService:
             _engine("Strategy Validation Engine", "RUNNING", "HEALTHY", 72, 1, "Walk-forward and robustness gates active"),
             _engine("Portfolio Engine", "QUEUED", "HEALTHY", 0, 1, "Waiting for validation output"),
             _engine("Shadow Trading Engine", "QUEUED", "HEALTHY", 0, 1, "Waiting for portfolio update"),
-            _engine("Live Trading Engine", "DISABLED", "SAFE", 0, 0, "Live execution intentionally disabled"),
+            _engine("Live Trading Engine", live["engine_status"], live["health"], 0, 0, live["message"]),
             _engine("Operations Manager", "RUNNING", "HEALTHY", 18, 0, "Monitoring services and workload"),
         ]
 
@@ -1007,6 +1076,22 @@ class DashboardService:
     def _research_matrix_rows(self):
         return self._research_matrix_builder().rows()
 
+    def _always_on_research_orchestrator(self) -> AlwaysOnAutonomousResearchOrchestrator:
+        state_file = _full_history_state_file()
+        return AlwaysOnAutonomousResearchOrchestrator(
+            planned_jobs=_planned_full_history_jobs(state_file),
+            full_history_state_file=state_file,
+            paths=default_always_on_orchestrator_paths(_repo_root()),
+            thresholds=_research_orchestrator_thresholds(),
+        )
+
+    def _history_validation_engine(self) -> HistoricalValidationEngine:
+        return HistoricalValidationEngine(
+            asset_repository=self._strategy_asset_repository,
+            paths=default_historical_validation_paths(_repo_root()),
+            config=historical_validation_config_from_env(),
+        )
+
     def _find_strategy(self, strategy_id: str) -> StrategyLibraryAsset:
         for asset in self._library.production_grade_strategies:
             if asset.asset_id == strategy_id:
@@ -1038,6 +1123,32 @@ def _approval_service() -> ApprovalService:
 
 def _admin_settings_file() -> Path:
     return _repo_root() / "var" / "admin_settings.json"
+
+
+def _live_trading_admin_state() -> dict[str, str]:
+    admin_file = _admin_settings_file()
+    enabled = bool(admin_setting_value(admin_file, "risk.live_trading_enabled", False))
+    blocked = bool(admin_setting_value(admin_file, "workflow.live_trading_blocked_by_policy", True))
+    if enabled and not blocked:
+        return {
+            "status": "ENABLED",
+            "engine_status": "ENABLED",
+            "health": "WATCH",
+            "message": "Live trading enabled from Admin; execution remains subject to broker credentials and risk checks",
+        }
+    if enabled and blocked:
+        return {
+            "status": "BLOCKED_BY_POLICY",
+            "engine_status": "BLOCKED",
+            "health": "SAFE",
+            "message": "Live trading switch is enabled, but policy block is still active",
+        }
+    return {
+        "status": "DISABLED",
+        "engine_status": "DISABLED",
+        "health": "SAFE",
+        "message": "Live execution disabled from Admin",
+    }
 
 
 def _approved_strategy_assets_file() -> Path:
@@ -1080,6 +1191,24 @@ def _full_history_config() -> FullHistorySchedulerConfig:
         rolling_max_batches=int(admin_setting_value(admin_file, "full_history.rolling_max_batches", 25)),
         full_history_max_batches=int(admin_setting_value(admin_file, "full_history.full_history_max_batches", 100)),
     )
+
+
+def _research_orchestrator_thresholds() -> AlwaysOnResearchThresholds:
+    return AlwaysOnResearchThresholds(
+        min_assets_per_program=_env_int("RESEARCH_ORCHESTRATOR_MIN_ASSETS_PER_PROGRAM", 1),
+        stale_after_hours=_env_int("RESEARCH_ORCHESTRATOR_STALE_AFTER_HOURS", 6),
+        force_rerun_after_hours=_env_int("RESEARCH_ORCHESTRATOR_FORCE_RERUN_AFTER_HOURS", 24),
+        max_jobs_per_pass=_env_int("RESEARCH_ORCHESTRATOR_MAX_JOBS_PER_CYCLE", 12),
+        schedule_seconds=_env_int("RESEARCH_ORCHESTRATOR_INTERVAL_SECONDS", 900),
+        max_jobs_in_flight=_env_int("RESEARCH_ORCHESTRATOR_MAX_IN_FLIGHT", 24),
+    )
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
 
 
 def _build_full_history_research_summary(status: dict[str, Any], timestamp: str) -> dict[str, Any]:

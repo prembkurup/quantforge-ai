@@ -5,12 +5,20 @@ from quantforge.research import (
     build_demo_knowledge_engine,
 )
 from quantforge.research.orchestrator import (
+    AlwaysOnAutonomousResearchOrchestrator,
+    AlwaysOnOrchestratorPaths,
+    AlwaysOnResearchState,
+    AlwaysOnResearchThresholds,
+    IdleReasonCode,
     OrchestrationDecision,
     ResearchContext,
     ResearchJobType,
     ResearchOrchestrationRequest,
     ResearchOrchestrator,
 )
+from quantforge.research.full_history_scheduler import FullHistoryResearchScheduler, FullHistorySchedulerConfig
+from datetime import UTC, datetime
+import json
 
 
 def test_orchestrator_builds_knowledge_guided_research_plan() -> None:
@@ -126,3 +134,158 @@ def test_orchestrator_schedules_full_research_loop() -> None:
     assert "ema_pullback" in run.templates.selected_plugins
     assert run.parameters.narrowed_by_knowledge["ema_fast"].startswith("Knowledge-guided")
     assert run.jobs[-1].job_type == ResearchJobType.KNOWLEDGE_UPDATE
+
+
+def test_always_on_orchestrator_records_idle_reason_when_coverage_is_healthy(tmp_path) -> None:
+    state_file, planned = _completed_full_history_plan(tmp_path)
+    orchestrator = AlwaysOnAutonomousResearchOrchestrator(
+        planned_jobs=planned,
+        full_history_state_file=state_file,
+        paths=_always_on_paths(tmp_path),
+        thresholds=AlwaysOnResearchThresholds(min_assets_per_program=0, target_families=0, target_regimes=0),
+    )
+
+    record = orchestrator.run_once(trigger="test")
+    status = orchestrator.current_status()
+
+    assert record.state == AlwaysOnResearchState.IDLE
+    assert record.idle_reason_code == IdleReasonCode.NO_WEAK_COVERAGE.value
+    assert status["idle_reason"]["message"]
+    assert orchestrator.idle_reasons()[0]["reason_code"] == "NO_WEAK_COVERAGE"
+
+
+def test_always_on_orchestrator_launches_research_for_weak_programs(tmp_path) -> None:
+    state_file, planned = _completed_full_history_plan(tmp_path)
+    launched: list[str] = []
+
+    def runner(programs) -> None:
+        launched.extend(program.program_id for program in programs)
+
+    orchestrator = AlwaysOnAutonomousResearchOrchestrator(
+        planned_jobs=planned,
+        full_history_state_file=state_file,
+        paths=_always_on_paths(tmp_path),
+        thresholds=AlwaysOnResearchThresholds(max_jobs_per_pass=1),
+        research_runner=runner,
+    )
+
+    record = orchestrator.run_once(trigger="test")
+    status = orchestrator.current_status()
+
+    assert record.jobs_launched == 1
+    assert launched == ["RP-EUR_USD-H1"]
+    assert status["state"] == "WAITING_FOR_SCHEDULE"
+    assert status["idle_reason"]["reason_code"] == "WAITING_FOR_SCHEDULE"
+
+
+def test_orchestrator_respects_max_jobs_per_cycle(tmp_path) -> None:
+    state_file, planned = _completed_full_history_plan(tmp_path, pairs=("EUR_USD", "GBP_USD"), timeframes=("H1", "M15"))
+    launched: list[str] = []
+
+    def runner(programs) -> None:
+        launched.extend(program.program_id for program in programs)
+
+    orchestrator = AlwaysOnAutonomousResearchOrchestrator(
+        planned_jobs=planned,
+        full_history_state_file=state_file,
+        paths=_always_on_paths(tmp_path),
+        thresholds=AlwaysOnResearchThresholds(max_jobs_per_pass=2),
+        research_runner=runner,
+    )
+
+    record = orchestrator.run_once(trigger="test")
+
+    assert record.jobs_launched == 2
+    assert len(launched) == 2
+
+
+def test_orchestrator_blocks_when_max_in_flight(tmp_path) -> None:
+    state_file, planned = _completed_full_history_plan(tmp_path)
+    paths = _always_on_paths(tmp_path)
+    paths.status_file.write_text(json.dumps({"enabled": True, "jobs_in_flight": 24}))
+    orchestrator = AlwaysOnAutonomousResearchOrchestrator(
+        planned_jobs=planned,
+        full_history_state_file=state_file,
+        paths=paths,
+        thresholds=AlwaysOnResearchThresholds(max_jobs_in_flight=24),
+    )
+
+    record = orchestrator.run_once(trigger="test")
+
+    assert record.state == AlwaysOnResearchState.BLOCKED
+    assert record.idle_reason_code == IdleReasonCode.MAX_JOBS_IN_FLIGHT.value
+    assert orchestrator.guardrails()[0]["reason_code"] == "MAX_JOBS_IN_FLIGHT"
+
+
+def test_orchestrator_stop_disables_loop(tmp_path) -> None:
+    state_file, planned = _completed_full_history_plan(tmp_path)
+    orchestrator = AlwaysOnAutonomousResearchOrchestrator(
+        planned_jobs=planned,
+        full_history_state_file=state_file,
+        paths=_always_on_paths(tmp_path),
+    )
+
+    orchestrator.stop()
+    record = orchestrator.run_once(trigger="test")
+
+    assert record.state == AlwaysOnResearchState.STOPPED
+    assert orchestrator.current_status()["enabled"] is False
+
+
+def test_always_on_orchestrator_explains_no_usable_datasets(tmp_path) -> None:
+    state_file, planned = _pending_full_history_plan(tmp_path)
+    orchestrator = AlwaysOnAutonomousResearchOrchestrator(
+        planned_jobs=planned,
+        full_history_state_file=state_file,
+        paths=_always_on_paths(tmp_path),
+    )
+
+    record = orchestrator.run_once(trigger="test")
+
+    assert record.jobs_launched == 0
+    assert record.idle_reason_code == IdleReasonCode.NO_USABLE_DATASETS.value
+
+
+def _completed_full_history_plan(tmp_path, pairs=("EUR_USD",), timeframes=("H1",)):
+    state_file = tmp_path / "full_history.json"
+    scheduler = FullHistoryResearchScheduler(
+        FullHistorySchedulerConfig(
+            pairs=pairs,
+            timeframes=timeframes,
+            start=datetime(2024, 1, 1, tzinfo=UTC),
+            end=datetime(2025, 1, 1, tzinfo=UTC),
+            rolling_years=1,
+        ),
+        state_file,
+        repository_factory=lambda: None,  # type: ignore[arg-type]
+    )
+    planned = scheduler.plan()
+    state_file.write_text(json.dumps({"completed": [job.job_id for job in planned], "failed": []}))
+    return state_file, planned
+
+
+def _pending_full_history_plan(tmp_path):
+    state_file = tmp_path / "full_history.json"
+    scheduler = FullHistoryResearchScheduler(
+        FullHistorySchedulerConfig(
+            pairs=("EUR_USD",),
+            timeframes=("H1",),
+            start=datetime(2024, 1, 1, tzinfo=UTC),
+            end=datetime(2025, 1, 1, tzinfo=UTC),
+            rolling_years=1,
+        ),
+        state_file,
+        repository_factory=lambda: None,  # type: ignore[arg-type]
+    )
+    planned = scheduler.plan()
+    state_file.write_text(json.dumps({"completed": [], "failed": []}))
+    return state_file, planned
+
+
+def _always_on_paths(tmp_path) -> AlwaysOnOrchestratorPaths:
+    return AlwaysOnOrchestratorPaths(
+        status_file=tmp_path / "research_orchestrator_status.json",
+        runs_file=tmp_path / "research_orchestrator_runs.json",
+        idle_reasons_file=tmp_path / "research_orchestrator_idle_reasons.json",
+        guardrails_file=tmp_path / "research_orchestrator_guardrails.json",
+    )

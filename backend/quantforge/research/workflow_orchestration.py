@@ -15,6 +15,7 @@ from quantforge.research.approvals import (
     ApprovalStatus,
     ApprovalType,
 )
+from quantforge.admin.settings import admin_setting_value
 from quantforge.research.full_history_scheduler import (
     FULL_HISTORY_MAX_RETRIES,
     FULL_HISTORY_RETRY_DELAY_SECONDS,
@@ -76,6 +77,7 @@ class WorkflowPaths:
     full_history_state_file: Path
     post_pipeline_state_file: Path
     approval_file: Path
+    admin_settings_file: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,13 +134,19 @@ class WorkflowRetryManager:
 
 
 class WorkflowApprovalGate:
-    def __init__(self, approval_file: Path) -> None:
+    def __init__(self, approval_file: Path, admin_settings_file: Path | None = None) -> None:
         self.approval_file = approval_file
+        self.admin_settings_file = admin_settings_file
         self.repository = ApprovalRepository(approval_file)
 
     def approval(self, workflow_id: str, *, certification_complete: bool) -> WorkflowApproval:
         requested_at = _now() if certification_complete else ""
         status = ApprovalStatus.WAITING.value if certification_complete else ApprovalStatus.NOT_REQUIRED.value
+        reason = (
+            "Waiting for production certification before Admin live switch can open gate."
+            if not certification_complete and self._admin_live_trading_enabled()
+            else "Manual approval required before live trading."
+        )
         approval = WorkflowApproval(
             approval_id=f"APPROVAL-{workflow_id}",
             workflow_id=workflow_id,
@@ -147,24 +155,46 @@ class WorkflowApprovalGate:
             requested_at=requested_at,
             requested_by="workflow_orchestrator",
             status=status,
+            reason=reason,
         )
         stored = self.repository.load()
         if stored and stored.workflow_id == workflow_id:
+            if certification_complete and self._admin_live_trading_enabled() and stored.status == ApprovalStatus.WAITING.value:
+                approved = ApprovalRecord(
+                    approval_id=stored.approval_id,
+                    workflow_id=stored.workflow_id,
+                    approval_type=stored.approval_type,
+                    stage=stored.stage,
+                    requested_at=stored.requested_at,
+                    requested_by=stored.requested_by,
+                    status=ApprovalStatus.APPROVED.value,
+                    reason="Approved by Admin live trading switch.",
+                    approved_by="admin_settings",
+                    approved_at=_now(),
+                    rejected_by=stored.rejected_by,
+                    rejected_at=stored.rejected_at,
+                    trace_id=stored.trace_id,
+                )
+                self.repository.save(approved)
+                return _approval_record_to_workflow_approval(approved)
             return _approval_record_to_workflow_approval(stored)
         if certification_complete:
-            self.repository.save(
-                ApprovalRecord(
-                    approval_id=approval.approval_id,
-                    workflow_id=approval.workflow_id,
-                    approval_type=approval.approval_type,
-                    stage=approval.stage,
-                    requested_at=approval.requested_at,
-                    requested_by=approval.requested_by,
-                    status=approval.status,
-                    reason=approval.reason,
-                    trace_id=workflow_id,
-                )
+            status = ApprovalStatus.APPROVED.value if self._admin_live_trading_enabled() else approval.status
+            record = ApprovalRecord(
+                approval_id=approval.approval_id,
+                workflow_id=approval.workflow_id,
+                approval_type=approval.approval_type,
+                stage=approval.stage,
+                requested_at=approval.requested_at,
+                requested_by=approval.requested_by,
+                status=status,
+                reason="Approved by Admin live trading switch." if status == ApprovalStatus.APPROVED.value else approval.reason,
+                approved_by="admin_settings" if status == ApprovalStatus.APPROVED.value else "",
+                approved_at=_now() if status == ApprovalStatus.APPROVED.value else "",
+                trace_id=workflow_id,
             )
+            self.repository.save(record)
+            return _approval_record_to_workflow_approval(record)
         return approval
 
     def live_trading_status(self, approval: WorkflowApproval) -> str:
@@ -173,6 +203,13 @@ class WorkflowApprovalGate:
         if approval.status == ApprovalStatus.WAITING.value:
             return "WAITING_APPROVAL"
         return "BLOCKED_BY_POLICY"
+
+    def _admin_live_trading_enabled(self) -> bool:
+        if self.admin_settings_file is None:
+            return False
+        enabled = bool(admin_setting_value(self.admin_settings_file, "risk.live_trading_enabled", False))
+        blocked = bool(admin_setting_value(self.admin_settings_file, "workflow.live_trading_blocked_by_policy", True))
+        return enabled and not blocked
 
 
 class WorkflowDependencyResolver:
@@ -409,7 +446,7 @@ class WorkflowOrchestrator:
         self.repository = WorkflowStateRepository(paths)
         self.planner = WorkflowPlanner()
         self.state_machine = WorkflowStateMachine()
-        self.approval_gate = WorkflowApprovalGate(paths.approval_file)
+        self.approval_gate = WorkflowApprovalGate(paths.approval_file, paths.admin_settings_file)
 
     def current(self, planned: tuple[FullHistoryResearchJob, ...]) -> dict[str, Any]:
         now = _now()
@@ -469,6 +506,7 @@ def default_workflow_paths(repo_root: Path) -> WorkflowPaths:
         full_history_state_file=repo_root / "var" / "full_history_research_state.json",
         post_pipeline_state_file=repo_root / "var" / "post_full_history_pipeline_state.json",
         approval_file=repo_root / "var" / "workflow_live_approval.json",
+        admin_settings_file=repo_root / "var" / "admin_settings.json",
     )
 
 
@@ -582,7 +620,7 @@ def _approval_tasks(workflow_id: str, approval: WorkflowApproval) -> list[dict[s
         manual_status = WorkflowStatus.BLOCKED.value
         live_status = WorkflowStatus.BLOCKED.value
         manual_waiting = "Waiting for production certification"
-        live_waiting = "Live trading blocked by policy"
+        live_waiting = approval.reason if approval.reason != "Manual approval required before live trading." else "Live trading blocked by policy"
     return [
         _control_task(
             workflow_id,
@@ -687,6 +725,8 @@ def _live_gate_reason(approval: WorkflowApproval) -> str:
         return "Manual approval required"
     if approval.status == ApprovalStatus.REJECTED.value:
         return "Manual approval rejected"
+    if approval.reason != "Manual approval required before live trading.":
+        return approval.reason
     return "Live trading blocked by policy"
 
 

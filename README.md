@@ -1,8 +1,10 @@
-# QuantForge AI
+# AutobotFX
 
 AI-powered quantitative Forex strategy discovery, validation, and automated trading platform.
 
-QuantForge AI is designed around permanent raw market data, reproducible research, plugin-driven strategy discovery, and a separate live trading engine for OANDA execution.
+AutobotFX is designed around permanent raw market data, reproducible research, plugin-driven strategy discovery, and a separate live trading engine for OANDA execution.
+
+> Internal Python modules still use the `quantforge` package name while the app is published as AutobotFX.
 
 ## Core Decisions
 
@@ -17,6 +19,18 @@ QuantForge AI is designed around permanent raw market data, reproducible researc
 - Research and live trading are separate engines.
 - OANDA API is used for broker execution.
 - CoreUI's `oanda_candles` table is the current live candle source while it remains updated.
+
+## Current App Status
+
+- Dashboard header now reads live platform health and live trading state from `GET /api/dashboard/overview`.
+- Admin includes a `risk.live_trading_enabled` master switch for controlled live trading.
+- Workflow shows the live gate reason, full-history workflow progress, tasks, and events.
+- Workflow Events are paginated at 30 rows per page.
+- Research list views paginate automatically when a list has more than 30 rows.
+- Full-history research workers process jobs in controlled batches and can sleep during idle windows.
+- Always-on research orchestration and historical validation workers are being added behind script-driven operations.
+
+Live trading enablement is a platform/admin gate only. Actual execution still depends on broker credentials, production certification, and runtime risk checks.
 
 ## Project Layout
 
@@ -240,6 +254,25 @@ The scheduler plans candle coverage checks, smoke windows, rolling yearly window
 It stores resume state in `var/full_history_research_state.json` and writes output to the database-backed Logs page.
 The Windows task `QuantForge Full History Research Scheduler` runs this daily with `--max-jobs 3`, so the 10-year workload progresses in controlled batches.
 
+Run the always-on research orchestrator:
+
+```powershell
+.\scripts\start_always_on_research_orchestrator.bat
+```
+
+Run the historical validation worker:
+
+```powershell
+.\scripts\start_historical_validation_worker.bat
+```
+
+Worker notes:
+
+- `full_history.max_parallel_jobs` controls how many full-history jobs a worker claims per loop.
+- `full_history.sleep_seconds` controls the active-loop delay.
+- `full_history.idle_sleep_seconds` controls how long a worker sleeps when no pending work is found.
+- If the dashboard shows idle workers after a new date/window rolls forward, restart the relevant worker so it immediately claims the new jobs instead of waiting for the idle interval.
+
 Run the read-only dashboard API:
 
 ```powershell
@@ -300,7 +333,7 @@ Start local services:
 docker compose up -d postgres redis
 ```
 
-Or point QuantForge AI at an existing PostgreSQL server:
+Or point AutobotFX at an existing PostgreSQL server:
 
 ```powershell
 Copy-Item .env.example .env

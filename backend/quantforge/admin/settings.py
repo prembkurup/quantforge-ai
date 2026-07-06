@@ -131,6 +131,7 @@ def _definitions(settings: Any) -> tuple[AdminSettingDefinition, ...]:
         AdminSettingDefinition("monday.board_id", "Integrations", "Monday board ID", "text", settings.monday_board_id or "", "Default Monday.com board for roadmap sync.", editable=False, source="environment"),
         AdminSettingDefinition("monday.api_token", "Integrations", "Monday API token", "password", settings.monday_api_token or "", "Monday.com API token.", editable=False, source="environment"),
         AdminSettingDefinition("risk.paper_trading_enabled", "Risk / Safety", "Paper trading enabled", "boolean", True, "Allow paper/shadow trading workflows to operate."),
+        AdminSettingDefinition("risk.live_trading_enabled", "Risk / Safety", "Live trading enabled", "boolean", False, "Master switch for controlled live trading execution."),
         AdminSettingDefinition("risk.production_certification_required", "Risk / Safety", "Production certification required", "boolean", True, "Require production certification before live approval can be requested."),
         AdminSettingDefinition("risk.capital_protection_enabled", "Risk / Safety", "Capital protection enabled", "boolean", True, "Keep operational capital-protection checks enabled."),
     )

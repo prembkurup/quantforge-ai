@@ -27,13 +27,17 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-function useApi<T>(path: string): T | null {
-  const [data, setData] = React.useState<T | null>(null);
+function useApi<T>(path: string, fallback: T | null = null): T | null {
+  const [data, setData] = React.useState<T | null>(fallback);
   React.useEffect(() => {
     let active = true;
-    getJson<T>(path).then((payload) => active && setData(payload));
+    getJson<T>(path)
+      .then((payload) => active && setData(payload))
+      .catch(() => active && fallback !== null && setData(fallback));
     const timer = window.setInterval(() => {
-      getJson<T>(path).then((payload) => active && setData(payload));
+      getJson<T>(path)
+        .then((payload) => active && setData(payload))
+        .catch(() => active && fallback !== null && setData(fallback));
     }, 30000);
     return () => {
       active = false;
@@ -72,6 +76,7 @@ function App() {
               <Route path="/indicators" element={<Indicators />} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/paper" element={<Paper />} />
+              <Route path="/history-validation" element={<HistoryValidation />} />
               <Route path="/operations" element={<Operations />} />
               <Route path="/logs" element={<Logs />} />
               <Route path="/knowledge" element={<Knowledge />} />
@@ -97,6 +102,7 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     ["/indicators", "Indicators", BookOpen],
     ["/portfolio", "Portfolio", ShieldCheck],
     ["/paper", "Paper", CandlestickChart],
+    ["/history-validation", "History Validation", Database],
     ["/operations", "Operations", HeartPulse],
     ["/logs", "Logs", ScrollText],
     ["/knowledge", "Knowledge", Brain],
@@ -142,6 +148,9 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
 }
 
 function Header({ onOpenNav }: { onOpenNav: () => void }) {
+  const overview = useApi<Row>("/api/dashboard/overview", {});
+  const liveStatus = String(overview?.live_trading_status ?? "UNKNOWN");
+  const liveTone = liveStatus === "ENABLED" ? "warn" : liveStatus === "DISABLED" ? "neutral" : "warn";
   return (
     <header className="app-header navbar navbar-expand dashboard-header sticky top-0 z-20 px-5 py-3 lg:px-8">
       <div className="dashboard-header-inner flex flex-wrap items-center justify-between gap-3">
@@ -158,9 +167,8 @@ function Header({ onOpenNav }: { onOpenNav: () => void }) {
           </div>
         </div>
         <div className="dashboard-status-strip flex flex-wrap gap-2">
-          <StatusBadge label="HEALTHY" tone="good" />
-          <StatusBadge label="READ ONLY" tone="neutral" />
-          <StatusBadge label="LIVE DISABLED" tone="warn" />
+          <StatusBadge label={String(overview?.platform_status ?? "CHECKING")} tone={overview?.platform_status === "HEALTHY" ? "good" : "warn"} />
+          <StatusBadge label={`LIVE ${liveStatus}`} tone={liveTone} />
         </div>
       </div>
     </header>
@@ -206,13 +214,52 @@ function Research() {
   const productivity = useApi<Row[]>("/api/research/productivity");
   const matrix = useApi<Row[]>("/api/research/matrix");
   const rejected = useApi<Row[]>("/api/research/rejected");
-  if (!progress || !programs || !rejections || !coverage || !diversity || !productivity || !matrix || !rejected) return <Loading />;
-  const productivityRows = productivity.slice(0, 30);
-  const matrixRows = matrix.slice(0, 30);
-  const rejectedRows = rejected.slice(0, 30);
+  const orchestrator = useApi<any>("/api/research/orchestrator/status", {
+    enabled: false,
+    state: "UNKNOWN",
+    idle_reason: { reason_code: "API_PENDING", message: "Orchestrator status endpoint is not available yet." },
+    next_check_at: "",
+    last_checked_at: "",
+    last_jobs_launched: 0,
+    totals: { weak_programs: 0, stale_programs: 0, blocked_programs: 0 },
+  });
+  const orchestratorRuns = useApi<Row[]>("/api/research/orchestrator/runs", []);
+  const idleReasons = useApi<Row[]>("/api/research/orchestrator/idle-reasons", []);
+  const guardrails = useApi<Row[]>("/api/research/orchestrator/guardrails", []);
+  const fineTuning = useApi<any>("/api/fine-tuning/status", {
+    state: "UNKNOWN",
+    eligible_assets: 0,
+    message: "Fine-tuning status endpoint is not available yet.",
+  });
+  if (
+    !progress ||
+    !programs ||
+    !rejections ||
+    !coverage ||
+    !diversity ||
+    !productivity ||
+    !matrix ||
+    !rejected ||
+    !orchestrator ||
+    !orchestratorRuns ||
+    !idleReasons ||
+    !guardrails ||
+    !fineTuning
+  ) return <Loading />;
+  const latestIdleReasons = idleReasons.slice(-10).reverse();
+  const latestRuns = orchestratorRuns.slice(-10).reverse();
+  const latestGuardrails = guardrails.slice(-10).reverse();
   return (
     <Page title="Research Progress">
       <div className="kpi-grid">
+        <KpiCard title="Orchestrator" value={orchestrator.state} tone={orchestrator.state === "ERROR" ? "warn" : "good"} />
+        <KpiCard title="Idle Reason" value={orchestrator.idle_reason?.reason_code ?? "NONE"} />
+        <KpiCard title="Next Check" value={shortTime(orchestrator.next_check_at)} />
+        <KpiCard title="Last Jobs" value={orchestrator.last_jobs_launched ?? 0} />
+        <KpiCard title="Weak Programs" value={orchestrator.totals?.weak_programs ?? 0} tone={(orchestrator.totals?.weak_programs ?? 0) ? "warn" : "good"} />
+        <KpiCard title="Stale Programs" value={orchestrator.totals?.stale_programs ?? 0} />
+        <KpiCard title="Blocked Programs" value={orchestrator.totals?.blocked_programs ?? 0} />
+        <KpiCard title="Fine-Tuning" value={fineTuning.state} />
         <KpiCard title="Usable Datasets" value={`${coverage.usable_datasets}/${coverage.total_datasets}`} tone="good" />
         <KpiCard title="Research Coverage" value={`${coverage.coverage_percent}%`} tone="good" />
         <KpiCard title="Programs" value={coverage.research_programs} />
@@ -230,11 +277,36 @@ function Research() {
         <BarPanel title="Profit factor distribution" data={progress.charts.profit_factor_distribution} />
         <BarPanel title="Drawdown distribution" data={progress.charts.drawdown_distribution} />
       </div>
-      <DataTable title="Multi-Market Research Programs" rows={programs} />
-      <DataTable title={`Research Productivity by Dataset (${productivity.length})`} rows={productivityRows} />
-      <DataTable title={`Full-History Research Matrix (${matrix.length})`} rows={matrixRows} />
-      <DataTable title={`Rejected Strategy Candidates (${rejected.length})`} rows={rejectedRows} />
-      <DataTable title="Rejected Strategy Reasons" rows={rejections} />
+      <section className="card panel dashboard-card">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Always-On Research Orchestrator</div>
+        <div className="pipeline-current">
+          <div>
+            <div className="pipeline-current-title">{orchestrator.idle_reason?.reason_code ?? orchestrator.state}</div>
+            <div className="pipeline-current-meta">
+              Last checked {shortTime(orchestrator.last_checked_at)} - next check {shortTime(orchestrator.next_check_at)}
+            </div>
+            <div className="pipeline-current-detail">{orchestrator.idle_reason?.message ?? "Research orchestrator is active."}</div>
+          </div>
+        </div>
+      </section>
+      <section className="card panel dashboard-card">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Fine-Tuning Status</div>
+        <div className="pipeline-current">
+          <div>
+            <div className="pipeline-current-title">{fineTuning.state}</div>
+            <div className="pipeline-current-meta">Eligible assets {fineTuning.eligible_assets ?? 0}</div>
+            <div className="pipeline-current-detail">{fineTuning.message}</div>
+          </div>
+        </div>
+      </section>
+      <DataTable title={`Orchestrator Runs (${orchestratorRuns.length})`} rows={latestRuns} />
+      <DataTable title={`Orchestrator Idle Reasons (${idleReasons.length})`} rows={latestIdleReasons} />
+      <DataTable title={`Orchestrator Guardrails (${guardrails.length})`} rows={latestGuardrails} />
+      <PaginatedDataTable title={`Multi-Market Research Programs (${programs.length})`} rows={programs} />
+      <PaginatedDataTable title={`Research Productivity by Dataset (${productivity.length})`} rows={productivity} />
+      <PaginatedDataTable title={`Full-History Research Matrix (${matrix.length})`} rows={matrix} />
+      <PaginatedDataTable title={`Rejected Strategy Candidates (${rejected.length})`} rows={rejected} />
+      <PaginatedDataTable title={`Rejected Strategy Reasons (${rejections.length})`} rows={rejections} />
     </Page>
   );
 }
@@ -336,6 +408,7 @@ function Workflow() {
   const data = useApi<any>("/api/workflow/current");
   const audit = useApi<Row[]>("/api/workflow/approvals/audit");
   const [taskPage, setTaskPage] = React.useState(1);
+  const [eventPage, setEventPage] = React.useState(1);
   if (!data || !audit) return <Loading />;
   const run = data.run ?? {};
   const stages = data.stages ?? [];
@@ -345,6 +418,9 @@ function Workflow() {
   const taskPageSize = 30;
   const taskTotalPages = Math.max(1, Math.ceil(tasks.length / taskPageSize));
   const taskRows = tasks.slice((taskPage - 1) * taskPageSize, taskPage * taskPageSize);
+  const eventPageSize = 30;
+  const eventTotalPages = Math.max(1, Math.ceil(events.length / eventPageSize));
+  const eventPageRows = events.slice((eventPage - 1) * eventPageSize, eventPage * eventPageSize);
   const stageRows = stages.map((stage: any) => ({
     Stage: stage.stage_id,
     Status: stage.status,
@@ -378,7 +454,7 @@ function Workflow() {
     Rejected: approval.rejected_at,
     Reason: approval.reason,
   }));
-  const eventRows = events.map((event: any) => ({
+  const eventRows = eventPageRows.map((event: any) => ({
     Time: event.timestamp,
     Event: event.event_type,
     Stage: event.stage,
@@ -434,7 +510,14 @@ function Workflow() {
         <DataTable title="Approvals" rows={approvalRows} />
         <DataTable title="Approval Audit Log" rows={audit} />
       </div>
-      <DataTable title="Workflow Events" rows={eventRows} />
+      <DataTable title={`Workflow Events (${events.length})`} rows={eventRows} />
+      <PaginationControls
+        page={eventPage}
+        totalPages={eventTotalPages}
+        pageSize={eventPageSize}
+        totalRows={events.length}
+        onPageChange={setEventPage}
+      />
     </Page>
   );
 }
@@ -553,6 +636,62 @@ function Portfolio() {
         <LinePanel title="Expected Drawdown" data={risk.expected_drawdown_curve} />
         <LinePanel title="Validation Equity Curve" data={risk.portfolio_equity_curve} />
       </div>
+    </Page>
+  );
+}
+
+function HistoryValidation() {
+  const status = useApi<any>("/api/history-validation/status");
+  const balance = useApi<Row>("/api/history-validation/balance-sheet", {});
+  const queue = useApi<Row[]>("/api/history-validation/queue", []);
+  const running = useApi<Row[]>("/api/history-validation/running", []);
+  const results = useApi<Row[]>("/api/history-validation/results", []);
+  const improvements = useApi<Row[]>("/api/history-validation/improvements", []);
+  const spreads = useApi<Row[]>("/api/history-validation/spreads", []);
+  if (!status || !balance || !queue || !running || !results || !improvements || !spreads) return <Loading />;
+  const recentResults = results.slice(-20).reverse();
+  const recentImprovements = improvements.slice(-20).reverse();
+  const sheet = Object.keys(balance).length ? balance : status.balance_sheet ?? {};
+  return (
+    <Page title="Historical Validation">
+      <div className="kpi-grid">
+        <KpiCard title="Hist Balance" value={`$${number(sheet.paper_balance ?? 0)}`} />
+        <KpiCard title="Hist Equity" value={`$${number(sheet.paper_equity ?? 0)}`} />
+        <KpiCard title="Hist P/L" value={`$${number(sheet.historical_pl ?? 0)}`} tone={Number(sheet.historical_pl ?? 0) >= 0 ? "good" : "warn"} />
+        <KpiCard title="Spread Cost" value={`$${number(sheet.spread_slippage_cost ?? 0)}`} tone={Number(sheet.spread_slippage_cost ?? 0) > 0 ? "warn" : "neutral"} />
+        <KpiCard title="Spread / Slip" value={`${sheet.spread_pips ?? 0} / ${sheet.slippage_pips ?? 0} pips`} />
+        <KpiCard title="Promotion" value={sheet.promotion_readiness ?? "HOLD"} tone={sheet.promotion_readiness === "PROMOTE" ? "good" : "warn"} />
+        <KpiCard title="State" value={status.state} tone={status.state === "ERROR" ? "warn" : "good"} />
+        <KpiCard title="Current" value={status.current_pair ? `${status.current_pair} ${status.current_timeframe}` : "Waiting"} />
+        <KpiCard title="Progress" value={`${status.progress?.completed ?? 0}/${status.progress?.total ?? 0}`} />
+        <KpiCard title="Overall" value={`${status.overall_completion_pct ?? 0}%`} tone="good" />
+        <KpiCard title="Running" value={status.running_validations ?? 0} />
+        <KpiCard title="Queued" value={status.queued_validations ?? 0} />
+        <KpiCard title="Passed" value={status.passed_validations ?? 0} tone="good" />
+        <KpiCard title="Failed" value={status.failed_validations ?? 0} tone={status.failed_validations ? "warn" : "good"} />
+        <KpiCard title="Improvements" value={status.improvement_requests ?? 0} tone={status.improvement_requests ? "warn" : "good"} />
+        <KpiCard title="ETA" value={`${status.estimated_remaining_minutes ?? 0}m`} />
+      </div>
+      <DataTable title="Historical Validation Balance Sheet" rows={[sheet as Row]} />
+      <section className="card panel dashboard-card">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Current Batch</div>
+        <div className="pipeline-current">
+          <div>
+            <div className="pipeline-current-title">{status.current_pair ? `${status.current_pair} ${status.current_timeframe}` : status.state}</div>
+            <div className="pipeline-current-meta">
+              Next {status.next?.pair ? `${status.next.pair} ${status.next.timeframe}` : "none"} - queue length {status.queue_length ?? 0}
+            </div>
+            <div className="pipeline-current-detail">
+              Historical paper trading validates one pair/timeframe batch at a time against the configured long-term dataset.
+            </div>
+          </div>
+        </div>
+      </section>
+      <DataTable title={`Validation Queue (${queue.length})`} rows={queue.slice(0, 60)} />
+      <DataTable title={`Running Tests (${running.length})`} rows={running} />
+      <DataTable title={`Validation Results (${results.length})`} rows={recentResults} />
+      <DataTable title={`Pair Spread Model (${spreads.length})`} rows={spreads} />
+      <DataTable title={`Improvement Requests (${improvements.length})`} rows={recentImprovements} />
     </Page>
   );
 }
@@ -736,7 +875,7 @@ const manualSections = [
     ],
     details: [
       "The dashboard is read-only. It does not start trades, deploy strategies, or change production state.",
-      "LIVE DISABLED means live execution is intentionally blocked from this dashboard."
+      "The header live badge follows the Admin Live trading enabled switch."
     ]
   },
   {
@@ -1317,6 +1456,39 @@ function DataTable({ title, rows, linkKey }: { title: string; rows: Row[]; linkK
   );
 }
 
+function PaginatedDataTable({
+  title,
+  rows,
+  linkKey,
+  pageSize = 30
+}: {
+  title: string;
+  rows: Row[];
+  linkKey?: string;
+  pageSize?: number;
+}) {
+  const [page, setPage] = React.useState(1);
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  React.useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+  const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  return (
+    <>
+      <DataTable title={title} rows={pageRows} linkKey={linkKey} />
+      {rows.length > pageSize && (
+        <PaginationControls
+          page={page}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalRows={rows.length}
+          onPageChange={setPage}
+        />
+      )}
+    </>
+  );
+}
+
 function LinePanel({ title, data }: { title: string; data: number[] }) {
   return (
     <div className="card panel dashboard-card">
@@ -1357,6 +1529,13 @@ function formatDate(value: unknown) {
   const parsed = new Date(String(value));
   if (Number.isNaN(parsed.getTime())) return String(value);
   return parsed.toLocaleString();
+}
+
+function shortTime(value: unknown) {
+  if (!value) return "";
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

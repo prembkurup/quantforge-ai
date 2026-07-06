@@ -78,6 +78,78 @@ def create_app() -> FastAPI:
     def research_productivity() -> list[dict[str, Any]]:
         return service.research_productivity()
 
+    @app.get("/api/research/orchestrator/status")
+    def research_orchestrator_status() -> dict[str, Any]:
+        return service.research_orchestrator_status()
+
+    @app.get("/api/research/orchestrator/runs")
+    def research_orchestrator_runs() -> list[dict[str, Any]]:
+        return service.research_orchestrator_runs()
+
+    @app.get("/api/research/orchestrator/idle-reason")
+    def research_orchestrator_idle_reason() -> dict[str, Any]:
+        return service.research_orchestrator_idle_reason()
+
+    @app.get("/api/research/orchestrator/idle-reasons")
+    def research_orchestrator_idle_reasons() -> list[dict[str, Any]]:
+        return service.research_orchestrator_idle_reasons()
+
+    @app.get("/api/research/orchestrator/guardrails")
+    def research_orchestrator_guardrails() -> list[dict[str, Any]]:
+        return service.research_orchestrator_guardrails()
+
+    @app.post("/api/research/orchestrator/wake")
+    def research_orchestrator_wake() -> dict[str, Any]:
+        return service.wake_research_orchestrator()
+
+    @app.post("/api/research/orchestrator/stop")
+    def research_orchestrator_stop() -> dict[str, Any]:
+        return service.stop_research_orchestrator()
+
+    @app.post("/api/research/orchestrator/start")
+    def research_orchestrator_start() -> dict[str, Any]:
+        return service.start_research_orchestrator()
+
+    @app.get("/api/fine-tuning/status")
+    def fine_tuning_status() -> dict[str, Any]:
+        return service.fine_tuning_status()
+
+    @app.get("/api/history-validation/status")
+    def history_validation_status() -> dict[str, Any]:
+        return service.history_validation_status()
+
+    @app.get("/api/history-validation/balance-sheet")
+    def history_validation_balance_sheet() -> dict[str, Any]:
+        return service.history_validation_balance_sheet()
+
+    @app.get("/api/history-validation/queue")
+    def history_validation_queue() -> list[dict[str, Any]]:
+        return service.history_validation_queue()
+
+    @app.get("/api/history-validation/running")
+    def history_validation_running() -> list[dict[str, Any]]:
+        return service.history_validation_running()
+
+    @app.get("/api/history-validation/results")
+    def history_validation_results() -> list[dict[str, Any]]:
+        return service.history_validation_results()
+
+    @app.get("/api/history-validation/results/{validation_id}")
+    def history_validation_result(validation_id: str) -> dict[str, Any]:
+        return _or_404(service.history_validation_result, validation_id, "Historical validation result not found")
+
+    @app.get("/api/history-validation/improvements")
+    def history_validation_improvements() -> list[dict[str, Any]]:
+        return service.history_validation_improvements()
+
+    @app.get("/api/history-validation/spreads")
+    def history_validation_spreads() -> list[dict[str, Any]]:
+        return service.history_validation_spreads()
+
+    @app.post("/api/history-validation/run-next")
+    def history_validation_run_next() -> dict[str, Any]:
+        return service.run_history_validation_batch()
+
     @app.get("/api/pipeline/summary")
     def pipeline_summary() -> dict[str, Any]:
         return service.pipeline_summary()

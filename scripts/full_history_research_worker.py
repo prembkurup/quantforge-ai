@@ -60,6 +60,7 @@ def main() -> None:
         full_history_state_file=state_file,
         post_pipeline_state_file=post_pipeline_state_file,
         approval_file=workflow_paths.approval_file,
+        admin_settings_file=workflow_paths.admin_settings_file,
     )
     workflow = WorkflowOrchestrator(workflow_paths)
     python_exe = repo_root / ".venv" / "Scripts" / "python.exe"

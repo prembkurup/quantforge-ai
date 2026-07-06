@@ -18,7 +18,7 @@ def test_dashboard_overview_returns_core_kpis() -> None:
     assert payload["platform_status"] == "HEALTHY"
     assert payload["research_status"] == "COMPLETE"
     assert payload["portfolio_readiness"] == "READY_FOR_PORTFOLIO_CONSTRUCTION"
-    assert payload["live_trading_status"] == "DISABLED"
+    assert payload["live_trading_status"] in {"DISABLED", "ENABLED", "BLOCKED_BY_POLICY"}
     assert payload["experiments"] == 750_000
     assert payload["candidate_strategies"] == 7_500_000
     assert payload["validated_assets"] == 1_000
@@ -78,7 +78,8 @@ def test_pipeline_page_data_shows_tasks_engines_and_current_work() -> None:
         assert all(task["status"] != "QUEUED" for task in tasks)
     assert current["progress"] > 0
     assert any(engine["engine"] == "Live Trading Engine" for engine in engines)
-    assert any(engine["status"] == "DISABLED" for engine in engines)
+    live_engine = next(engine for engine in engines if engine["engine"] == "Live Trading Engine")
+    assert live_engine["status"] in {"DISABLED", "ENABLED", "BLOCKED"}
     assert len(workload) == len(engines)
 
 
@@ -147,9 +148,12 @@ def test_admin_settings_api_exposes_help_defaults_and_updates_values() -> None:
         for setting in group["settings"]
     ]
     h4_smoke = next(setting for setting in settings if setting["setting_id"] == "full_history.h4_smoke_window_candles")
+    live_enabled = next(setting for setting in settings if setting["setting_id"] == "risk.live_trading_enabled")
     assert h4_smoke["default"] == 120
     assert "Default:" in h4_smoke["help"]
     assert h4_smoke["editable"] is True
+    assert live_enabled["kind"] == "boolean"
+    assert live_enabled["editable"] is True
 
     update = client.post("/api/admin/settings", json={"values": {"full_history.h4_smoke_window_candles": 120}})
 
@@ -198,6 +202,79 @@ def test_multi_market_research_api_exposes_matrix_programs_and_productivity() ->
     assert "pair_count" in diversity.json()
     assert productivity.json()
     assert rejected.status_code == 200
+
+
+def test_research_orchestrator_api_exposes_status_runs_and_idle_reasons() -> None:
+    status = client.get("/api/research/orchestrator/status")
+    runs = client.get("/api/research/orchestrator/runs")
+    idle_reason = client.get("/api/research/orchestrator/idle-reason")
+    idle_reasons = client.get("/api/research/orchestrator/idle-reasons")
+    guardrails = client.get("/api/research/orchestrator/guardrails")
+
+    assert status.status_code == 200
+    assert status.json()["state"] in {"STOPPED", "IDLE", "WAITING_FOR_SCHEDULE", "ERROR"}
+    assert "next_run_at" in status.json()
+    assert "idle_reason" in status.json()
+    assert idle_reason.status_code == 200
+    assert runs.status_code == 200
+    assert idle_reasons.status_code == 200
+    assert guardrails.status_code == 200
+
+
+def test_research_orchestrator_manual_control_endpoints() -> None:
+    stopped = client.post("/api/research/orchestrator/stop")
+    started = client.post("/api/research/orchestrator/start")
+    wake = client.post("/api/research/orchestrator/wake")
+
+    assert stopped.status_code == 200
+    assert stopped.json()["enabled"] is False
+    assert started.status_code == 200
+    assert started.json()["enabled"] is True
+    assert wake.status_code == 200
+    assert wake.json()["trigger"] == "manual_wake"
+
+
+def test_fine_tuning_status_is_separate_from_research_status() -> None:
+    response = client.get("/api/fine-tuning/status")
+
+    assert response.status_code == 200
+    assert response.json()["state"] in {
+        "DISABLED",
+        "MANUAL",
+        "GATED",
+        "WAITING_FOR_NEW_ASSETS",
+        "TRAINING",
+        "EVALUATING",
+        "READY_TO_PROMOTE",
+        "BLOCKED",
+        "ERROR",
+    }
+
+
+def test_history_validation_api_exposes_queue_results_and_improvements() -> None:
+    run = client.post("/api/history-validation/run-next")
+    status = client.get("/api/history-validation/status")
+    balance = client.get("/api/history-validation/balance-sheet")
+    queue = client.get("/api/history-validation/queue")
+    running = client.get("/api/history-validation/running")
+    results = client.get("/api/history-validation/results")
+    improvements = client.get("/api/history-validation/improvements")
+    spreads = client.get("/api/history-validation/spreads")
+
+    assert run.status_code == 200
+    assert status.status_code == 200
+    assert status.json()["progress"]["total"] >= 1
+    assert balance.status_code == 200
+    assert balance.json()["paper_balance"] == 100_000.0
+    assert queue.status_code == 200
+    assert running.status_code == 200
+    assert results.status_code == 200
+    assert improvements.status_code == 200
+    assert spreads.status_code == 200
+    assert any(row["pair"] == "EUR_USD" for row in spreads.json())
+    if results.json():
+        detail = client.get(f"/api/history-validation/results/{results.json()[0]['validation_id']}")
+        assert detail.status_code == 200
 
 
 def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:

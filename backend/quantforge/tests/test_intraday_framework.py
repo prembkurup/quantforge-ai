@@ -6,6 +6,7 @@ from quantforge.live import (
     DailyRiskProfile,
     DailyRiskState,
     DailyLearningLoop,
+    DailyMarketReadinessEvaluator,
     DailyOperationsDashboardBuilder,
     DailyReportGenerator,
     ForcedCloseManager,
@@ -15,6 +16,8 @@ from quantforge.live import (
     IntradaySession,
     IntradayStrategyProfile,
     IntradayTradingStatus,
+    MarketReadinessDecision,
+    MarketReadinessInputs,
     SessionEngine,
     SessionPortfolioManager,
     TradingStyle,
@@ -197,3 +200,33 @@ def test_intraday_metrics_report_and_learning_loop_support_daily_operations() ->
     assert metrics.risk.maximum_daily_drawdown == 0.012
     assert report.report_id == "INTRADAY-DAILY-2026-07-06"
     assert "intraday_session_portfolio_refinement" in learning["future_campaigns"]
+
+
+def test_daily_market_readiness_scores_first_decision_before_trading() -> None:
+    evaluator = DailyMarketReadinessEvaluator()
+
+    excellent = evaluator.evaluate(
+        MarketReadinessInputs(
+            market_regime="TRENDING",
+            volatility=0.006,
+            spread=0.00010,
+            session=IntradaySession.LONDON_NEW_YORK_OVERLAP,
+            available_strategies=3,
+            portfolio_exposure=0.18,
+        )
+    )
+    blocked = evaluator.evaluate(
+        MarketReadinessInputs(
+            market_regime="NEWS_RISK",
+            volatility=0.03,
+            spread=0.00080,
+            session=IntradaySession.NO_TRADING,
+            available_strategies=0,
+            portfolio_exposure=0.75,
+        )
+    )
+
+    assert excellent.score >= 90
+    assert excellent.decision == MarketReadinessDecision.EXCELLENT
+    assert blocked.score < 40
+    assert blocked.decision == MarketReadinessDecision.NO_NEW_TRADES

@@ -5,10 +5,14 @@ from datetime import UTC, datetime
 
 from quantforge.live import (
     DailyLearningLoop,
+    DailyMarketReadinessEvaluator,
     DailyOperationsDashboardBuilder,
     DailyReportGenerator,
     DailyRiskState,
     IntradayMetricsCalculator,
+    MarketReadinessDecision,
+    MarketReadinessInputs,
+    SessionEngine,
     SessionPortfolioManager,
     default_intraday_profile,
 )
@@ -23,6 +27,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--realized-daily-loss", type=float, default=0.004)
     parser.add_argument("--daily-drawdown", type=float, default=0.006)
     parser.add_argument("--risk-paused", action="store_true")
+    parser.add_argument("--market-regime", default="TRENDING")
+    parser.add_argument("--volatility", type=float, default=0.006)
+    parser.add_argument("--spread", type=float, default=0.00012)
+    parser.add_argument("--portfolio-exposure", type=float, default=0.18)
     return parser.parse_args()
 
 
@@ -35,9 +43,20 @@ def main() -> None:
         realized_daily_loss=args.realized_daily_loss,
         current_daily_drawdown=args.daily_drawdown,
         trades_today=args.trades_today,
-        daily_exposure=0.18,
+        daily_exposure=args.portfolio_exposure,
         strategy_allocation=0.12,
-        currency_exposure=0.16,
+        currency_exposure=args.portfolio_exposure,
+    )
+    current_session = SessionEngine().current_session(timestamp)
+    market_readiness = DailyMarketReadinessEvaluator().evaluate(
+        MarketReadinessInputs(
+            market_regime=args.market_regime,
+            volatility=args.volatility,
+            spread=args.spread,
+            session=current_session,
+            available_strategies=1,
+            portfolio_exposure=args.portfolio_exposure,
+        )
     )
     snapshot = DailyOperationsDashboardBuilder().snapshot(
         profile,
@@ -46,7 +65,7 @@ def main() -> None:
         timestamp,
         todays_pl=args.todays_pl,
         open_positions=args.open_positions,
-        risk_paused=args.risk_paused,
+        risk_paused=args.risk_paused or market_readiness.decision == MarketReadinessDecision.NO_NEW_TRADES,
     )
     metrics = IntradayMetricsCalculator().calculate(
         (
@@ -70,6 +89,19 @@ def main() -> None:
     print()
     print("Trading Status")
     print(snapshot.trading_status.value)
+    print()
+    print("Market Readiness Score")
+    print(f"{market_readiness.score}/100")
+    print()
+    print("Market Readiness Band")
+    print(market_readiness.band.value)
+    print()
+    print("First Decision")
+    print(market_readiness.decision.value)
+    print()
+    print("Readiness Factor Scores")
+    for factor, score in market_readiness.factors.items():
+        print(f"{factor}: {score}")
     print()
     print("Today's P/L")
     print(snapshot.todays_pl)

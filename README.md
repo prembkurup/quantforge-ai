@@ -23,6 +23,7 @@ QuantForge AI is designed around permanent raw market data, reproducible researc
 - Version 2.0 / Milestone 23 is now defined as the Intraday Trading Framework design specification.
 - Version 2.0 focuses on intraday-only strategies, daily capital rotation, no overnight exposure, session-aware portfolios, daily risk controls, and forced end-of-day exits.
 - Version 2.0 daily operations are wired through `GET /api/intraday/daily`, the Intraday dashboard page, and script-driven start/end-of-day automation.
+- Before the first trade each day, the platform now produces a 0-100 market readiness score covering regime, volatility, spread, session quality, strategy availability, and portfolio exposure.
 - Forced end-of-day closes now create execution receipts and Trade Journal evidence.
 - Dashboard header now reads live platform health and live trading state from `GET /api/dashboard/overview`.
 - Admin includes a `risk.live_trading_enabled` master switch for controlled live trading.
@@ -210,6 +211,12 @@ Run the Version 2.0 intraday daily operations snapshot:
 
 ```powershell
 .\.venv\Scripts\python .\scripts\intraday_daily_operations.py
+```
+
+Include explicit morning market readiness inputs when needed:
+
+```powershell
+.\.venv\Scripts\python .\scripts\intraday_daily_operations.py --market-regime TRENDING --volatility 0.006 --spread 0.00012 --portfolio-exposure 0.18
 ```
 
 Or use the Windows launcher:

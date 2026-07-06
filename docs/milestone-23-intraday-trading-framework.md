@@ -195,6 +195,28 @@ The Execution Manager automatically closes remaining positions.
 
 Reasons are recorded in the Trade Journal.
 
+### 23.10.1 Daily Market Readiness Gate
+
+Before the first trade each day, QuantForge AI evaluates whether the market is worth trading at all.
+
+The readiness gate produces a score from 0 to 100 using:
+
+- Current market regime
+- Volatility
+- Spread
+- Session quality
+- Strategy availability
+- Portfolio exposure
+
+Score interpretation:
+
+- 90-100: Excellent trading conditions
+- 70-89: Normal trading
+- 40-69: Trade selectively
+- Below 40: No new trades unless exceptional conditions arise
+
+This becomes the first daily decision. The platform asks "Is today a good day to trade at all?" before asking which strategy should trade.
+
 ## 23.11 Intraday Metrics
 
 Version 2.0 introduces new research metrics. These metrics supplement, not replace, the existing validation metrics.

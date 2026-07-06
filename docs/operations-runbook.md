@@ -6,11 +6,12 @@
 - Start the React dashboard from `frontend/` with `npm run dev`.
 - The header reads platform health and live trading status from `GET /api/dashboard/overview`.
 - The Admin page owns the `risk.live_trading_enabled` setting.
-- The Intraday page reads `GET /api/intraday/daily` for session, daily P/L, open positions, daily risk, certification, report, learning-loop, and Trade Journal evidence.
+- The Intraday page reads `GET /api/intraday/daily` for market readiness, session, daily P/L, open positions, daily risk, certification, report, learning-loop, and Trade Journal evidence.
 
 ## Intraday Operations
 
 - Run the daily operations snapshot with `.\.venv\Scripts\python .\scripts\intraday_daily_operations.py`.
+- The first start-of-day decision is the market readiness score. Scores of 90-100 mean excellent conditions, 70-89 normal trading, 40-69 selective trading, and below 40 no new trades unless exceptional conditions arise.
 - Record start-of-day activation with `.\.venv\Scripts\python .\scripts\intraday_daily_scheduler.py --mode start`.
 - Record end-of-day report and learning updates with `.\.venv\Scripts\python .\scripts\intraday_daily_scheduler.py --mode end`.
 - Forced end-of-day position closes are written to `var/intraday_trade_journal.json` as Trade Journal evidence.

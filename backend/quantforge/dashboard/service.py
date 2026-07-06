@@ -52,12 +52,16 @@ from quantforge.research.strategy_assets import StrategyAssetRepository, Strateg
 from quantforge.research.workflow_orchestration import WorkflowOrchestrator, default_workflow_paths
 from quantforge.live import (
     DailyLearningLoop,
+    DailyMarketReadinessEvaluator,
     DailyOperationsDashboardBuilder,
     DailyReportGenerator,
     DailyRiskController,
     DailyRiskState,
     IntradayCertificationEngine,
     IntradayMetricsCalculator,
+    MarketReadinessDecision,
+    MarketReadinessInputs,
+    SessionEngine,
     SessionPortfolioManager,
     TradeJournalStore,
     default_intraday_profile,
@@ -664,6 +668,16 @@ class DashboardService:
             currency_exposure=exposure,
         )
         risk_decision = DailyRiskController().evaluate_new_trade(profile.daily_risk_profile, risk_state)
+        current_session = SessionEngine().current_session(timestamp)
+        readiness_inputs = MarketReadinessInputs(
+            market_regime="TRENDING",
+            volatility=0.006,
+            spread=0.00012,
+            session=current_session,
+            available_strategies=len(certified_profiles),
+            portfolio_exposure=exposure,
+        )
+        market_readiness = DailyMarketReadinessEvaluator().evaluate(readiness_inputs)
         snapshot = DailyOperationsDashboardBuilder().snapshot(
             profile,
             risk_state,
@@ -671,7 +685,7 @@ class DashboardService:
             timestamp,
             todays_pl=float(paper.get("daily_pl", 0.0)),
             open_positions=len(open_trades),
-            risk_paused=not risk_decision.approved,
+            risk_paused=not risk_decision.approved or market_readiness.decision == MarketReadinessDecision.NO_NEW_TRADES,
         )
         metrics = IntradayMetricsCalculator().calculate(
             (
@@ -697,6 +711,21 @@ class DashboardService:
             "session_portfolio": snapshot.session_portfolio,
             "active_strategies": list(snapshot.active_strategies),
             "trading_status": snapshot.trading_status.value,
+            "market_readiness": {
+                "score": market_readiness.score,
+                "band": market_readiness.band.value,
+                "decision": market_readiness.decision.value,
+                "factors": market_readiness.factors,
+                "reasons": list(market_readiness.reasons),
+                "inputs": {
+                    "market_regime": readiness_inputs.market_regime,
+                    "volatility": readiness_inputs.volatility,
+                    "spread": readiness_inputs.spread,
+                    "session": readiness_inputs.session.value,
+                    "available_strategies": readiness_inputs.available_strategies,
+                    "portfolio_exposure": readiness_inputs.portfolio_exposure,
+                },
+            },
             "metrics": {
                 "performance": {
                     "average_daily_profit": metrics.performance.average_daily_profit,

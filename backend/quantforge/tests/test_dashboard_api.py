@@ -110,6 +110,9 @@ def test_intraday_daily_endpoint_exposes_version_2_dashboard_status() -> None:
     assert "certification" in payload
     assert "risk_decision" in payload
     assert "trade_journal" in payload
+    assert 0 <= payload["market_readiness"]["score"] <= 100
+    assert payload["market_readiness"]["decision"] in {"EXCELLENT", "NORMAL", "SELECTIVE", "NO_NEW_TRADES"}
+    assert "session_quality" in payload["market_readiness"]["factors"]
 
 
 def test_pipeline_snapshot_combines_page_payload_for_fast_loading() -> None:

@@ -708,9 +708,12 @@ function IntradayDaily() {
   const report = data.daily_report ?? {};
   const learning = data.learning_loop ?? {};
   const riskDecision = data.risk_decision ?? {};
+  const readiness = data.market_readiness ?? {};
   return (
     <Page title="Intraday Daily Operations">
       <div className="kpi-grid">
+        <KpiCard title="Market Readiness" value={`${readiness.score ?? 0}/100`} tone={Number(readiness.score ?? 0) >= 70 ? "good" : "warn"} />
+        <KpiCard title="First Decision" value={readiness.decision ?? "UNKNOWN"} tone={readiness.decision === "NO_NEW_TRADES" ? "warn" : "good"} />
         <KpiCard title="Trading Status" value={data.trading_status} tone={data.trading_status === "ACTIVE" ? "good" : "warn"} />
         <KpiCard title="Current Session" value={data.current_session} />
         <KpiCard title="Today's P/L" value={`$${number(data.todays_pl)}`} tone={Number(data.todays_pl) >= 0 ? "good" : "warn"} />
@@ -723,6 +726,17 @@ function IntradayDaily() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Market Readiness</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Band" value={readiness.band ?? "UNKNOWN"} />
+            <MiniFact label="Market Regime" value={readiness.inputs?.market_regime ?? "UNKNOWN"} />
+            <MiniFact label="Volatility" value={readiness.inputs?.volatility ?? 0} />
+            <MiniFact label="Spread" value={readiness.inputs?.spread ?? 0} />
+            <MiniFact label="Strategy Availability" value={readiness.inputs?.available_strategies ?? 0} />
+            <MiniFact label="Portfolio Exposure" value={readiness.inputs?.portfolio_exposure ?? 0} />
+          </div>
+        </section>
         <section className="card panel dashboard-card">
           <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Performance</div>
           <div className="pipeline-detail-grid">
@@ -755,6 +769,7 @@ function IntradayDaily() {
       </div>
 
       <DataTable title={`Intraday Certification (${(data.certification ?? []).length})`} rows={data.certification ?? []} linkKey="strategy_asset_id" />
+      <JsonPanel title="Market Readiness Factors" data={{ factors: readiness.factors ?? {}, reasons: readiness.reasons ?? [] }} />
       <JsonPanel title="Daily Report" data={report} />
       <JsonPanel title="Daily Learning Loop" data={learning} />
       <JsonPanel title="Trade Journal Evidence" data={data.trade_journal ?? []} />

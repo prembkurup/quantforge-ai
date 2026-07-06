@@ -33,6 +33,20 @@ class IntradayTradingStatus(StrEnum):
     NO_TRADING = "NO TRADING"
 
 
+class MarketReadinessBand(StrEnum):
+    EXCELLENT = "Excellent trading conditions"
+    NORMAL = "Normal trading"
+    SELECTIVE = "Trade selectively"
+    NO_TRADE = "No new trades unless exceptional conditions arise"
+
+
+class MarketReadinessDecision(StrEnum):
+    EXCELLENT = "EXCELLENT"
+    NORMAL = "NORMAL"
+    SELECTIVE = "SELECTIVE"
+    NO_NEW_TRADES = "NO_NEW_TRADES"
+
+
 @dataclass(frozen=True, slots=True)
 class IntradayPolicy:
     trading_style: TradingStyle = TradingStyle.INTRADAY
@@ -183,6 +197,25 @@ class TradeJournalEntry:
     position_id: str
     reason: str
     evidence: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class MarketReadinessInputs:
+    market_regime: str
+    volatility: float
+    spread: float
+    session: IntradaySession
+    available_strategies: int
+    portfolio_exposure: float
+
+
+@dataclass(frozen=True, slots=True)
+class MarketReadinessScore:
+    score: int
+    band: MarketReadinessBand
+    decision: MarketReadinessDecision
+    factors: dict[str, int]
+    reasons: tuple[str, ...]
 
 
 class SessionEngine:
@@ -506,6 +539,103 @@ class TradeJournalStore:
     def _save(self, payload: dict[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+class DailyMarketReadinessEvaluator:
+    def evaluate(self, inputs: MarketReadinessInputs) -> MarketReadinessScore:
+        factors = {
+            "market_regime": self._regime_score(inputs.market_regime),
+            "volatility": self._volatility_score(inputs.volatility),
+            "spread": self._spread_score(inputs.spread),
+            "session_quality": self._session_score(inputs.session),
+            "strategy_availability": self._strategy_score(inputs.available_strategies),
+            "portfolio_exposure": self._exposure_score(inputs.portfolio_exposure),
+        }
+        score = max(0, min(100, sum(factors.values())))
+        band, decision = self._classify(score)
+        return MarketReadinessScore(score, band, decision, factors, self._reasons(inputs, factors, decision))
+
+    def _regime_score(self, market_regime: str) -> int:
+        regime = market_regime.strip().upper().replace(" ", "_")
+        if regime in {"TRENDING", "BREAKOUT", "TREND_FOLLOWING"}:
+            return 20
+        if regime in {"RANGING", "MEAN_REVERSION", "BALANCED"}:
+            return 14
+        if regime in {"VOLATILE", "CHOPPY", "NEWS_RISK"}:
+            return 8
+        return 10
+
+    def _volatility_score(self, volatility: float) -> int:
+        if 0.002 <= volatility <= 0.012:
+            return 20
+        if 0.001 <= volatility < 0.002 or 0.012 < volatility <= 0.02:
+            return 12
+        return 4
+
+    def _spread_score(self, spread: float) -> int:
+        if spread <= 0.00015:
+            return 15
+        if spread <= 0.00030:
+            return 10
+        if spread <= 0.00050:
+            return 5
+        return 0
+
+    def _session_score(self, session: IntradaySession) -> int:
+        scores = {
+            IntradaySession.LONDON_OPEN: 18,
+            IntradaySession.LONDON: 20,
+            IntradaySession.LONDON_NEW_YORK_OVERLAP: 20,
+            IntradaySession.NEW_YORK: 16,
+            IntradaySession.ASIAN: 12,
+            IntradaySession.LATE_NEW_YORK: 8,
+            IntradaySession.NO_TRADING: 0,
+        }
+        return scores[session]
+
+    def _strategy_score(self, available_strategies: int) -> int:
+        if available_strategies >= 3:
+            return 15
+        if available_strategies >= 1:
+            return 10
+        return 0
+
+    def _exposure_score(self, portfolio_exposure: float) -> int:
+        if portfolio_exposure <= 0.25:
+            return 10
+        if portfolio_exposure <= 0.50:
+            return 6
+        return 2
+
+    def _classify(self, score: int) -> tuple[MarketReadinessBand, MarketReadinessDecision]:
+        if score >= 90:
+            return MarketReadinessBand.EXCELLENT, MarketReadinessDecision.EXCELLENT
+        if score >= 70:
+            return MarketReadinessBand.NORMAL, MarketReadinessDecision.NORMAL
+        if score >= 40:
+            return MarketReadinessBand.SELECTIVE, MarketReadinessDecision.SELECTIVE
+        return MarketReadinessBand.NO_TRADE, MarketReadinessDecision.NO_NEW_TRADES
+
+    def _reasons(
+        self,
+        inputs: MarketReadinessInputs,
+        factors: dict[str, int],
+        decision: MarketReadinessDecision,
+    ) -> tuple[str, ...]:
+        reasons: list[str] = [f"Daily market readiness decision: {decision.value}."]
+        if factors["market_regime"] < 14:
+            reasons.append(f"Market regime is {inputs.market_regime}, reducing readiness.")
+        if factors["volatility"] < 20:
+            reasons.append("Volatility is outside the preferred intraday range.")
+        if factors["spread"] < 10:
+            reasons.append("Spread is too wide for normal intraday execution.")
+        if factors["session_quality"] < 12:
+            reasons.append(f"Session quality is low for {inputs.session.value}.")
+        if factors["strategy_availability"] == 0:
+            reasons.append("No certified intraday strategies are available.")
+        if factors["portfolio_exposure"] < 10:
+            reasons.append("Existing portfolio exposure is consuming daily capacity.")
+        return tuple(reasons)
 
 
 def default_trade_journal_path(repo_root: Path | None = None) -> Path:

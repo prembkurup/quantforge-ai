@@ -31,6 +31,7 @@ def main() -> None:
     if args.mode == "start":
         _append_json_record(output_dir / "intraday_start_of_day.json", record)
         print("Start-of-day intraday activation recorded.")
+        print(_market_readiness_line(payload))
         print(f"Trading Status: {payload.get('trading_status')}")
         print(f"Current Session: {payload.get('current_session')}")
         print(f"Active Strategies: {', '.join(payload.get('active_strategies', [])) or 'NONE'}")
@@ -50,8 +51,14 @@ def main() -> None:
     )
     print("End-of-day intraday report and knowledge update recorded.")
     print(f"Report: {payload.get('daily_report', {}).get('report_id')}")
+    print(_market_readiness_line(payload))
     print(f"Trading Status: {payload.get('trading_status')}")
     print(f"Open Positions: {payload.get('open_positions')}")
+
+
+def _market_readiness_line(payload: dict[str, Any]) -> str:
+    readiness = payload.get("market_readiness", {})
+    return f"Market Readiness: {readiness.get('score', 0)}/100 - {readiness.get('band', 'UNKNOWN')}"
 
 
 def _append_json_record(path: Path, record: dict[str, Any]) -> None:

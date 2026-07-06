@@ -107,6 +107,9 @@ def test_intraday_daily_endpoint_exposes_version_2_dashboard_status() -> None:
     assert payload["metrics"]["performance"]["daily_expectancy"] != 0
     assert payload["daily_report"]["report_id"].startswith("INTRADAY-DAILY-")
     assert payload["learning_loop"]["future_campaigns"]
+    assert "certification" in payload
+    assert "risk_decision" in payload
+    assert "trade_journal" in payload
 
 
 def test_pipeline_snapshot_combines_page_payload_for_fast_loading() -> None:

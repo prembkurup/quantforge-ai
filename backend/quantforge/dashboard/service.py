@@ -48,16 +48,21 @@ from quantforge.research.orchestrator import (
     AlwaysOnResearchThresholds,
     default_always_on_orchestrator_paths,
 )
-from quantforge.research.strategy_assets import StrategyAssetRepository, StrategyLibraryLoader
+from quantforge.research.strategy_assets import StrategyAssetRepository, StrategyLibraryLoader, strategy_asset_from_approved
 from quantforge.research.workflow_orchestration import WorkflowOrchestrator, default_workflow_paths
 from quantforge.live import (
     DailyLearningLoop,
     DailyOperationsDashboardBuilder,
     DailyReportGenerator,
+    DailyRiskController,
     DailyRiskState,
+    IntradayCertificationEngine,
     IntradayMetricsCalculator,
     SessionPortfolioManager,
+    TradeJournalStore,
     default_intraday_profile,
+    default_trade_journal_path,
+    intraday_profile_from_strategy_definition,
     ReplayProgressStore,
 )
 
@@ -611,24 +616,62 @@ class DashboardService:
         return self._engine_workload_from(self.engine_status())
 
     def intraday_daily(self) -> dict[str, Any]:
-        profile = default_intraday_profile()
+        approved_assets = tuple(asset for asset in self._strategy_asset_repository.list() if asset.deployable)
+        certified_profiles: dict[str, Any] = {}
+        certification_rows: list[dict[str, Any]] = []
+        for asset in approved_assets:
+            strategy_asset = strategy_asset_from_approved(asset)
+            profile = intraday_profile_from_strategy_definition(strategy_asset.strategy_definition) or default_intraday_profile()
+            certification = IntradayCertificationEngine().certify(
+                strategy_asset,
+                profile,
+                {
+                    "overnight_positions": 0,
+                    "late_closes": 0,
+                    "maximum_daily_drawdown": asset.max_drawdown,
+                    "average_trade_duration_minutes": min(profile.maximum_trade_duration_minutes, 60),
+                },
+            )
+            certification_rows.append(
+                {
+                    "strategy_asset_id": asset.strategy_asset_id,
+                    "pair": asset.pair,
+                    "session": profile.preferred_session.value,
+                    "status": certification.status,
+                    "certified": certification.certified,
+                }
+            )
+            if certification.certified:
+                certified_profiles[asset.strategy_asset_id] = profile
+        if certified_profiles:
+            profile = next(iter(certified_profiles.values()))
+        else:
+            profile = default_intraday_profile()
+            certified_profiles = {"QF-INTRADAY-DEMO": profile}
         timestamp = datetime.now(UTC)
-        portfolios = SessionPortfolioManager().build({"QF-INTRADAY-DEMO": profile})
+        portfolios = SessionPortfolioManager().build(certified_profiles)
+        paper = self.paper_summary()
+        open_trades = self.paper_open_trades()
+        exposure = float(self._paper.paper_portfolio.exposure)
+        daily_drawdown = float(paper.get("paper_drawdown", 0.0))
+        realized_loss = abs(min(float(paper.get("daily_pl", 0.0)), 0.0)) / max(float(self._paper.paper_portfolio.balance), 1.0)
         risk_state = DailyRiskState(
-            realized_daily_loss=0.004,
-            current_daily_drawdown=0.006,
-            trades_today=4,
-            daily_exposure=0.18,
-            strategy_allocation=0.12,
-            currency_exposure=0.16,
+            realized_daily_loss=round(realized_loss, 4),
+            current_daily_drawdown=daily_drawdown,
+            trades_today=len(open_trades),
+            daily_exposure=exposure,
+            strategy_allocation=max(self._paper.paper_portfolio.portfolio.values(), default=0.0),
+            currency_exposure=exposure,
         )
+        risk_decision = DailyRiskController().evaluate_new_trade(profile.daily_risk_profile, risk_state)
         snapshot = DailyOperationsDashboardBuilder().snapshot(
             profile,
             risk_state,
             portfolios,
             timestamp,
-            todays_pl=420.50,
-            open_positions=1,
+            todays_pl=float(paper.get("daily_pl", 0.0)),
+            open_positions=len(open_trades),
+            risk_paused=not risk_decision.approved,
         )
         metrics = IntradayMetricsCalculator().calculate(
             (
@@ -643,6 +686,7 @@ class DashboardService:
         )
         report = DailyReportGenerator().generate(snapshot, metrics)
         learning = DailyLearningLoop().update_priorities(report)
+        journal_entries = list(TradeJournalStore(default_trade_journal_path()).list())[-20:]
         return {
             "current_session": snapshot.current_session.value,
             "todays_pl": snapshot.todays_pl,
@@ -686,6 +730,13 @@ class DashboardService:
                 "research_priorities": list(learning["research_priorities"]),
                 "future_campaigns": list(learning["future_campaigns"]),
             },
+            "certification": certification_rows,
+            "risk_decision": {
+                "approved": risk_decision.approved,
+                "reasons": list(risk_decision.reasons),
+                "checks": risk_decision.metadata.get("checks", {}),
+            },
+            "trade_journal": journal_entries,
             "timestamp": snapshot.timestamp.isoformat(),
         }
 

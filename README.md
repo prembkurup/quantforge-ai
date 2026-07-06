@@ -22,6 +22,8 @@ QuantForge AI is designed around permanent raw market data, reproducible researc
 
 - Version 2.0 / Milestone 23 is now defined as the Intraday Trading Framework design specification.
 - Version 2.0 focuses on intraday-only strategies, daily capital rotation, no overnight exposure, session-aware portfolios, daily risk controls, and forced end-of-day exits.
+- Version 2.0 daily operations are wired through `GET /api/intraday/daily`, the Intraday dashboard page, and script-driven start/end-of-day automation.
+- Forced end-of-day closes now create execution receipts and Trade Journal evidence.
 - Dashboard header now reads live platform health and live trading state from `GET /api/dashboard/overview`.
 - Admin includes a `risk.live_trading_enabled` master switch for controlled live trading.
 - Workflow shows the live gate reason, full-history workflow progress, tasks, and events.
@@ -214,6 +216,19 @@ Or use the Windows launcher:
 
 ```powershell
 .\scripts\start_intraday_daily_operations.bat
+```
+
+Run start-of-day or end-of-day intraday automation:
+
+```powershell
+.\.venv\Scripts\python .\scripts\intraday_daily_scheduler.py --mode start
+.\.venv\Scripts\python .\scripts\intraday_daily_scheduler.py --mode end
+```
+
+Or use the Windows launcher:
+
+```powershell
+.\scripts\start_intraday_daily_scheduler.bat --mode end
 ```
 
 Run the Production Engineering and SRE demo:

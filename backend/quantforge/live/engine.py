@@ -1,9 +1,17 @@
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
+from pathlib import Path
 from enum import StrEnum
 from typing import Any
 
 from quantforge.execution.oanda import OandaExecutionClient
+from quantforge.live.intraday import (
+    ForcedCloseManager,
+    TradeJournalStore,
+    default_intraday_profile,
+    default_trade_journal_path,
+    journal_entries_from_forced_close,
+)
 from quantforge.risk.engine import RiskDecision, RiskEngine
 from quantforge.strategies.plugin import StrategyPlugin
 from quantforge.strategies.production import (
@@ -111,6 +119,7 @@ class PositionSnapshot:
     floating_pl: float
     margin_used: float
     exposure: float
+    position_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,6 +165,7 @@ class LiveTradingRunResult:
     recovery_completed: bool
     synchronization: SynchronizationResult
     dashboard: LiveTradingDashboard
+    forced_close_receipts: tuple[ExecutionReceipt, ...] = ()
 
 
 class LiveEventBus:
@@ -328,6 +338,25 @@ class ExecutionManager:
             return ExecutionReceipt(order_id, signal.signal_id, "submitted", "OANDA", payload)
         return ExecutionReceipt("paper_oanda_order_0001", signal.signal_id, "filled", "OANDA_PAPER", payload)
 
+    def close_position(self, position: PositionSnapshot, reason: str) -> ExecutionReceipt:
+        payload = {
+            "instrument": position.instrument,
+            "units": str(int(position.units)),
+            "type": "MARKET_CLOSE",
+            "positionFill": "REDUCE_ONLY",
+            "reason": reason,
+            "position_id": position.position_id,
+        }
+        if self._execution_client is not None:
+            response = self._execution_client.close_position(position.instrument, position.units)
+            order_id = str(
+                response.get("longOrderCreateTransaction", {}).get("id")
+                or response.get("shortOrderCreateTransaction", {}).get("id")
+                or "oanda_position_close"
+            )
+            return ExecutionReceipt(order_id, position.position_id, "submitted", "OANDA", payload)
+        return ExecutionReceipt(f"paper_close_{position.position_id}", position.position_id, "filled", "OANDA_PAPER", payload)
+
 
 class PositionMonitor:
     def monitor(self, executions: tuple[ExecutionReceipt, ...]) -> tuple[PositionSnapshot, ...]:
@@ -344,6 +373,7 @@ class PositionMonitor:
                     floating_pl=124.5,
                     margin_used=363.0,
                     exposure=abs(units) / 100_000.0,
+                    position_id=f"pos_{execution.order_id}",
                 )
             )
         return tuple(positions)
@@ -431,6 +461,9 @@ class LiveTradingEngine:
         *,
         events: tuple[LiveEvent, ...] | None = None,
         demo: bool = True,
+        intraday_timestamp: datetime | None = None,
+        force_close_time_utc: time | None = None,
+        trade_journal_path: Path | None = None,
     ) -> LiveTradingRunResult:
         if asset is None:
             if not demo:
@@ -466,8 +499,38 @@ class LiveTradingEngine:
             executions.append(receipt)
 
         positions = self.positions.monitor(tuple(executions))
+        forced_close_receipts: tuple[ExecutionReceipt, ...] = ()
+        force_close_time = force_close_time_utc or default_intraday_profile().force_close_time_utc
+        close_timestamp = intraday_timestamp or (events[-1].timestamp if events else datetime.now(UTC))
+        close_instructions = ForcedCloseManager().instructions(
+            tuple(
+                {
+                    "position_id": position.position_id,
+                    "strategy_id": position.strategy_id,
+                    "instrument": position.instrument,
+                }
+                for position in positions
+            ),
+            close_timestamp,
+            force_close_time,
+        )
+        if close_instructions:
+            instruction_by_position = {instruction.position_id: instruction for instruction in close_instructions}
+            forced_close_receipts = tuple(
+                self.execution.close_position(position, instruction_by_position[position.position_id].reason)
+                for position in positions
+                if position.position_id in instruction_by_position
+            )
+            journal_path = trade_journal_path or default_trade_journal_path()
+            TradeJournalStore(journal_path).append_many(
+                journal_entries_from_forced_close(
+                    close_instructions,
+                    execution_status="SUBMITTED" if self.execution._execution_client is not None else "FILLED",
+                )
+            )
+            positions = ()
         snapshot = self.state.persist(
-            tuple(executions),
+            tuple(executions) + forced_close_receipts,
             positions,
             tuple(signals),
             regimes,
@@ -480,7 +543,7 @@ class LiveTradingEngine:
             connected=any(event.event_type == LiveEventType.CONNECT for event in seeded_events),
             market_events=len(events),
             signals_generated=len(signals),
-            orders_executed=sum(execution.status in {"filled", "submitted"} for execution in executions),
+            orders_executed=sum(execution.status in {"filled", "submitted"} for execution in tuple(executions) + forced_close_receipts),
             open_positions=len(positions),
             risk_blocks=risk_blocks,
             recovered=recovered,
@@ -491,10 +554,11 @@ class LiveTradingEngine:
             connected=dashboard.connected,
             events_processed=len(events),
             signals=tuple(signals),
-            executions=tuple(executions),
+            executions=tuple(executions) + forced_close_receipts,
             positions=positions,
             state_snapshot=snapshot,
             recovery_completed=recovered,
             synchronization=synchronization,
             dashboard=dashboard,
+            forced_close_receipts=forced_close_receipts,
         )

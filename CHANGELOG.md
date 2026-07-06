@@ -7,6 +7,10 @@
 - Started Milestone 23 implementation with intraday policy, session, daily risk, forced-close, session portfolio, and certification primitives.
 - Added intraday daily metrics, daily report, learning-loop, and dashboard API snapshot support.
 - Added script and Windows launcher for the Version 2 intraday daily operations snapshot.
+- Wired forced end-of-day intraday close receipts into live execution and Trade Journal evidence.
+- Added approved-asset intraday certification and real session portfolio selection to the daily operations API.
+- Added React Intraday dashboard page for daily trading, daily risk, certification, report, learning-loop, and journal evidence.
+- Added start/end-of-day intraday scheduler script and Windows launcher.
 - Restored QuantForge AI repo-facing metadata and documented the intraday-only strategy policy.
 - Added Admin live trading master switch through `risk.live_trading_enabled`.
 - Connected the dashboard header to live platform health and live trading status.

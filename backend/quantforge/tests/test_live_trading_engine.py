@@ -1,3 +1,6 @@
+from datetime import UTC, datetime, time
+
+from quantforge.live import TradeJournalStore
 from quantforge.live import (
     LiveFeatureVector,
     LiveTradingEngine,
@@ -70,3 +73,23 @@ def test_live_engine_uses_paper_oanda_path_without_real_credentials() -> None:
 
     assert result.executions[0].broker == "OANDA_PAPER"
     assert result.executions[0].order_id == "paper_oanda_order_0001"
+
+
+def test_live_engine_forces_intraday_close_and_records_trade_journal(tmp_path) -> None:
+    journal = tmp_path / "intraday_trade_journal.json"
+
+    result = LiveTradingEngine().run(
+        intraday_timestamp=datetime(2026, 7, 6, 21, 50, tzinfo=UTC),
+        force_close_time_utc=time(21, 45),
+        trade_journal_path=journal,
+    )
+
+    assert result.positions == ()
+    assert result.forced_close_receipts
+    assert result.forced_close_receipts[0].status == "filled"
+    assert result.dashboard.open_positions == 0
+
+    entries = TradeJournalStore(journal).list()
+    assert entries[0]["event_type"] == "FORCED_CLOSE"
+    assert entries[0]["reason"] == "Forced end-of-day intraday close."
+    assert entries[0]["evidence"]["policy"] == "INTRADAY_FORCE_CLOSE"

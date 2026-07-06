@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import json
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, time
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 from quantforge.validation import StrategyAsset
@@ -169,6 +171,18 @@ class DailyTradingReport:
     drift_summary: dict[str, Any]
     knowledge_updates: tuple[str, ...]
     improvement_recommendations: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TradeJournalEntry:
+    event_id: str
+    timestamp: datetime
+    event_type: str
+    strategy_id: str
+    instrument: str
+    position_id: str
+    reason: str
+    evidence: dict[str, Any] = field(default_factory=dict)
 
 
 class SessionEngine:
@@ -459,6 +473,68 @@ class DailyLearningLoop:
             "research_priorities": (priority,),
             "future_campaigns": ("intraday_session_portfolio_refinement",),
         }
+
+
+class TradeJournalStore:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def append(self, entry: TradeJournalEntry) -> None:
+        payload = self._load()
+        entries = list(payload.get("entries", []))
+        entries.append(
+            {
+                **asdict(entry),
+                "timestamp": entry.timestamp.astimezone(UTC).isoformat(),
+            }
+        )
+        payload["entries"] = entries
+        self._save(payload)
+
+    def append_many(self, entries: tuple[TradeJournalEntry, ...]) -> None:
+        for entry in entries:
+            self.append(entry)
+
+    def list(self) -> tuple[dict[str, Any], ...]:
+        return tuple(self._load().get("entries", []))
+
+    def _load(self) -> dict[str, Any]:
+        if not self.path.exists():
+            return {"version": 1, "entries": []}
+        return json.loads(self.path.read_text(encoding="utf-8"))
+
+    def _save(self, payload: dict[str, Any]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def default_trade_journal_path(repo_root: Path | None = None) -> Path:
+    root = repo_root or Path(__file__).resolve().parents[3]
+    return root / "var" / "intraday_trade_journal.json"
+
+
+def journal_entries_from_forced_close(
+    instructions: tuple[ForcedCloseInstruction, ...],
+    *,
+    execution_status: str,
+) -> tuple[TradeJournalEntry, ...]:
+    return tuple(
+        TradeJournalEntry(
+            event_id=f"forced-close-{instruction.timestamp.strftime('%Y%m%dT%H%M%S')}-{instruction.position_id}",
+            timestamp=instruction.timestamp,
+            event_type="FORCED_CLOSE",
+            strategy_id=instruction.strategy_id,
+            instrument=instruction.instrument,
+            position_id=instruction.position_id,
+            reason=instruction.reason,
+            evidence={
+                "execution_status": execution_status,
+                "policy": "INTRADAY_FORCE_CLOSE",
+                "overnight_positions_allowed": False,
+            },
+        )
+        for instruction in instructions
+    )
 
 
 def default_intraday_profile() -> IntradayStrategyProfile:

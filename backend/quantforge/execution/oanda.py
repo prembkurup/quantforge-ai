@@ -26,3 +26,13 @@ class OandaExecutionClient:
         response.raise_for_status()
         return response.json()
 
+    def close_position(self, instrument: str, units: float) -> dict[str, Any]:
+        payload = {"longUnits" if units > 0 else "shortUnits": "ALL"}
+        response = requests.put(
+            f"{self.api_url}/accounts/{self.account_id}/positions/{instrument}/close",
+            json=payload,
+            headers=self._headers(),
+            timeout=15,
+        )
+        response.raise_for_status()
+        return response.json()

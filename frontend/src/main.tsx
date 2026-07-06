@@ -75,6 +75,7 @@ function App() {
               <Route path="/strategies/:id" element={<StrategyDetail />} />
               <Route path="/indicators" element={<Indicators />} />
               <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/intraday" element={<IntradayDaily />} />
               <Route path="/paper" element={<Paper />} />
               <Route path="/history-validation" element={<HistoryValidation />} />
               <Route path="/operations" element={<Operations />} />
@@ -101,6 +102,7 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     ["/strategies", "Strategies", Library],
     ["/indicators", "Indicators", BookOpen],
     ["/portfolio", "Portfolio", ShieldCheck],
+    ["/intraday", "Intraday", Activity],
     ["/paper", "Paper", CandlestickChart],
     ["/history-validation", "History Validation", Database],
     ["/operations", "Operations", HeartPulse],
@@ -692,6 +694,70 @@ function HistoryValidation() {
       <DataTable title={`Validation Results (${results.length})`} rows={recentResults} />
       <DataTable title={`Pair Spread Model (${spreads.length})`} rows={spreads} />
       <DataTable title={`Improvement Requests (${improvements.length})`} rows={recentImprovements} />
+    </Page>
+  );
+}
+
+function IntradayDaily() {
+  const data = useApi<any>("/api/intraday/daily");
+  if (!data) return <Loading />;
+  const metrics = data.metrics ?? {};
+  const performance = metrics.performance ?? {};
+  const risk = metrics.risk ?? {};
+  const operational = metrics.operational ?? {};
+  const report = data.daily_report ?? {};
+  const learning = data.learning_loop ?? {};
+  const riskDecision = data.risk_decision ?? {};
+  return (
+    <Page title="Intraday Daily Operations">
+      <div className="kpi-grid">
+        <KpiCard title="Trading Status" value={data.trading_status} tone={data.trading_status === "ACTIVE" ? "good" : "warn"} />
+        <KpiCard title="Current Session" value={data.current_session} />
+        <KpiCard title="Today's P/L" value={`$${number(data.todays_pl)}`} tone={Number(data.todays_pl) >= 0 ? "good" : "warn"} />
+        <KpiCard title="Today's Trades" value={data.todays_trades} />
+        <KpiCard title="Open Positions" value={data.open_positions} tone={Number(data.open_positions) === 0 ? "good" : "warn"} />
+        <KpiCard title="Remaining Daily Risk" value={data.remaining_daily_risk} />
+        <KpiCard title="Daily Drawdown" value={data.daily_drawdown} tone={Number(data.daily_drawdown) > 0.02 ? "warn" : "good"} />
+        <KpiCard title="Session Portfolio" value={data.session_portfolio} />
+        <KpiCard title="Risk Gate" value={riskDecision.approved ? "OPEN" : "PAUSED"} tone={riskDecision.approved ? "good" : "warn"} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Performance</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Average Daily Profit" value={`$${number(performance.average_daily_profit)}`} />
+            <MiniFact label="Winning Days" value={performance.winning_days ?? 0} />
+            <MiniFact label="Losing Days" value={performance.losing_days ?? 0} />
+            <MiniFact label="Trades / Day" value={performance.average_trades_per_day ?? 0} />
+            <MiniFact label="Trade Duration" value={`${performance.average_trade_duration_minutes ?? 0} min`} />
+            <MiniFact label="Daily Expectancy" value={`$${number(performance.daily_expectancy)}`} />
+          </div>
+        </section>
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Risk</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Max Daily Drawdown" value={risk.maximum_daily_drawdown ?? 0} />
+            <MiniFact label="Average Drawdown" value={risk.average_daily_drawdown ?? 0} />
+            <MiniFact label="Risk Utilization" value={risk.daily_risk_utilization ?? 0} />
+            <MiniFact label="Risk Reasons" value={(riskDecision.reasons ?? []).join(", ") || "None"} />
+          </div>
+        </section>
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Operational</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Signals / Day" value={operational.average_daily_signals ?? 0} />
+            <MiniFact label="Executions / Day" value={operational.average_daily_executions ?? 0} />
+            <MiniFact label="Exposure / Day" value={operational.average_daily_exposure ?? 0} />
+            <MiniFact label="Slippage / Day" value={operational.average_daily_slippage ?? 0} />
+          </div>
+        </section>
+      </div>
+
+      <DataTable title={`Intraday Certification (${(data.certification ?? []).length})`} rows={data.certification ?? []} linkKey="strategy_asset_id" />
+      <JsonPanel title="Daily Report" data={report} />
+      <JsonPanel title="Daily Learning Loop" data={learning} />
+      <JsonPanel title="Trade Journal Evidence" data={data.trade_journal ?? []} />
     </Page>
   );
 }

@@ -6,6 +6,15 @@
 - Start the React dashboard from `frontend/` with `npm run dev`.
 - The header reads platform health and live trading status from `GET /api/dashboard/overview`.
 - The Admin page owns the `risk.live_trading_enabled` setting.
+- The Intraday page reads `GET /api/intraday/daily` for session, daily P/L, open positions, daily risk, certification, report, learning-loop, and Trade Journal evidence.
+
+## Intraday Operations
+
+- Run the daily operations snapshot with `.\.venv\Scripts\python .\scripts\intraday_daily_operations.py`.
+- Record start-of-day activation with `.\.venv\Scripts\python .\scripts\intraday_daily_scheduler.py --mode start`.
+- Record end-of-day report and learning updates with `.\.venv\Scripts\python .\scripts\intraday_daily_scheduler.py --mode end`.
+- Forced end-of-day position closes are written to `var/intraday_trade_journal.json` as Trade Journal evidence.
+- Daily report automation writes `var/intraday_daily_reports.json` and learning updates to `var/intraday_knowledge_updates.json`.
 
 ## Research Workers
 

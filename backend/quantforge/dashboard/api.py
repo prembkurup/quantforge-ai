@@ -174,6 +174,10 @@ def create_app() -> FastAPI:
     def intraday_daily() -> dict[str, Any]:
         return service.intraday_daily()
 
+    @app.get("/api/intraday/decision-intelligence")
+    def intraday_decision_intelligence() -> dict[str, Any]:
+        return service.intraday_decision_intelligence()
+
     @app.get("/api/pipeline/workload")
     def pipeline_workload() -> list[dict[str, Any]]:
         return service.engine_workload()

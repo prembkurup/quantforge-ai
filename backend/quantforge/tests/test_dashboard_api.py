@@ -115,6 +115,21 @@ def test_intraday_daily_endpoint_exposes_version_2_dashboard_status() -> None:
     assert "session_quality" in payload["market_readiness"]["factors"]
 
 
+def test_intraday_decision_intelligence_endpoint_exposes_milestone_24_layers() -> None:
+    response = client.get("/api/intraday/decision-intelligence")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert 0 <= payload["opportunity_score"]["score"] <= 100
+    assert payload["market_quality"]["rating"] in {"Poor", "Fair", "Good", "Excellent"}
+    assert payload["eligibility"]["status"] in {"Eligible", "Not Eligible"}
+    assert payload["trade_decision"]["decision"] in {"BUY", "SELL", "EXIT", "HOLD", "NO TRADE"}
+    assert payload["trade_decision"]["decision_trace"]["reason_codes"]
+    assert payload["daily_trading_plan"]["preferred_sessions"]
+    assert payload["dynamic_daily_risk_budget"]["policy"] in {"Normal Risk", "Reduced Risk", "Minimal Risk", "No New Trades"}
+    assert payload["intraday_trading_status"]["status"] in {"ACTIVE", "WAITING", "PAUSED", "NO TRADING", "FINISHED"}
+
+
 def test_pipeline_snapshot_combines_page_payload_for_fast_loading() -> None:
     snapshot = client.get("/api/pipeline/snapshot").json()
 

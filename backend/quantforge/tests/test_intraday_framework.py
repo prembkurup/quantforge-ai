@@ -9,17 +9,27 @@ from quantforge.live import (
     DailyMarketReadinessEvaluator,
     DailyOperationsDashboardBuilder,
     DailyReportGenerator,
+    DynamicDailyRiskBudgetEngine,
     ForcedCloseManager,
+    IntradayTradeDecision,
+    IntradayTradeDecisionEngine,
     IntradayCertificationEngine,
     IntradayMetricsCalculator,
     IntradayPolicyEngine,
     IntradaySession,
     IntradayStrategyProfile,
     IntradayTradingStatus,
+    MarketQualityEngine,
+    MarketQualityInputs,
     MarketReadinessDecision,
     MarketReadinessInputs,
+    NewsEventFilter,
+    ScheduledNewsEvent,
+    NewsEventType,
     SessionEngine,
     SessionPortfolioManager,
+    TradeEligibilityEngine,
+    TradeEligibilityRequest,
     TradingStyle,
     intraday_profile_from_strategy_definition,
 )
@@ -230,3 +240,51 @@ def test_daily_market_readiness_scores_first_decision_before_trading() -> None:
     assert excellent.decision == MarketReadinessDecision.EXCELLENT
     assert blocked.score < 40
     assert blocked.decision == MarketReadinessDecision.NO_NEW_TRADES
+
+
+def test_decision_intelligence_rejects_trade_when_news_filter_blocks_entries() -> None:
+    timestamp = datetime(2026, 7, 6, 12, 30, tzinfo=UTC)
+    opportunity = DailyMarketReadinessEvaluator().evaluate(
+        MarketReadinessInputs("TRENDING", 0.006, 0.00010, IntradaySession.LONDON_NEW_YORK_OVERLAP, 3, 0.18)
+    )
+    quality = MarketQualityEngine().evaluate(
+        MarketQualityInputs(0.00010, 0.9, 0.006, 0.88, IntradaySession.LONDON_NEW_YORK_OVERLAP, "CLEAN_TREND")
+    )
+    news_state = NewsEventFilter().evaluate(
+        (ScheduledNewsEvent(NewsEventType.CPI, datetime(2026, 7, 6, 12, 39, tzinfo=UTC), "high", "EUR_USD"),),
+        timestamp,
+    )
+    eligibility = TradeEligibilityEngine().evaluate(
+        TradeEligibilityRequest(
+            strategy_active=True,
+            session_allowed=True,
+            opportunity_score=opportunity,
+            market_quality=quality,
+            portfolio_exposure=0.18,
+            daily_risk_remaining=0.02,
+            news_state=news_state,
+            manual_trading_suspension=False,
+            broker_healthy=True,
+        )
+    )
+    decision = IntradayTradeDecisionEngine().decide(
+        instrument="EUR_USD",
+        strategy_asset_id="QF-INTRADAY-1",
+        feature_vector_id="FV-TEST",
+        market_regime="TRENDING",
+        signal=IntradayTradeDecision.BUY,
+        eligibility=eligibility,
+        opportunity_score=opportunity,
+        market_quality=quality,
+        risk_state=DailyRiskState(),
+        portfolio_state={"portfolio_exposure": 0.18},
+        news_state=news_state,
+        timestamp=timestamp,
+    )
+    budget = DynamicDailyRiskBudgetEngine().allocate(0.02, opportunity)
+
+    assert news_state.paused is True
+    assert eligibility.eligible is False
+    assert decision.decision == IntradayTradeDecision.NO_TRADE
+    assert "High-impact news" in decision.reason
+    assert budget.policy == "Normal Risk"

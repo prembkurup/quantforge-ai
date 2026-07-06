@@ -47,6 +47,45 @@ class MarketReadinessDecision(StrEnum):
     NO_NEW_TRADES = "NO_NEW_TRADES"
 
 
+class MarketQualityRating(StrEnum):
+    POOR = "Poor"
+    FAIR = "Fair"
+    GOOD = "Good"
+    EXCELLENT = "Excellent"
+
+
+class NewsEventType(StrEnum):
+    INTEREST_RATE_DECISION = "Interest Rate Decision"
+    CPI = "CPI"
+    PPI = "PPI"
+    GDP = "GDP"
+    EMPLOYMENT_REPORT = "Employment Report"
+    CENTRAL_BANK_SPEECH = "Central Bank Speech"
+    NFP = "NFP"
+    PMI = "PMI"
+
+
+class TradeEligibilityStatus(StrEnum):
+    ELIGIBLE = "Eligible"
+    NOT_ELIGIBLE = "Not Eligible"
+
+
+class IntradayTradeDecision(StrEnum):
+    BUY = "BUY"
+    SELL = "SELL"
+    EXIT = "EXIT"
+    HOLD = "HOLD"
+    NO_TRADE = "NO TRADE"
+
+
+class DecisionIntelligenceTradingStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    WAITING = "WAITING"
+    PAUSED = "PAUSED"
+    NO_TRADING = "NO TRADING"
+    FINISHED = "FINISHED"
+
+
 @dataclass(frozen=True, slots=True)
 class IntradayPolicy:
     trading_style: TradingStyle = TradingStyle.INTRADAY
@@ -215,6 +254,111 @@ class MarketReadinessScore:
     band: MarketReadinessBand
     decision: MarketReadinessDecision
     factors: dict[str, int]
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class MarketQualityInputs:
+    spread: float
+    liquidity: float
+    volatility: float
+    price_stability: float
+    session: IntradaySession
+    market_structure: str
+
+
+@dataclass(frozen=True, slots=True)
+class MarketQualityScore:
+    score: int
+    rating: MarketQualityRating
+    factors: dict[str, int]
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduledNewsEvent:
+    event_type: NewsEventType
+    event_time: datetime
+    impact: str
+    instrument: str
+
+
+@dataclass(frozen=True, slots=True)
+class NewsFilterState:
+    paused: bool
+    reason: str
+    next_event: ScheduledNewsEvent | None = None
+    minutes_to_event: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TradeEligibilityRequest:
+    strategy_active: bool
+    session_allowed: bool
+    opportunity_score: MarketReadinessScore
+    market_quality: MarketQualityScore
+    portfolio_exposure: float
+    daily_risk_remaining: float
+    news_state: NewsFilterState
+    manual_trading_suspension: bool
+    broker_healthy: bool
+
+
+@dataclass(frozen=True, slots=True)
+class TradeEligibilityResult:
+    status: TradeEligibilityStatus
+    eligible: bool
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionTraceRecord:
+    timestamp: datetime
+    instrument: str
+    strategy_asset_id: str
+    feature_vector_id: str
+    market_regime: str
+    opportunity_score: int
+    market_quality: str
+    risk_state: dict[str, Any]
+    portfolio_state: dict[str, Any]
+    news_state: dict[str, Any]
+    final_decision: IntradayTradeDecision
+    decision_confidence: float
+    reason_codes: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class IntradayTradeDecisionResult:
+    decision: IntradayTradeDecision
+    confidence: float
+    reason: str
+    supporting_evidence: dict[str, Any]
+    decision_trace: DecisionTraceRecord
+
+
+@dataclass(frozen=True, slots=True)
+class DailyTradingPlan:
+    trading_day: str
+    preferred_sessions: tuple[IntradaySession, ...]
+    preferred_strategy_families: tuple[str, ...]
+    daily_risk_budget: float
+    capital_allocation: dict[str, float]
+    expected_regimes: tuple[str, ...]
+    maximum_trades: int
+    trading_objectives: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DynamicDailyRiskBudget:
+    opportunity_decision: MarketReadinessDecision
+    budget: float
+    policy: str
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionIntelligenceStatus:
+    status: DecisionIntelligenceTradingStatus
     reasons: tuple[str, ...]
 
 
@@ -636,6 +780,222 @@ class DailyMarketReadinessEvaluator:
         if factors["portfolio_exposure"] < 10:
             reasons.append("Existing portfolio exposure is consuming daily capacity.")
         return tuple(reasons)
+
+
+class MarketQualityEngine:
+    def evaluate(self, inputs: MarketQualityInputs) -> MarketQualityScore:
+        factors = {
+            "spread": DailyMarketReadinessEvaluator()._spread_score(inputs.spread),
+            "liquidity": self._liquidity_score(inputs.liquidity),
+            "volatility": DailyMarketReadinessEvaluator()._volatility_score(inputs.volatility),
+            "price_stability": self._price_stability_score(inputs.price_stability),
+            "session": DailyMarketReadinessEvaluator()._session_score(inputs.session),
+            "market_structure": self._structure_score(inputs.market_structure),
+        }
+        score = max(0, min(100, sum(factors.values())))
+        rating = self._rating(score)
+        reasons = [f"Market quality is {rating.value}."]
+        if rating in {MarketQualityRating.POOR, MarketQualityRating.FAIR}:
+            reasons.append("Current trading environment requires additional selectivity.")
+        return MarketQualityScore(score, rating, factors, tuple(reasons))
+
+    def _liquidity_score(self, liquidity: float) -> int:
+        if liquidity >= 0.80:
+            return 15
+        if liquidity >= 0.60:
+            return 10
+        if liquidity >= 0.40:
+            return 5
+        return 0
+
+    def _price_stability_score(self, price_stability: float) -> int:
+        if price_stability >= 0.80:
+            return 15
+        if price_stability >= 0.60:
+            return 10
+        if price_stability >= 0.40:
+            return 5
+        return 0
+
+    def _structure_score(self, market_structure: str) -> int:
+        structure = market_structure.strip().upper().replace(" ", "_")
+        if structure in {"CLEAN_TREND", "ORDERLY_RANGE", "BREAKOUT_STRUCTURE"}:
+            return 15
+        if structure in {"MIXED", "TRANSITION"}:
+            return 8
+        return 3
+
+    def _rating(self, score: int) -> MarketQualityRating:
+        if score >= 85:
+            return MarketQualityRating.EXCELLENT
+        if score >= 70:
+            return MarketQualityRating.GOOD
+        if score >= 45:
+            return MarketQualityRating.FAIR
+        return MarketQualityRating.POOR
+
+
+class NewsEventFilter:
+    def evaluate(
+        self,
+        events: tuple[ScheduledNewsEvent, ...],
+        timestamp: datetime,
+        *,
+        pause_before_minutes: int = 30,
+        cooldown_after_minutes: int = 15,
+    ) -> NewsFilterState:
+        current = timestamp.astimezone(UTC)
+        for event in sorted(events, key=lambda item: item.event_time):
+            event_time = event.event_time.astimezone(UTC)
+            minutes_to_event = int((event_time - current).total_seconds() // 60)
+            minutes_after_event = int((current - event_time).total_seconds() // 60)
+            if 0 <= minutes_to_event <= pause_before_minutes:
+                return NewsFilterState(True, f"High-impact news in {minutes_to_event} minutes.", event, minutes_to_event)
+            if 0 <= minutes_after_event <= cooldown_after_minutes:
+                return NewsFilterState(True, f"Cooling down after {event.event_type.value}.", event, -minutes_after_event)
+        return NewsFilterState(False, "No blocking scheduled news events.")
+
+
+class TradeEligibilityEngine:
+    def evaluate(self, request: TradeEligibilityRequest) -> TradeEligibilityResult:
+        reasons: list[str] = []
+        if not request.strategy_active:
+            reasons.append("Strategy is not active.")
+        if not request.session_allowed:
+            reasons.append("Session is not allowed.")
+        if request.opportunity_score.score < 40:
+            reasons.append("Opportunity score is below trading threshold.")
+        if request.market_quality.rating == MarketQualityRating.POOR:
+            reasons.append("Market quality is poor.")
+        if request.portfolio_exposure > 0.60:
+            reasons.append("Portfolio exposure is above allowed intraday capacity.")
+        if request.daily_risk_remaining <= 0:
+            reasons.append("No daily risk budget remains.")
+        if request.news_state.paused:
+            reasons.append(request.news_state.reason)
+        if request.manual_trading_suspension:
+            reasons.append("Manual trading suspension is active.")
+        if not request.broker_healthy:
+            reasons.append("Broker health check failed.")
+        eligible = not reasons
+        return TradeEligibilityResult(TradeEligibilityStatus.ELIGIBLE if eligible else TradeEligibilityStatus.NOT_ELIGIBLE, eligible, tuple(reasons))
+
+
+class IntradayTradeDecisionEngine:
+    def decide(
+        self,
+        *,
+        instrument: str,
+        strategy_asset_id: str,
+        feature_vector_id: str,
+        market_regime: str,
+        signal: IntradayTradeDecision,
+        eligibility: TradeEligibilityResult,
+        opportunity_score: MarketReadinessScore,
+        market_quality: MarketQualityScore,
+        risk_state: DailyRiskState,
+        portfolio_state: dict[str, Any],
+        news_state: NewsFilterState,
+        timestamp: datetime,
+    ) -> IntradayTradeDecisionResult:
+        if not eligibility.eligible:
+            final_decision = IntradayTradeDecision.NO_TRADE
+            confidence = 0.0
+            reason = "; ".join(eligibility.reasons)
+            reason_codes = tuple(reason.upper().replace(" ", "_").replace(".", "") for reason in eligibility.reasons)
+        else:
+            final_decision = signal if signal in {IntradayTradeDecision.BUY, IntradayTradeDecision.SELL, IntradayTradeDecision.EXIT} else IntradayTradeDecision.HOLD
+            confidence = round(min((opportunity_score.score / 100) * (market_quality.score / 100), 0.99), 2)
+            reason = "Trade decision passed decision intelligence checks."
+            reason_codes = ("DECISION_INTELLIGENCE_APPROVED",)
+        trace = DecisionTraceRecord(
+            timestamp=timestamp.astimezone(UTC),
+            instrument=instrument,
+            strategy_asset_id=strategy_asset_id,
+            feature_vector_id=feature_vector_id,
+            market_regime=market_regime,
+            opportunity_score=opportunity_score.score,
+            market_quality=market_quality.rating.value,
+            risk_state=asdict(risk_state),
+            portfolio_state=portfolio_state,
+            news_state={
+                "paused": news_state.paused,
+                "reason": news_state.reason,
+                "minutes_to_event": news_state.minutes_to_event,
+            },
+            final_decision=final_decision,
+            decision_confidence=confidence,
+            reason_codes=reason_codes,
+        )
+        return IntradayTradeDecisionResult(
+            decision=final_decision,
+            confidence=confidence,
+            reason=reason,
+            supporting_evidence={
+                "eligibility": eligibility.status.value,
+                "opportunity_band": opportunity_score.band.value,
+                "market_quality": market_quality.rating.value,
+            },
+            decision_trace=trace,
+        )
+
+
+class DynamicDailyRiskBudgetEngine:
+    def allocate(self, base_daily_risk: float, opportunity_score: MarketReadinessScore) -> DynamicDailyRiskBudget:
+        if opportunity_score.decision == MarketReadinessDecision.EXCELLENT:
+            return DynamicDailyRiskBudget(opportunity_score.decision, base_daily_risk, "Normal Risk")
+        if opportunity_score.decision == MarketReadinessDecision.NORMAL:
+            return DynamicDailyRiskBudget(opportunity_score.decision, round(base_daily_risk * 0.75, 4), "Reduced Risk")
+        if opportunity_score.decision == MarketReadinessDecision.SELECTIVE:
+            return DynamicDailyRiskBudget(opportunity_score.decision, round(base_daily_risk * 0.35, 4), "Minimal Risk")
+        return DynamicDailyRiskBudget(opportunity_score.decision, 0.0, "No New Trades")
+
+
+class DailyTradingPlanGenerator:
+    def generate(
+        self,
+        *,
+        trading_day: str,
+        profile: IntradayStrategyProfile,
+        opportunity_score: MarketReadinessScore,
+        risk_budget: DynamicDailyRiskBudget,
+    ) -> DailyTradingPlan:
+        return DailyTradingPlan(
+            trading_day=trading_day,
+            preferred_sessions=profile.allowed_sessions,
+            preferred_strategy_families=("intraday_momentum", "session_breakout", "mean_reversion"),
+            daily_risk_budget=risk_budget.budget,
+            capital_allocation={
+                session.value: round(1 / max(len(profile.allowed_sessions), 1), 4)
+                for session in profile.allowed_sessions
+            },
+            expected_regimes=("TRENDING", "RANGING") if opportunity_score.score >= 40 else ("NO_TRADE",),
+            maximum_trades=profile.daily_risk_profile.max_trades_per_day if risk_budget.budget > 0 else 0,
+            trading_objectives=(
+                "Trade only high-quality intraday opportunities.",
+                "End the trading day with zero open positions.",
+                "Preserve daily risk budget when market quality is weak.",
+            ),
+        )
+
+
+class DecisionIntelligenceStatusEngine:
+    def status(
+        self,
+        *,
+        snapshot: DailyOperationsSnapshot,
+        eligibility: TradeEligibilityResult,
+        news_state: NewsFilterState,
+    ) -> DecisionIntelligenceStatus:
+        if snapshot.trading_status == IntradayTradingStatus.FINISHED_END_OF_DAY:
+            return DecisionIntelligenceStatus(DecisionIntelligenceTradingStatus.FINISHED, ("End-of-day cutoff reached.",))
+        if news_state.paused:
+            return DecisionIntelligenceStatus(DecisionIntelligenceTradingStatus.NO_TRADING, (news_state.reason,))
+        if not eligibility.eligible:
+            return DecisionIntelligenceStatus(DecisionIntelligenceTradingStatus.PAUSED, eligibility.reasons)
+        if snapshot.trading_status == IntradayTradingStatus.NO_TRADING:
+            return DecisionIntelligenceStatus(DecisionIntelligenceTradingStatus.WAITING, ("Waiting for an approved trading session.",))
+        return DecisionIntelligenceStatus(DecisionIntelligenceTradingStatus.ACTIVE, ("Decision intelligence allows new trade evaluation.",))
 
 
 def default_trade_journal_path(repo_root: Path | None = None) -> Path:

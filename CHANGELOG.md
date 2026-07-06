@@ -12,6 +12,7 @@
 - Added React Intraday dashboard page for daily trading, daily risk, certification, report, learning-loop, and journal evidence.
 - Added start/end-of-day intraday scheduler script and Windows launcher.
 - Added the daily market readiness gate that scores pre-trade conditions from 0-100 before any new intraday trades are considered.
+- Added Milestone 24 Decision Intelligence Platform primitives, API, dashboard page, scripts, tests, and specification.
 - Restored QuantForge AI repo-facing metadata and documented the intraday-only strategy policy.
 - Added Admin live trading master switch through `risk.live_trading_enabled`.
 - Connected the dashboard header to live platform health and live trading status.

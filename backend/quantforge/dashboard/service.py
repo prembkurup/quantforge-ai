@@ -57,12 +57,24 @@ from quantforge.live import (
     DailyReportGenerator,
     DailyRiskController,
     DailyRiskState,
+    DailyTradingPlanGenerator,
+    DecisionIntelligenceStatusEngine,
+    DynamicDailyRiskBudgetEngine,
     IntradayCertificationEngine,
     IntradayMetricsCalculator,
+    IntradayTradeDecision,
+    IntradayTradeDecisionEngine,
     MarketReadinessDecision,
     MarketReadinessInputs,
+    MarketQualityEngine,
+    MarketQualityInputs,
+    NewsEventFilter,
+    NewsEventType,
+    ScheduledNewsEvent,
     SessionEngine,
     SessionPortfolioManager,
+    TradeEligibilityEngine,
+    TradeEligibilityRequest,
     TradeJournalStore,
     default_intraday_profile,
     default_trade_journal_path,
@@ -767,6 +779,134 @@ class DashboardService:
             },
             "trade_journal": journal_entries,
             "timestamp": snapshot.timestamp.isoformat(),
+        }
+
+    def intraday_decision_intelligence(self) -> dict[str, Any]:
+        daily = self.intraday_daily()
+        profile = default_intraday_profile()
+        timestamp = datetime.now(UTC)
+        session = SessionEngine().current_session(timestamp)
+        readiness_inputs = MarketReadinessInputs(
+            market_regime=daily["market_readiness"]["inputs"]["market_regime"],
+            volatility=float(daily["market_readiness"]["inputs"]["volatility"]),
+            spread=float(daily["market_readiness"]["inputs"]["spread"]),
+            session=session,
+            available_strategies=len(daily.get("active_strategies", [])),
+            portfolio_exposure=float(daily["market_readiness"]["inputs"]["portfolio_exposure"]),
+        )
+        opportunity_score = DailyMarketReadinessEvaluator().evaluate(readiness_inputs)
+        market_quality = MarketQualityEngine().evaluate(
+            MarketQualityInputs(
+                spread=readiness_inputs.spread,
+                liquidity=0.82,
+                volatility=readiness_inputs.volatility,
+                price_stability=0.84,
+                session=session,
+                market_structure="CLEAN_TREND",
+            )
+        )
+        news_state = NewsEventFilter().evaluate(
+            (
+                ScheduledNewsEvent(
+                    NewsEventType.CENTRAL_BANK_SPEECH,
+                    timestamp + timedelta(minutes=120),
+                    "medium",
+                    "EUR_USD",
+                ),
+            ),
+            timestamp,
+        )
+        risk_state = DailyRiskState(
+            realized_daily_loss=max(profile.daily_risk_profile.max_daily_loss - float(daily["remaining_daily_risk"]), 0.0),
+            current_daily_drawdown=float(daily["daily_drawdown"]),
+            trades_today=int(daily["todays_trades"]),
+            daily_exposure=readiness_inputs.portfolio_exposure,
+            strategy_allocation=readiness_inputs.portfolio_exposure,
+            currency_exposure=readiness_inputs.portfolio_exposure,
+        )
+        eligibility = TradeEligibilityEngine().evaluate(
+            TradeEligibilityRequest(
+                strategy_active=bool(daily.get("active_strategies")),
+                session_allowed=session in profile.allowed_sessions,
+                opportunity_score=opportunity_score,
+                market_quality=market_quality,
+                portfolio_exposure=readiness_inputs.portfolio_exposure,
+                daily_risk_remaining=float(daily["remaining_daily_risk"]),
+                news_state=news_state,
+                manual_trading_suspension=False,
+                broker_healthy=True,
+            )
+        )
+        decision = IntradayTradeDecisionEngine().decide(
+            instrument="EUR_USD",
+            strategy_asset_id=str(next(iter(daily.get("active_strategies", ["QF-INTRADAY-DEMO"])))),
+            feature_vector_id=f"FV-{timestamp.strftime('%Y%m%d')}-INTRADAY",
+            market_regime=readiness_inputs.market_regime,
+            signal=IntradayTradeDecision.BUY,
+            eligibility=eligibility,
+            opportunity_score=opportunity_score,
+            market_quality=market_quality,
+            risk_state=risk_state,
+            portfolio_state={
+                "session_portfolio": daily["session_portfolio"],
+                "portfolio_exposure": readiness_inputs.portfolio_exposure,
+                "active_strategies": daily.get("active_strategies", []),
+            },
+            news_state=news_state,
+            timestamp=timestamp,
+        )
+        risk_budget = DynamicDailyRiskBudgetEngine().allocate(profile.daily_risk_profile.max_daily_loss, opportunity_score)
+        plan = DailyTradingPlanGenerator().generate(
+            trading_day=timestamp.date().isoformat(),
+            profile=profile,
+            opportunity_score=opportunity_score,
+            risk_budget=risk_budget,
+        )
+        status = DecisionIntelligenceStatusEngine().status(
+            snapshot=DailyOperationsDashboardBuilder().snapshot(
+                profile,
+                risk_state,
+                SessionPortfolioManager().build({"QF-INTRADAY-DEMO": profile}),
+                timestamp,
+                todays_pl=float(daily["todays_pl"]),
+                open_positions=int(daily["open_positions"]),
+                risk_paused=not eligibility.eligible,
+            ),
+            eligibility=eligibility,
+            news_state=news_state,
+        )
+        return {
+            "opportunity_score": {
+                "score": opportunity_score.score,
+                "band": opportunity_score.band.value,
+                "decision": opportunity_score.decision.value,
+                "factors": opportunity_score.factors,
+                "reasons": list(opportunity_score.reasons),
+            },
+            "market_quality": {
+                "score": market_quality.score,
+                "rating": market_quality.rating.value,
+                "factors": market_quality.factors,
+                "reasons": list(market_quality.reasons),
+            },
+            "news_filter": _news_state_payload(news_state),
+            "eligibility": {
+                "status": eligibility.status.value,
+                "eligible": eligibility.eligible,
+                "reasons": list(eligibility.reasons),
+            },
+            "trade_decision": _trade_decision_payload(decision),
+            "daily_trading_plan": _daily_plan_payload(plan),
+            "dynamic_daily_risk_budget": {
+                "opportunity_decision": risk_budget.opportunity_decision.value,
+                "budget": risk_budget.budget,
+                "policy": risk_budget.policy,
+            },
+            "intraday_trading_status": {
+                "status": status.status.value,
+                "reasons": list(status.reasons),
+            },
+            "timestamp": timestamp.isoformat(),
         }
 
     def _engine_workload_from(self, engines: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1680,4 +1820,58 @@ def _indicator(name: str, category: str, purpose: str, used_by: str) -> dict[str
         "purpose": purpose,
         "used_by": used_by,
         "status": "ACTIVE",
+    }
+
+
+def _news_state_payload(news_state: Any) -> dict[str, Any]:
+    return {
+        "paused": news_state.paused,
+        "reason": news_state.reason,
+        "minutes_to_event": news_state.minutes_to_event,
+        "next_event": {
+            "event_type": news_state.next_event.event_type.value,
+            "event_time": news_state.next_event.event_time.isoformat(),
+            "impact": news_state.next_event.impact,
+            "instrument": news_state.next_event.instrument,
+        }
+        if news_state.next_event
+        else None,
+    }
+
+
+def _trade_decision_payload(decision: Any) -> dict[str, Any]:
+    trace = decision.decision_trace
+    return {
+        "decision": decision.decision.value,
+        "confidence": decision.confidence,
+        "reason": decision.reason,
+        "supporting_evidence": decision.supporting_evidence,
+        "decision_trace": {
+            "timestamp": trace.timestamp.isoformat(),
+            "instrument": trace.instrument,
+            "strategy_asset_id": trace.strategy_asset_id,
+            "feature_vector_id": trace.feature_vector_id,
+            "market_regime": trace.market_regime,
+            "opportunity_score": trace.opportunity_score,
+            "market_quality": trace.market_quality,
+            "risk_state": trace.risk_state,
+            "portfolio_state": trace.portfolio_state,
+            "news_state": trace.news_state,
+            "final_decision": trace.final_decision.value,
+            "decision_confidence": trace.decision_confidence,
+            "reason_codes": list(trace.reason_codes),
+        },
+    }
+
+
+def _daily_plan_payload(plan: Any) -> dict[str, Any]:
+    return {
+        "trading_day": plan.trading_day,
+        "preferred_sessions": [session.value for session in plan.preferred_sessions],
+        "preferred_strategy_families": list(plan.preferred_strategy_families),
+        "daily_risk_budget": plan.daily_risk_budget,
+        "capital_allocation": plan.capital_allocation,
+        "expected_regimes": list(plan.expected_regimes),
+        "maximum_trades": plan.maximum_trades,
+        "trading_objectives": list(plan.trading_objectives),
     }

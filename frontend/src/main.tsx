@@ -76,6 +76,7 @@ function App() {
               <Route path="/indicators" element={<Indicators />} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/intraday" element={<IntradayDaily />} />
+              <Route path="/decision-intelligence" element={<DecisionIntelligence />} />
               <Route path="/paper" element={<Paper />} />
               <Route path="/history-validation" element={<HistoryValidation />} />
               <Route path="/operations" element={<Operations />} />
@@ -103,6 +104,7 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     ["/indicators", "Indicators", BookOpen],
     ["/portfolio", "Portfolio", ShieldCheck],
     ["/intraday", "Intraday", Activity],
+    ["/decision-intelligence", "Decision Intel", Brain],
     ["/paper", "Paper", CandlestickChart],
     ["/history-validation", "History Validation", Database],
     ["/operations", "Operations", HeartPulse],
@@ -773,6 +775,64 @@ function IntradayDaily() {
       <JsonPanel title="Daily Report" data={report} />
       <JsonPanel title="Daily Learning Loop" data={learning} />
       <JsonPanel title="Trade Journal Evidence" data={data.trade_journal ?? []} />
+    </Page>
+  );
+}
+
+function DecisionIntelligence() {
+  const data = useApi<any>("/api/intraday/decision-intelligence");
+  if (!data) return <Loading />;
+  const opportunity = data.opportunity_score ?? {};
+  const quality = data.market_quality ?? {};
+  const eligibility = data.eligibility ?? {};
+  const decision = data.trade_decision ?? {};
+  const plan = data.daily_trading_plan ?? {};
+  const budget = data.dynamic_daily_risk_budget ?? {};
+  const status = data.intraday_trading_status ?? {};
+  return (
+    <Page title="Intraday Decision Intelligence">
+      <div className="kpi-grid">
+        <KpiCard title="Opportunity" value={`${opportunity.score ?? 0}/100`} tone={Number(opportunity.score ?? 0) >= 70 ? "good" : "warn"} />
+        <KpiCard title="Market Quality" value={quality.rating ?? "UNKNOWN"} tone={(quality.rating ?? "") === "Poor" ? "warn" : "good"} />
+        <KpiCard title="Eligibility" value={eligibility.status ?? "UNKNOWN"} tone={eligibility.eligible ? "good" : "warn"} />
+        <KpiCard title="Final Decision" value={decision.decision ?? "UNKNOWN"} tone={decision.decision === "NO TRADE" ? "warn" : "good"} />
+        <KpiCard title="Confidence" value={decision.confidence ?? 0} />
+        <KpiCard title="Trading Status" value={status.status ?? "UNKNOWN"} tone={status.status === "ACTIVE" ? "good" : "warn"} />
+        <KpiCard title="Risk Budget" value={budget.budget ?? 0} />
+        <KpiCard title="Risk Policy" value={budget.policy ?? "UNKNOWN"} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Daily Trading Plan</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Preferred Sessions" value={(plan.preferred_sessions ?? []).join(", ")} />
+            <MiniFact label="Strategy Families" value={(plan.preferred_strategy_families ?? []).join(", ")} />
+            <MiniFact label="Expected Regimes" value={(plan.expected_regimes ?? []).join(", ")} />
+            <MiniFact label="Max Trades" value={plan.maximum_trades ?? 0} />
+          </div>
+        </section>
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Decision Reasons</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Eligibility" value={(eligibility.reasons ?? []).join(", ") || "Eligible"} />
+            <MiniFact label="Decision" value={decision.reason ?? "No decision reason"} />
+            <MiniFact label="Status" value={(status.reasons ?? []).join(", ")} />
+          </div>
+        </section>
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">News Filter</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Paused" value={data.news_filter?.paused ? "YES" : "NO"} />
+            <MiniFact label="Reason" value={data.news_filter?.reason ?? "None"} />
+            <MiniFact label="Minutes" value={data.news_filter?.minutes_to_event ?? "N/A"} />
+          </div>
+        </section>
+      </div>
+
+      <JsonPanel title="Opportunity Evidence" data={opportunity} />
+      <JsonPanel title="Market Quality Evidence" data={quality} />
+      <JsonPanel title="Decision Trace" data={decision.decision_trace ?? {}} />
     </Page>
   );
 }

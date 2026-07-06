@@ -57,8 +57,11 @@ from quantforge.live import (
     DailyReportGenerator,
     DailyRiskController,
     DailyRiskState,
+    DailyDecisionJournalGenerator,
     DailyTradingPlanGenerator,
     DecisionIntelligenceStatusEngine,
+    DecisionQualityMetricsCalculator,
+    DecisionTimelineBuilder,
     DynamicDailyRiskBudgetEngine,
     IntradayCertificationEngine,
     IntradayMetricsCalculator,
@@ -875,6 +878,50 @@ class DashboardService:
             eligibility=eligibility,
             news_state=news_state,
         )
+        timeline = DecisionTimelineBuilder().build(
+            timestamp=timestamp,
+            opportunity_score=opportunity_score,
+            market_quality=market_quality,
+            eligibility=eligibility,
+            decision=decision,
+            status=status,
+        )
+        journal = DailyDecisionJournalGenerator().generate(
+            trading_day=timestamp.date().isoformat(),
+            opportunity_score=opportunity_score,
+            market_quality=market_quality,
+            decision=decision,
+            eligibility=eligibility,
+            risk_budget=risk_budget,
+        )
+        avoided_eligibility = TradeEligibilityEngine().evaluate(
+            TradeEligibilityRequest(
+                strategy_active=True,
+                session_allowed=True,
+                opportunity_score=opportunity_score,
+                market_quality=market_quality,
+                portfolio_exposure=readiness_inputs.portfolio_exposure,
+                daily_risk_remaining=0.0,
+                news_state=news_state,
+                manual_trading_suspension=False,
+                broker_healthy=True,
+            )
+        )
+        avoided_decision = IntradayTradeDecisionEngine().decide(
+            instrument="EUR_USD",
+            strategy_asset_id="QF-INTRADAY-DEMO",
+            feature_vector_id=f"FV-{timestamp.strftime('%Y%m%d')}-AVOIDED",
+            market_regime="NEWS_RISK",
+            signal=IntradayTradeDecision.BUY,
+            eligibility=avoided_eligibility,
+            opportunity_score=opportunity_score,
+            market_quality=market_quality,
+            risk_state=risk_state,
+            portfolio_state={"portfolio_exposure": readiness_inputs.portfolio_exposure},
+            news_state=news_state,
+            timestamp=timestamp,
+        )
+        quality_metrics = DecisionQualityMetricsCalculator().calculate((decision, avoided_decision))
         return {
             "opportunity_score": {
                 "score": opportunity_score.score,
@@ -906,6 +953,21 @@ class DashboardService:
                 "status": status.status.value,
                 "reasons": list(status.reasons),
             },
+            "dashboard": {
+                "current_session": session.value,
+                "opportunity_score": opportunity_score.score,
+                "market_quality": market_quality.rating.value,
+                "trading_status": status.status.value,
+                "todays_risk_usage": risk_state.realized_daily_loss,
+                "todays_trades": risk_state.trades_today,
+                "remaining_risk_budget": daily["remaining_daily_risk"],
+                "current_portfolio": daily["session_portfolio"],
+                "expected_market_regime": plan.expected_regimes[0],
+                "next_high_impact_event": _news_state_payload(news_state)["next_event"],
+            },
+            "decision_timeline": [_timeline_event_payload(item) for item in timeline],
+            "daily_trading_journal": _daily_decision_journal_payload(journal),
+            "decision_quality_metrics": _decision_quality_metrics_payload(quality_metrics),
             "timestamp": timestamp.isoformat(),
         }
 
@@ -1874,4 +1936,42 @@ def _daily_plan_payload(plan: Any) -> dict[str, Any]:
         "expected_regimes": list(plan.expected_regimes),
         "maximum_trades": plan.maximum_trades,
         "trading_objectives": list(plan.trading_objectives),
+    }
+
+
+def _timeline_event_payload(event: Any) -> dict[str, Any]:
+    return {
+        "timestamp": event.timestamp.isoformat(),
+        "stage": event.stage,
+        "status": event.status,
+        "reason": event.reason,
+    }
+
+
+def _daily_decision_journal_payload(journal: Any) -> dict[str, Any]:
+    return {
+        "journal_id": journal.journal_id,
+        "trading_day": journal.trading_day,
+        "market_summary": journal.market_summary,
+        "trading_opportunities": list(journal.trading_opportunities),
+        "trades_executed": list(journal.trades_executed),
+        "trades_skipped": list(journal.trades_skipped),
+        "risk_summary": journal.risk_summary,
+        "strategy_performance": journal.strategy_performance,
+        "knowledge_updates": list(journal.knowledge_updates),
+        "recommendations": list(journal.recommendations),
+    }
+
+
+def _decision_quality_metrics_payload(metrics: Any) -> dict[str, Any]:
+    return {
+        "trading_days": metrics.trading_days,
+        "opportunity_days": metrics.opportunity_days,
+        "no_trade_days": metrics.no_trade_days,
+        "trades_avoided": metrics.trades_avoided,
+        "average_opportunity_score": metrics.average_opportunity_score,
+        "average_market_quality": metrics.average_market_quality,
+        "average_decision_confidence": metrics.average_decision_confidence,
+        "trade_acceptance_rate": metrics.trade_acceptance_rate,
+        "trade_rejection_reasons": metrics.trade_rejection_reasons,
     }

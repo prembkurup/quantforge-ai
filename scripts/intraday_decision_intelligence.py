@@ -12,6 +12,8 @@ def main() -> None:
     plan = payload["daily_trading_plan"]
     budget = payload["dynamic_daily_risk_budget"]
     status = payload["intraday_trading_status"]
+    journal = payload["daily_trading_journal"]
+    quality_metrics = payload["decision_quality_metrics"]
 
     print("QuantForge AI Version 2.0")
     print("Milestone 24 - Intraday Decision Intelligence")
@@ -39,6 +41,19 @@ def main() -> None:
     print(f"Daily Risk Budget: {plan['daily_risk_budget']}")
     print(f"Maximum Trades: {plan['maximum_trades']}")
     print(f"Risk Policy: {budget['policy']}")
+    print()
+    print("Decision Timeline")
+    for item in payload["decision_timeline"]:
+        print(f"{item['stage']}: {item['status']} - {item['reason']}")
+    print()
+    print("Daily Trading Journal")
+    print(journal["journal_id"])
+    print(f"Trades Executed: {len(journal['trades_executed'])}")
+    print(f"Trades Skipped: {len(journal['trades_skipped'])}")
+    print()
+    print("Decision Quality Metrics")
+    print(f"Trades Avoided: {quality_metrics['trades_avoided']}")
+    print(f"Acceptance Rate: {quality_metrics['trade_acceptance_rate']}")
 
 
 if __name__ == "__main__":

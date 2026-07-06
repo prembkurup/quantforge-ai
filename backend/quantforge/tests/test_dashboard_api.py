@@ -128,6 +128,10 @@ def test_intraday_decision_intelligence_endpoint_exposes_milestone_24_layers() -
     assert payload["daily_trading_plan"]["preferred_sessions"]
     assert payload["dynamic_daily_risk_budget"]["policy"] in {"Normal Risk", "Reduced Risk", "Minimal Risk", "No New Trades"}
     assert payload["intraday_trading_status"]["status"] in {"ACTIVE", "WAITING", "PAUSED", "NO TRADING", "FINISHED"}
+    assert payload["dashboard"]["current_session"]
+    assert payload["decision_timeline"]
+    assert payload["daily_trading_journal"]["journal_id"].startswith("DECISION-JOURNAL-")
+    assert payload["decision_quality_metrics"]["trades_avoided"] >= 0
 
 
 def test_pipeline_snapshot_combines_page_payload_for_fast_loading() -> None:

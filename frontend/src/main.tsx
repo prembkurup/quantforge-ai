@@ -789,6 +789,8 @@ function DecisionIntelligence() {
   const plan = data.daily_trading_plan ?? {};
   const budget = data.dynamic_daily_risk_budget ?? {};
   const status = data.intraday_trading_status ?? {};
+  const dashboard = data.dashboard ?? {};
+  const qualityMetrics = data.decision_quality_metrics ?? {};
   return (
     <Page title="Intraday Decision Intelligence">
       <div className="kpi-grid">
@@ -798,7 +800,12 @@ function DecisionIntelligence() {
         <KpiCard title="Final Decision" value={decision.decision ?? "UNKNOWN"} tone={decision.decision === "NO TRADE" ? "warn" : "good"} />
         <KpiCard title="Confidence" value={decision.confidence ?? 0} />
         <KpiCard title="Trading Status" value={status.status ?? "UNKNOWN"} tone={status.status === "ACTIVE" ? "good" : "warn"} />
+        <KpiCard title="Today's Risk Usage" value={dashboard.todays_risk_usage ?? 0} />
+        <KpiCard title="Today's Trades" value={dashboard.todays_trades ?? 0} />
         <KpiCard title="Risk Budget" value={budget.budget ?? 0} />
+        <KpiCard title="Remaining Risk" value={dashboard.remaining_risk_budget ?? 0} />
+        <KpiCard title="Current Portfolio" value={dashboard.current_portfolio ?? "UNKNOWN"} />
+        <KpiCard title="Expected Regime" value={dashboard.expected_market_regime ?? "UNKNOWN"} />
         <KpiCard title="Risk Policy" value={budget.policy ?? "UNKNOWN"} />
       </div>
 
@@ -826,10 +833,16 @@ function DecisionIntelligence() {
             <MiniFact label="Paused" value={data.news_filter?.paused ? "YES" : "NO"} />
             <MiniFact label="Reason" value={data.news_filter?.reason ?? "None"} />
             <MiniFact label="Minutes" value={data.news_filter?.minutes_to_event ?? "N/A"} />
+            <MiniFact label="Next Event" value={dashboard.next_high_impact_event?.event_type ?? "None"} />
           </div>
         </section>
       </div>
 
+      <DataTable title={`Decision Timeline (${(data.decision_timeline ?? []).length})`} rows={data.decision_timeline ?? []} />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <JsonPanel title="Daily Trading Journal" data={data.daily_trading_journal ?? {}} />
+        <JsonPanel title="Decision Quality Metrics" data={qualityMetrics} />
+      </div>
       <JsonPanel title="Opportunity Evidence" data={opportunity} />
       <JsonPanel title="Market Quality Evidence" data={quality} />
       <JsonPanel title="Decision Trace" data={decision.decision_trace ?? {}} />

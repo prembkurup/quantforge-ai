@@ -350,6 +350,41 @@ class DailyTradingPlan:
 
 
 @dataclass(frozen=True, slots=True)
+class DecisionTimelineEvent:
+    timestamp: datetime
+    stage: str
+    status: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class DailyDecisionJournal:
+    journal_id: str
+    trading_day: str
+    market_summary: dict[str, Any]
+    trading_opportunities: tuple[dict[str, Any], ...]
+    trades_executed: tuple[dict[str, Any], ...]
+    trades_skipped: tuple[dict[str, Any], ...]
+    risk_summary: dict[str, Any]
+    strategy_performance: dict[str, Any]
+    knowledge_updates: tuple[str, ...]
+    recommendations: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionQualityMetrics:
+    trading_days: int
+    opportunity_days: int
+    no_trade_days: int
+    trades_avoided: int
+    average_opportunity_score: float
+    average_market_quality: float
+    average_decision_confidence: float
+    trade_acceptance_rate: float
+    trade_rejection_reasons: dict[str, int]
+
+
+@dataclass(frozen=True, slots=True)
 class DynamicDailyRiskBudget:
     opportunity_decision: MarketReadinessDecision
     budget: float
@@ -996,6 +1031,84 @@ class DecisionIntelligenceStatusEngine:
         if snapshot.trading_status == IntradayTradingStatus.NO_TRADING:
             return DecisionIntelligenceStatus(DecisionIntelligenceTradingStatus.WAITING, ("Waiting for an approved trading session.",))
         return DecisionIntelligenceStatus(DecisionIntelligenceTradingStatus.ACTIVE, ("Decision intelligence allows new trade evaluation.",))
+
+
+class DecisionTimelineBuilder:
+    def build(
+        self,
+        *,
+        timestamp: datetime,
+        opportunity_score: MarketReadinessScore,
+        market_quality: MarketQualityScore,
+        eligibility: TradeEligibilityResult,
+        decision: IntradayTradeDecisionResult,
+        status: DecisionIntelligenceStatus,
+    ) -> tuple[DecisionTimelineEvent, ...]:
+        return (
+            DecisionTimelineEvent(timestamp, "Daily Opportunity Engine", opportunity_score.decision.value, opportunity_score.band.value),
+            DecisionTimelineEvent(timestamp, "Market Quality Engine", market_quality.rating.value, f"Score {market_quality.score}/100"),
+            DecisionTimelineEvent(timestamp, "Trade Eligibility Engine", eligibility.status.value, "; ".join(eligibility.reasons) or "Eligible."),
+            DecisionTimelineEvent(timestamp, "Trade Decision Engine", decision.decision.value, decision.reason),
+            DecisionTimelineEvent(timestamp, "Intraday Trading Status", status.status.value, "; ".join(status.reasons)),
+        )
+
+
+class DailyDecisionJournalGenerator:
+    def generate(
+        self,
+        *,
+        trading_day: str,
+        opportunity_score: MarketReadinessScore,
+        market_quality: MarketQualityScore,
+        decision: IntradayTradeDecisionResult,
+        eligibility: TradeEligibilityResult,
+        risk_budget: DynamicDailyRiskBudget,
+    ) -> DailyDecisionJournal:
+        skipped = () if eligibility.eligible else ({"decision": decision.decision.value, "reasons": list(eligibility.reasons)},)
+        executed = ({"decision": decision.decision.value, "confidence": decision.confidence},) if decision.decision in {IntradayTradeDecision.BUY, IntradayTradeDecision.SELL, IntradayTradeDecision.EXIT} else ()
+        return DailyDecisionJournal(
+            journal_id=f"DECISION-JOURNAL-{trading_day}",
+            trading_day=trading_day,
+            market_summary={
+                "opportunity_score": opportunity_score.score,
+                "opportunity_band": opportunity_score.band.value,
+                "market_quality": market_quality.rating.value,
+            },
+            trading_opportunities=({"score": opportunity_score.score, "decision": opportunity_score.decision.value},),
+            trades_executed=executed,
+            trades_skipped=skipped,
+            risk_summary={"daily_risk_budget": risk_budget.budget, "risk_policy": risk_budget.policy},
+            strategy_performance={"decision_confidence": decision.confidence},
+            knowledge_updates=("decision_trace_recorded", "decision_quality_inputs_available"),
+            recommendations=("Keep avoiding trades when decision intelligence rejects participation.",),
+        )
+
+
+class DecisionQualityMetricsCalculator:
+    def calculate(self, decisions: tuple[IntradayTradeDecisionResult, ...]) -> DecisionQualityMetrics:
+        trading_days = max(len(decisions), 1)
+        accepted = [item for item in decisions if item.decision != IntradayTradeDecision.NO_TRADE]
+        rejected = [item for item in decisions if item.decision == IntradayTradeDecision.NO_TRADE]
+        opportunity_scores = [float(item.decision_trace.opportunity_score) for item in decisions]
+        quality_scores = [
+            {"Poor": 25.0, "Fair": 50.0, "Good": 75.0, "Excellent": 100.0}.get(item.decision_trace.market_quality, 0.0)
+            for item in decisions
+        ]
+        reasons: dict[str, int] = {}
+        for item in rejected:
+            for reason in item.decision_trace.reason_codes:
+                reasons[reason] = reasons.get(reason, 0) + 1
+        return DecisionQualityMetrics(
+            trading_days=trading_days,
+            opportunity_days=sum(1 for score in opportunity_scores if score >= 40),
+            no_trade_days=len(rejected),
+            trades_avoided=len(rejected),
+            average_opportunity_score=round(_avg(opportunity_scores), 2),
+            average_market_quality=round(_avg(quality_scores), 2),
+            average_decision_confidence=round(_avg([item.confidence for item in decisions]), 2),
+            trade_acceptance_rate=round(len(accepted) / trading_days, 4),
+            trade_rejection_reasons=reasons,
+        )
 
 
 def default_trade_journal_path(repo_root: Path | None = None) -> Path:

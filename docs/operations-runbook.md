@@ -8,6 +8,7 @@
 - The Admin page owns the `risk.live_trading_enabled` setting.
 - The Intraday page reads `GET /api/intraday/daily` for market readiness, session, daily P/L, open positions, daily risk, certification, report, learning-loop, and Trade Journal evidence.
 - The Decision Intel page reads `GET /api/intraday/decision-intelligence` for opportunity score, market quality, news state, trade eligibility, final decision, decision trace, daily plan, dynamic risk budget, and status reasons.
+- The Decision Intel page also displays the decision timeline, Daily Trading Journal, and Decision Quality Metrics so avoided trades are auditable.
 
 ## Intraday Operations
 

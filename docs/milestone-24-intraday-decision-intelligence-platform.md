@@ -214,3 +214,109 @@ Possible values:
 - FINISHED
 
 Reasons are displayed for every non-active state.
+
+## 24.14 Dashboard
+
+The dashboard displays:
+
+- Current session
+- Opportunity score
+- Market quality
+- Trading status
+- Today's risk usage
+- Today's trades
+- Remaining risk budget
+- Current portfolio
+- Expected market regime
+- Next high-impact event
+- Decision timeline
+
+## 24.15 Daily Trading Journal
+
+The Daily Trading Journal is generated automatically and becomes part of the Knowledge Base.
+
+Sections:
+
+- Market summary
+- Trading opportunities
+- Trades executed
+- Trades skipped
+- Reasons for skipped trades
+- Risk summary
+- Strategy performance
+- Knowledge updates
+- Recommendations
+
+## 24.16 Decision Quality Metrics
+
+Decision quality is measured separately from profitability.
+
+Metrics:
+
+- Trading days
+- Opportunity days
+- No trade days
+- Trades avoided
+- Average opportunity score
+- Average market quality
+- Average decision confidence
+- Trade acceptance rate
+- Trade rejection reasons
+
+## 24.17 Acceptance Criteria
+
+The Decision Intelligence Platform is complete when:
+
+- Every trade passes through the Opportunity Engine.
+- Every trade passes through the Market Quality Engine.
+- Every trade passes through the Trade Eligibility Engine.
+- Every decision has a complete Decision Trace.
+- Daily Trading Plans are generated automatically.
+- Session-specific portfolios activate correctly.
+- No trades are opened outside policy.
+- Dashboard displays all decision information.
+
+## 24.18 Deliverables
+
+Software:
+
+- Daily Opportunity Engine
+- Market Quality Engine
+- News Filter
+- Trade Eligibility Engine
+- Decision Trace Manager
+- Daily Trading Planner
+- Trading Journal Generator
+
+Dashboard:
+
+- Opportunity Dashboard
+- Market Quality Dashboard
+- Daily Trading Dashboard
+- Decision Timeline
+
+Reports:
+
+- Daily Trading Journal
+- Decision Quality Report
+- Opportunity Analysis Report
+
+## 24.19 Exit Criteria
+
+Milestone 24 is complete when QuantForge AI demonstrates that it can intelligently decide when not to trade, applying opportunity assessment, market quality evaluation, session awareness, portfolio context, and operational conditions before allowing any strategy to execute.
+
+The platform should be capable of ending an entire trading day without opening a single position if the Decision Intelligence Platform determines that market conditions are unsuitable.
+
+## 24.20 Guiding Principle
+
+Version 2.0 is built on the following philosophy:
+
+**The quality of trades avoided is just as important as the quality of trades executed.**
+
+QuantForge AI should never feel compelled to trade simply because strategies exist.
+
+Instead, it should trade only when the market, portfolio, operational state, and risk environment collectively justify participation.
+
+This discipline is expected to improve long-term robustness, reduce unnecessary drawdowns, and align the platform with institutional trading practices.
+
+**End of Milestone 24 - Intraday Decision Intelligence Platform**

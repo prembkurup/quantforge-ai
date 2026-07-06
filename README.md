@@ -25,6 +25,7 @@ QuantForge AI is designed around permanent raw market data, reproducible researc
 - Version 2.0 daily operations are wired through `GET /api/intraday/daily`, the Intraday dashboard page, and script-driven start/end-of-day automation.
 - Before the first trade each day, the platform now produces a 0-100 market readiness score covering regime, volatility, spread, session quality, strategy availability, and portfolio exposure.
 - Milestone 24 adds Decision Intelligence through `GET /api/intraday/decision-intelligence`, separating signal generation from the final decision to trade.
+- Decision Intelligence now exposes the dashboard decision timeline, daily trading journal, and decision quality metrics for evaluating trades avoided as well as trades executed.
 - Forced end-of-day closes now create execution receipts and Trade Journal evidence.
 - Dashboard header now reads live platform health and live trading state from `GET /api/dashboard/overview`.
 - Admin includes a `risk.live_trading_enabled` master switch for controlled live trading.

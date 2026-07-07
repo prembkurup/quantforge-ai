@@ -23,4 +23,5 @@
 - Added automatic 30-row pagination to large Research page lists.
 - Improved Workflow live-gate wording so policy, certification, and full-history blockers are clearer.
 - Added always-on research orchestration and historical validation worker entry points.
+- Added a QuantForge 24/7 supervisor with Windows start/stop/status launchers for dashboard, research, validation, daily intelligence, and paper/practice trading loops.
 - Added dashboard/API test coverage for live trading status, workflow state, research orchestration, and history validation.

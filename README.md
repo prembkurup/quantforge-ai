@@ -220,6 +220,21 @@ Run the Live Trading Engine demo:
 .\.venv\Scripts\python .\scripts\live_trading.py
 ```
 
+Run QuantForge AI as one supervised 24/7 local process:
+
+```powershell
+.\scripts\start_quantforge_247.bat
+.\scripts\quantforge_247_status.bat
+```
+
+Stop the supervised process:
+
+```powershell
+.\scripts\stop_quantforge_247.bat
+```
+
+The supervisor starts the dashboard API, dashboard frontend, full-history worker, historical validation worker, always-on research orchestrator, intraday daily jobs, portfolio intelligence, performance learning, and the paper/practice trading loop. It refuses to start if the configured OANDA URL is not the practice URL or if practice credentials are missing.
+
 Run the Version 2.0 intraday daily operations snapshot:
 
 ```powershell

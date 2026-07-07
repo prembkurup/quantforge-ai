@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
-import { CandlestickSeries, ColorType, LineStyle, createChart, createSeriesMarkers, type CandlestickData, type UTCTimestamp } from "lightweight-charts";
+import { CandlestickSeries, ColorType, LineStyle, createChart, createSeriesMarkers, type AutoscaleInfoProvider, type CandlestickData, type UTCTimestamp } from "lightweight-charts";
 import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, GitBranch, HeartPulse, Library, LineChart, ListChecks, Menu, PieChart, Save, ScrollText, Settings, ShieldCheck, Workflow as WorkflowIcon, X } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
@@ -1965,7 +1965,24 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
       borderDownColor: "#ef4444",
       wickUpColor: "#86efac",
       wickDownColor: "#fca5a5",
-      priceScaleId: "right"
+      priceScaleId: "right",
+      autoscaleInfoProvider: ((original) => {
+        const autoscale = original();
+        const tradePrices = [data.trade.open_price, data.trade.stop_loss, data.trade.take_profit]
+          .filter((price): price is number => typeof price === "number" && Number.isFinite(price));
+        if (!autoscale || !autoscale.priceRange || tradePrices.length === 0) return autoscale;
+        return {
+          ...autoscale,
+          priceRange: {
+            minValue: Math.min(autoscale.priceRange.minValue, ...tradePrices),
+            maxValue: Math.max(autoscale.priceRange.maxValue, ...tradePrices)
+          },
+          margins: {
+            above: 18,
+            below: 18
+          }
+        };
+      }) satisfies AutoscaleInfoProvider
     });
     candleSeries.priceScale().applyOptions({
       scaleMargins: {
@@ -1987,9 +2004,10 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
     addTradePriceLine(candleSeries, data.trade.stop_loss, "SL", "#f43f5e", LineStyle.Dashed);
     addTradePriceLine(candleSeries, data.trade.take_profit, "TP", "#22c55e", LineStyle.Dashed);
     const openTime = toChartTime(data.trade.opened_at);
-    if (openTime && data.trade.open_price) {
+    const markerTime = findNearestChartTime(candleData, openTime);
+    if (markerTime && data.trade.open_price) {
       createSeriesMarkers(candleSeries, [{
-        time: openTime,
+        time: markerTime,
         position: "atPriceMiddle",
         price: data.trade.open_price,
         shape: data.trade.direction.toUpperCase().includes("SELL") ? "arrowDown" : "arrowUp",
@@ -2011,6 +2029,24 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
     };
   }, [data]);
   return <div ref={containerRef} className="trade-chart-canvas" />;
+}
+
+function findNearestChartTime(
+  candleData: CandlestickData<UTCTimestamp>[],
+  targetTime: UTCTimestamp | null
+): UTCTimestamp | null {
+  if (!candleData.length) return null;
+  if (!targetTime) return candleData[candleData.length - 1].time as UTCTimestamp;
+  let nearest = candleData[0].time as UTCTimestamp;
+  let nearestDistance = Math.abs(Number(nearest) - Number(targetTime));
+  for (const item of candleData) {
+    const distance = Math.abs(Number(item.time) - Number(targetTime));
+    if (distance < nearestDistance) {
+      nearest = item.time as UTCTimestamp;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
 }
 
 function zoomToTradeSession(

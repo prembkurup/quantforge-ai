@@ -258,10 +258,12 @@ body.modal-open {
 
 .trade-chart-modal {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   width: min(96vw, 1360px);
+  height: min(92vh, 900px);
   max-height: min(92vh, 900px);
   gap: 12px;
-  overflow: auto;
+  overflow: hidden;
   border-color: rgba(56, 189, 248, 0.38);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
 }
@@ -281,8 +283,9 @@ body.modal-open {
 
 .trade-chart-canvas {
   width: 100%;
-  height: min(62vh, 600px);
+  height: 100%;
   min-width: 0;
+  min-height: 0;
 }
 
 .chart-loading {
@@ -304,11 +307,12 @@ body.modal-open {
 
   .trade-chart-modal {
     width: 100%;
+    height: calc(96vh - 20px);
     max-height: 96vh;
   }
 
   .trade-chart-canvas {
-    height: 460px;
+    height: 100%;
   }
 }
 

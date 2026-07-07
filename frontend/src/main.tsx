@@ -1942,7 +1942,7 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
     if (!container) return;
     const chart = createChart(container, {
       width: container.clientWidth,
-      height: 430,
+      height: container.clientHeight,
       layout: {
         background: { type: ColorType.Solid, color: "#0f172a" },
         textColor: "#cbd5e1"
@@ -1964,7 +1964,14 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
       borderUpColor: "#22c55e",
       borderDownColor: "#ef4444",
       wickUpColor: "#86efac",
-      wickDownColor: "#fca5a5"
+      wickDownColor: "#fca5a5",
+      priceScaleId: "right"
+    });
+    candleSeries.priceScale().applyOptions({
+      scaleMargins: {
+        top: 0.08,
+        bottom: 0.12
+      }
     });
     const candleData = data.candles
       .map((item) => ({
@@ -1992,7 +1999,10 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
     }
     zoomToTradeSession(chart, candleData, openTime);
     const resizeObserver = new ResizeObserver(() => {
-      chart.applyOptions({ width: container.clientWidth });
+      chart.applyOptions({
+        width: container.clientWidth,
+        height: container.clientHeight
+      });
     });
     resizeObserver.observe(container);
     return () => {

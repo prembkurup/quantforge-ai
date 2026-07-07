@@ -922,7 +922,7 @@ function IntradayDaily() {
         </section>
       </div>
 
-      <DataTable title={`Intraday Certification (${(data.certification ?? []).length})`} rows={data.certification ?? []} linkKey="strategy_asset_id" />
+      <PaginatedDataTable title={`Intraday Certification (${(data.certification ?? []).length})`} rows={data.certification ?? []} linkKey="strategy_asset_id" pageSize={30} />
       <JsonPanel title="Market Readiness Factors" data={{ factors: readiness.factors ?? {}, reasons: readiness.reasons ?? [] }} />
       <JsonPanel title="Daily Report" data={report} />
       <JsonPanel title="Daily Learning Loop" data={learning} />

@@ -2543,15 +2543,12 @@ function TradeExplanationFlow({ position, chartData }: { position: Row; chartDat
     <section className="trade-explanation-panel" aria-label="Trade decision explanation">
       <div className="trade-explanation-title">Trade Decision Explanation</div>
       <div className="trade-explanation-flow">
-        {steps.map((step, index) => (
-          <React.Fragment key={step.stage}>
-            <div className="trade-explanation-step">
-              <div className="trade-explanation-stage">{step.stage}</div>
-              <div className="trade-explanation-value">{step.value}</div>
-              <div className="trade-explanation-detail">{step.detail}</div>
-            </div>
-            {index < steps.length - 1 && <div className="trade-explanation-arrow">↓</div>}
-          </React.Fragment>
+        {steps.map((step) => (
+          <div className="trade-explanation-step" key={step.stage}>
+            <div className="trade-explanation-stage">{step.stage}</div>
+            <div className="trade-explanation-value">{step.value}</div>
+            <div className="trade-explanation-detail">{step.detail}</div>
+          </div>
         ))}
       </div>
     </section>

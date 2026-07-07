@@ -214,6 +214,89 @@ def test_paper_scanner_treats_naive_candle_times_as_utc() -> None:
     assert _coerce_datetime("2026-07-07 03:30:00").isoformat() == "2026-07-07T03:30:00+00:00"
 
 
+def test_mark_to_market_closes_open_position_when_take_profit_touched(tmp_path: Path) -> None:
+    position_store = PaperPositionStore(tmp_path / "positions.json")
+    position_store._save(
+        {
+            "positions": [
+                {
+                    "position_id": "tp-hit",
+                    "pair": "EUR_USD",
+                    "instrument": "EUR_USD",
+                    "timeframe": "H1",
+                    "direction": "BUY",
+                    "status": "OPEN",
+                    "units": 10000,
+                    "entry_price": 1.1,
+                    "open_price": 1.1,
+                    "stop_loss": 1.099,
+                    "take_profit": 1.102,
+                    "opened_at": "2026-07-07T03:00:00+00:00",
+                }
+            ]
+        }
+    )
+
+    position_store.mark_to_market(
+        {"EUR_USD:H1": 1.101},
+        {
+            "EUR_USD:H1": {
+                "time": datetime(2026, 7, 7, 4, 0, tzinfo=UTC),
+                "high_price": 1.1021,
+                "low_price": 1.1005,
+            }
+        },
+    )
+
+    positions = position_store._load()["positions"]
+    assert positions[0]["status"] == "CLOSED"
+    assert positions[0]["close_reason"] == "TAKE_PROFIT"
+    assert positions[0]["close_price"] == 1.102
+    assert positions[0]["p_l"] == 20.0
+    assert position_store.list_open() == ()
+
+
+def test_mark_to_market_closes_open_position_when_stop_loss_touched(tmp_path: Path) -> None:
+    position_store = PaperPositionStore(tmp_path / "positions.json")
+    position_store._save(
+        {
+            "positions": [
+                {
+                    "position_id": "sl-hit",
+                    "pair": "EUR_USD",
+                    "instrument": "EUR_USD",
+                    "timeframe": "H1",
+                    "direction": "BUY",
+                    "status": "OPEN",
+                    "units": 10000,
+                    "entry_price": 1.1,
+                    "open_price": 1.1,
+                    "stop_loss": 1.099,
+                    "take_profit": 1.102,
+                    "opened_at": "2026-07-07T03:00:00+00:00",
+                }
+            ]
+        }
+    )
+
+    position_store.mark_to_market(
+        {"EUR_USD:H1": 1.101},
+        {
+            "EUR_USD:H1": {
+                "time": datetime(2026, 7, 7, 4, 0, tzinfo=UTC),
+                "high_price": 1.1021,
+                "low_price": 1.0989,
+            }
+        },
+    )
+
+    positions = position_store._load()["positions"]
+    assert positions[0]["status"] == "CLOSED"
+    assert positions[0]["close_reason"] == "STOP_LOSS"
+    assert positions[0]["close_price"] == 1.099
+    assert positions[0]["p_l"] == -10.0
+
+
 def test_risk_rejection_prevents_order(tmp_path: Path) -> None:
     scanner = MultiPairPaperScanner(
         FakeLatestCandleRepository(),

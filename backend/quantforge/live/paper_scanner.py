@@ -255,21 +255,41 @@ class PaperPositionStore:
         payload["positions"] = sorted(existing.values(), key=lambda item: str(item.get("opened_at", "")))
         self._save(payload)
 
-    def mark_to_market(self, price_by_pair_timeframe: dict[str, float]) -> None:
+    def mark_to_market(
+        self,
+        price_by_pair_timeframe: dict[str, float],
+        candle_by_pair_timeframe: dict[str, dict[str, Any]] | None = None,
+    ) -> None:
         payload = self._load()
         now = datetime.now(UTC).isoformat(timespec="seconds")
         changed = self._enrich_open_positions(payload)
+        candle_by_pair_timeframe = candle_by_pair_timeframe or {}
         for position in payload.get("positions", []):
             if position.get("status") != "OPEN":
                 continue
             pair = str(position.get("pair") or position.get("instrument") or "")
             timeframe = str(position.get("timeframe") or "")
-            close_price = price_by_pair_timeframe.get(_pair_timeframe_key(pair, timeframe))
+            key = _pair_timeframe_key(pair, timeframe)
+            close_price = price_by_pair_timeframe.get(key)
             if close_price is None:
                 continue
             entry_price = _float_or_zero(position.get("entry_price") or position.get("open_price"))
             direction = str(position.get("direction") or "")
             units = _float_or_zero(position.get("units"))
+            candle = candle_by_pair_timeframe.get(key, {})
+            exit_price, exit_reason = _exit_price_for_candle(position, candle)
+            if exit_price is not None:
+                realized_pl = _position_pl(entry_price, exit_price, units, direction)
+                position["close_price"] = exit_price
+                position["current_price"] = exit_price
+                position["floating_pl"] = realized_pl
+                position["p_l"] = realized_pl
+                position["status"] = "CLOSED"
+                position["close_reason"] = exit_reason
+                position["closed_at"] = _iso(candle.get("time")) if candle.get("time") else now
+                position["updated_at"] = now
+                changed = True
+                continue
             floating_pl = _position_pl(
                 entry_price,
                 close_price,
@@ -407,6 +427,7 @@ class MultiPairPaperScanner:
         new_candles = 0
         events_processed = 0
         price_by_pair_timeframe: dict[str, float] = {}
+        candle_by_pair_timeframe: dict[str, dict[str, Any]] = {}
 
         for pair in self.config.pairs[: self.config.max_pairs_per_scan]:
             for timeframe in self.config.timeframes:
@@ -418,7 +439,9 @@ class MultiPairPaperScanner:
                 )
                 candles_loaded += len(rows)
                 if rows:
-                    price_by_pair_timeframe[_pair_timeframe_key(pair, timeframe)] = _candle_close(rows[-1])
+                    key = _pair_timeframe_key(pair, timeframe)
+                    price_by_pair_timeframe[key] = _candle_close(rows[-1])
+                    candle_by_pair_timeframe[key] = rows[-1]
                 candle_check = self._validate_candles(pair, timeframe, rows)
                 if candle_check.status != "ELIGIBLE":
                     candle_time = _iso(rows[-1]["time"]) if rows else ""
@@ -671,7 +694,7 @@ class MultiPairPaperScanner:
 
         signal_by_pair = {signal.pair: signal for signal in paper_signals}
         self.positions.add_many(tuple(new_positions), signal_by_pair, price_by_pair_timeframe)
-        self.positions.mark_to_market(price_by_pair_timeframe)
+        self.positions.mark_to_market(price_by_pair_timeframe, candle_by_pair_timeframe)
         open_position_records = self.positions.list_open()
         open_positions = len(open_position_records)
         skip_reasons = dict(Counter(result.reason for result in pair_results if result.reason))
@@ -1005,6 +1028,31 @@ def _position_pl(entry_price: float, close_price: float, units: float, direction
         return round(fallback, 4)
     multiplier = -1.0 if direction.upper() == "SELL" else 1.0
     return round((close_price - entry_price) * abs(units) * multiplier, 4)
+
+
+def _exit_price_for_candle(position: dict[str, Any], candle: dict[str, Any]) -> tuple[float | None, str]:
+    candle_time = candle.get("time")
+    source_time = position.get("source_candle_time") or position.get("entry_time") or position.get("opened_at")
+    if candle_time and source_time and _coerce_datetime(candle_time) <= _coerce_datetime(source_time):
+        return None, ""
+    direction = str(position.get("direction") or "").upper()
+    stop_loss = _float_or_zero(position.get("stop_loss"))
+    take_profit = _float_or_zero(position.get("take_profit"))
+    high = _float_or_zero(candle.get("high_price") or candle.get("mid_h") or candle.get("high"))
+    low = _float_or_zero(candle.get("low_price") or candle.get("mid_l") or candle.get("low"))
+    if high <= 0 or low <= 0 or stop_loss <= 0 or take_profit <= 0:
+        return None, ""
+    if direction == "SELL":
+        if high >= stop_loss:
+            return stop_loss, "STOP_LOSS"
+        if low <= take_profit:
+            return take_profit, "TAKE_PROFIT"
+    else:
+        if low <= stop_loss:
+            return stop_loss, "STOP_LOSS"
+        if high >= take_profit:
+            return take_profit, "TAKE_PROFIT"
+    return None, ""
 
 
 def _paper_signal(

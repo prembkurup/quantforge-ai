@@ -1864,7 +1864,7 @@ function OpenPaperPositionsTable({
                     </button>
                   </td>
                   {columns.map((column) => (
-                    <td key={column} className="px-3 py-2 text-slate-200">{String(row[column])}</td>
+                    <td key={column} className={`px-3 py-2 ${paperPositionCellClass(column, row[column])}`}>{String(row[column])}</td>
                   ))}
                 </tr>
               );
@@ -1875,6 +1875,13 @@ function OpenPaperPositionsTable({
       {rows.length === 0 && <div className="pt-3 text-sm text-slate-400">No open paper positions.</div>}
     </div>
   );
+}
+
+function paperPositionCellClass(column: string, value: Row[string]) {
+  if (column !== "p_l") return "text-slate-200";
+  const number = Number(String(value).replace(/[$,]/g, ""));
+  if (Number.isNaN(number) || number === 0) return "text-slate-200";
+  return number > 0 ? "font-semibold text-emerald-300" : "font-semibold text-rose-300";
 }
 
 function PaperPositionChart({ position, onClose }: { position: Row; onClose: () => void }) {

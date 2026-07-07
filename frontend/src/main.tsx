@@ -33,6 +33,7 @@ type PaperPositionChartPayload = {
     stop_loss: number | null;
     take_profit: number | null;
     opened_at: string;
+    source_candle_time: string;
   };
   database_status: string;
   error: string;
@@ -1897,6 +1898,7 @@ function PaperPositionChart({ position, onClose }: { position: Row; onClose: () 
       stop_loss: String(position.stop_loss ?? ""),
       take_profit: String(position.take_profit ?? ""),
       opened_at: String(position.opened_at ?? ""),
+      source_candle_time: String(position.source_candle_time ?? ""),
       limit: "3000"
     });
     return params.toString();

@@ -363,6 +363,7 @@ def create_app() -> FastAPI:
         stop_loss: str | None = None,
         take_profit: str | None = None,
         opened_at: str = "",
+        source_candle_time: str = "",
         limit: int = 3000,
     ) -> dict[str, Any]:
         return service.paper_position_chart(
@@ -373,6 +374,7 @@ def create_app() -> FastAPI:
             stop_loss=stop_loss,
             take_profit=take_profit,
             opened_at=opened_at,
+            source_candle_time=source_candle_time,
             limit=limit,
         )
 

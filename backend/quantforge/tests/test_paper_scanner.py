@@ -100,6 +100,8 @@ def test_multi_pair_paper_scanner_reads_latest_candles_and_blocks_duplicate_runs
     assert result.paper_signals[0].feature_vector_id == result.pair_results[0].feature_vector.feature_vector_id
     assert result.paper_orders[0].execution_path == "OANDA_PAPER"
     assert result.paper_positions[0]["source_candle_time"] == "2026-07-07T03:30:00+00:00"
+    assert result.paper_positions[0]["entry_time"] == "2026-07-07T03:30:00+00:00"
+    assert result.paper_positions[0]["opened_at"] == "2026-07-07T03:30:00+00:00"
     assert result.pair_results[1].reason == "no_compatible_approved_strategy"
 
     second = scanner.run()
@@ -180,6 +182,31 @@ def test_paper_position_store_enriches_legacy_open_positions(tmp_path: Path) -> 
     assert positions[0]["strategy_asset_id"] == "QF-LIVE-0001"
     assert positions[0]["source_signal_id"] == "SIG-REPLAY-EUR_USD-H1-000001"
     assert positions[0]["entry_time"] == "2026-07-07T03:46:55+00:00"
+
+
+def test_paper_position_store_prefers_source_candle_time_for_open_time(tmp_path: Path) -> None:
+    position_store = PaperPositionStore(tmp_path / "positions.json")
+    position_store._save(
+        {
+            "positions": [
+                {
+                    "position_id": "open",
+                    "instrument": "EUR_USD",
+                    "timeframe": "H1",
+                    "status": "OPEN",
+                    "units": 10000,
+                    "entry_price": 1.1,
+                    "opened_at": "2026-07-07T03:46:55+00:00",
+                    "source_candle_time": "2026-07-07 03:30:00",
+                }
+            ]
+        }
+    )
+
+    positions = position_store.list_open()
+
+    assert positions[0]["entry_time"] == "2026-07-07T03:30:00+00:00"
+    assert positions[0]["opened_at"] == "2026-07-07T03:30:00+00:00"
 
 
 def test_risk_rejection_prevents_order(tmp_path: Path) -> None:

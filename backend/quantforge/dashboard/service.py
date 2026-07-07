@@ -1419,6 +1419,7 @@ class DashboardService:
         stop_loss: str | float | None = None,
         take_profit: str | float | None = None,
         opened_at: str = "",
+        source_candle_time: str = "",
         limit: int = 3000,
     ) -> dict[str, Any]:
         pair_name = _chart_pair_name(pair)
@@ -1460,7 +1461,8 @@ class DashboardService:
                 "open_price": _safe_float(open_price),
                 "stop_loss": _safe_float(stop_loss),
                 "take_profit": _safe_float(take_profit),
-                "opened_at": opened_at,
+                "opened_at": _chart_time(source_candle_time or opened_at),
+                "source_candle_time": _chart_time(source_candle_time),
             },
             "database_status": database_status,
             "error": error,
@@ -1936,8 +1938,17 @@ def _chart_time(value: Any) -> str:
     if isinstance(value, datetime):
         if value.tzinfo is None:
             value = value.replace(tzinfo=UTC)
-        return value.isoformat()
-    return str(value) if value else ""
+        return value.astimezone(UTC).isoformat()
+    if not value:
+        return ""
+    text = str(value)
+    try:
+        timestamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return text
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=UTC)
+    return timestamp.astimezone(UTC).isoformat()
 
 
 def _safe_float(value: Any) -> float | None:

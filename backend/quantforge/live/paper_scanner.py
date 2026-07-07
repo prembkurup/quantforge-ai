@@ -217,6 +217,7 @@ class PaperPositionStore:
         for position in positions:
             signal = signal_by_pair.get(position.instrument)
             timeframe = signal.timeframe if signal else ""
+            entry_time = _iso(signal.candle_time) if signal else now
             entry_price = price_by_pair_timeframe.get(_pair_timeframe_key(position.instrument, timeframe), 0.0)
             take_profit, stop_loss = _default_exit_prices(entry_price, signal.signal_type if signal else "")
             floating_pl = _position_pl(
@@ -234,7 +235,7 @@ class PaperPositionStore:
                 "timeframe": timeframe,
                 "direction": signal.signal_type if signal else "",
                 "units": position.units,
-                "entry_time": now,
+                "entry_time": entry_time,
                 "entry_price": entry_price,
                 "open_price": entry_price,
                 "close_price": entry_price,
@@ -243,7 +244,7 @@ class PaperPositionStore:
                 "status": "OPEN",
                 "source_signal_id": signal.signal_id if signal else "",
                 "source_candle_time": signal.candle_time if signal else "",
-                "opened_at": now,
+                "opened_at": entry_time,
                 "created_at": now,
                 "updated_at": now,
                 "floating_pl": floating_pl,
@@ -864,8 +865,17 @@ def _repo_root() -> Path:
 
 def _iso(value: Any) -> str:
     if isinstance(value, datetime):
-        return value.isoformat()
-    return str(value)
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        return value.astimezone(UTC).isoformat()
+    text = str(value)
+    try:
+        timestamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return text
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=UTC)
+    return timestamp.astimezone(UTC).isoformat()
 
 
 def _pair_timeframe_key(pair: str, timeframe: str) -> str:
@@ -906,6 +916,14 @@ def _enrich_open_position(position: dict[str, Any], updated_at: str) -> bool:
         if not position.get(target) and position.get(fallback):
             position[target] = position[fallback]
             changed = True
+
+    source_candle_time = str(position.get("source_candle_time") or "")
+    if source_candle_time:
+        normalized_source_time = _iso(source_candle_time)
+        for target in ("entry_time", "opened_at"):
+            if position.get(target) != normalized_source_time:
+                position[target] = normalized_source_time
+                changed = True
 
     direction = _infer_position_direction(position)
     if direction and position.get("direction") != direction:

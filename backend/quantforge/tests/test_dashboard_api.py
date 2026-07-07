@@ -345,6 +345,23 @@ def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:
     assert client.post("/api/portfolio/intelligence").status_code == 405
 
 
+def test_paper_position_chart_uses_source_candle_time_as_utc_trade_time() -> None:
+    response = client.get(
+        "/api/paper/positions/chart",
+        params={
+            "pair": "EUR_USD",
+            "timeframe": "H1",
+            "opened_at": "2026-07-07T03:46:55+00:00",
+            "source_candle_time": "2026-07-07 03:30:00",
+        },
+    )
+
+    assert response.status_code == 200
+    trade = response.json()["trade"]
+    assert trade["opened_at"] == "2026-07-07T03:30:00+00:00"
+    assert trade["source_candle_time"] == "2026-07-07T03:30:00+00:00"
+
+
 def test_performance_learning_endpoint_exposes_milestone_26_layers() -> None:
     response = client.get("/api/performance/learning")
 

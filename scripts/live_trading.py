@@ -143,6 +143,7 @@ def _write_result(result: Any) -> None:
         "paper_orders": _to_jsonable(getattr(result, "paper_orders", ())),
         "paper_positions": _to_jsonable(getattr(result, "paper_positions", ())),
         "open_paper_positions": _open_position_rows(getattr(result, "paper_positions", ())),
+        "closed_paper_positions": _closed_position_rows(getattr(result, "closed_paper_positions", ())),
         "safety": {
             "practice_safe": True,
             "broker_order_execution": "paper_only",
@@ -210,6 +211,31 @@ def _open_position_rows(positions: Any) -> list[dict[str, Any]]:
                 "status": _field(position, "status", ""),
                 "opened_at": _field(position, "entry_time", _field(position, "opened_at", "")),
                 "entry_time": _field(position, "entry_time", ""),
+                "source_candle_time": _field(position, "source_candle_time", ""),
+            }
+        )
+    return rows
+
+
+def _closed_position_rows(positions: Any) -> list[dict[str, Any]]:
+    rows = []
+    for position in positions:
+        entry_price = _field(position, "entry_price", _field(position, "open_price", ""))
+        close_price = _field(position, "close_price", _field(position, "current_price", ""))
+        rows.append(
+            {
+                "pair": _field(position, "pair", _field(position, "instrument", "")),
+                "timeframe": _field(position, "timeframe", ""),
+                "direction": _field(position, "direction", ""),
+                "units": _field(position, "units", 0),
+                "open_price": _display_price(entry_price),
+                "close_price": _display_price(close_price),
+                "take_profit": _display_price(_field(position, "take_profit", "")),
+                "stop_loss": _display_price(_field(position, "stop_loss", "")),
+                "p_l": _display_money(_field(position, "p_l", _field(position, "floating_pl", 0))),
+                "close_reason": _field(position, "close_reason", ""),
+                "opened_at": _field(position, "entry_time", _field(position, "opened_at", "")),
+                "closed_at": _field(position, "closed_at", ""),
                 "source_candle_time": _field(position, "source_candle_time", ""),
             }
         )

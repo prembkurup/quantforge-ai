@@ -145,6 +145,7 @@ class MultiPairPaperScannerResult:
     paper_signals: tuple[PaperSignalRecord, ...] = ()
     paper_orders: tuple[PaperOrderRecord, ...] = ()
     paper_positions: tuple[dict[str, Any], ...] = ()
+    closed_paper_positions: tuple[dict[str, Any], ...] = ()
     signals: tuple[TradingSignal, ...] = ()
     executions: tuple[ExecutionReceipt, ...] = ()
     positions: tuple[PositionSnapshot, ...] = ()
@@ -194,6 +195,11 @@ class PaperPositionStore:
         if changed:
             self._save(payload)
         return tuple(position for position in payload.get("positions", []) if position.get("status") == "OPEN")
+
+    def list_closed(self, *, limit: int = 100) -> tuple[dict[str, Any], ...]:
+        payload = self._load()
+        closed = [position for position in payload.get("positions", []) if position.get("status") == "CLOSED"]
+        return tuple(sorted(closed, key=lambda item: str(item.get("closed_at") or item.get("updated_at") or ""), reverse=True)[:limit])
 
     def has_open(self, pair: str, timeframe: str) -> bool:
         return any(
@@ -696,6 +702,7 @@ class MultiPairPaperScanner:
         self.positions.add_many(tuple(new_positions), signal_by_pair, price_by_pair_timeframe)
         self.positions.mark_to_market(price_by_pair_timeframe, candle_by_pair_timeframe)
         open_position_records = self.positions.list_open()
+        closed_position_records = self.positions.list_closed()
         open_positions = len(open_position_records)
         skip_reasons = dict(Counter(result.reason for result in pair_results if result.reason))
         orders_blocked = sum(result.status in {"BLOCKED", "SKIPPED", "NO_SIGNAL"} for result in pair_results)
@@ -732,6 +739,7 @@ class MultiPairPaperScanner:
             paper_signals=tuple(paper_signals),
             paper_orders=tuple(paper_orders),
             paper_positions=open_position_records,
+            closed_paper_positions=closed_position_records,
             signals=tuple(signals),
             executions=tuple(executions),
             positions=tuple(new_positions),

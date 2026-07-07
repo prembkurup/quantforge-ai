@@ -1087,6 +1087,7 @@ function Paper() {
       </section>
       <OpenPaperPositionsTable rows={practice.open_paper_positions ?? []} selected={selectedPosition} onSelect={setSelectedPosition} />
       {selectedPosition && <PaperPositionChart position={selectedPosition} onClose={() => setSelectedPosition(null)} />}
+      <PaperPositionsTable title={`Closed Paper Positions (${(practice.closed_paper_positions ?? []).length})`} rows={practice.closed_paper_positions ?? []} emptyText="No closed paper positions." />
       <PaginatedDataTable title={`Pair-Level Paper Scanner Results (${(practice.paper_scanner_pair_result ?? []).length})`} rows={practice.paper_scanner_pair_result ?? []} pageSize={30} />
       <JsonPanel title="Paper Scanner Skip Reasons" data={practice.skip_reasons ?? {}} />
       <JsonPanel title="Real Candle Replay Cursor" data={replay} />
@@ -1828,6 +1829,34 @@ function DataTable({ title, rows, linkKey }: { title: string; rows: Row[]; linkK
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function PaperPositionsTable({ title, rows, emptyText }: { title: string; rows: Row[]; emptyText: string }) {
+  const columns = rows[0] ? Object.keys(rows[0]) : [];
+  return (
+    <div className="card panel dashboard-card overflow-hidden">
+      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{title}</div>
+      <div className="overflow-auto">
+        <table className="table table-dark table-hover dashboard-table w-full min-w-[920px] text-left text-sm">
+          <thead className="bg-slate-900 text-xs uppercase text-slate-400">
+            <tr>
+              {columns.map((column) => <th key={column} className="px-3 py-2">{column.replace(/_/g, " ")}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={index} className="border-t border-slate-800">
+                {columns.map((column) => (
+                  <td key={column} className={`px-3 py-2 ${paperPositionCellClass(column, row[column])}`}>{String(row[column])}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length === 0 && <div className="pt-3 text-sm text-slate-400">{emptyText}</div>}
     </div>
   );
 }

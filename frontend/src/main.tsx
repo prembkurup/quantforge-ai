@@ -805,8 +805,6 @@ function HistoryValidation() {
   const improvements = useApi<Row[]>("/api/history-validation/improvements", []);
   const spreads = useApi<Row[]>("/api/history-validation/spreads", []);
   if (!status || !balance || !queue || !running || !results || !improvements || !spreads) return <Loading />;
-  const recentResults = results.slice(-20).reverse();
-  const recentImprovements = improvements.slice(-20).reverse();
   const sheet = Object.keys(balance).length ? balance : status.balance_sheet ?? {};
   return (
     <Page title="Historical Validation">
@@ -843,11 +841,11 @@ function HistoryValidation() {
           </div>
         </div>
       </section>
-      <DataTable title={`Validation Queue (${queue.length})`} rows={queue.slice(0, 60)} />
-      <DataTable title={`Running Tests (${running.length})`} rows={running} />
-      <DataTable title={`Validation Results (${results.length})`} rows={recentResults} />
-      <DataTable title={`Pair Spread Model (${spreads.length})`} rows={spreads} />
-      <DataTable title={`Improvement Requests (${improvements.length})`} rows={recentImprovements} />
+      <PaginatedDataTable title={`Validation Queue (${queue.length})`} rows={queue} pageSize={30} />
+      <PaginatedDataTable title={`Running Tests (${running.length})`} rows={running} pageSize={30} />
+      <PaginatedDataTable title={`Validation Results (${results.length})`} rows={[...results].reverse()} pageSize={30} />
+      <PaginatedDataTable title={`Pair Spread Model (${spreads.length})`} rows={spreads} pageSize={30} />
+      <PaginatedDataTable title={`Improvement Requests (${improvements.length})`} rows={[...improvements].reverse()} pageSize={30} />
     </Page>
   );
 }

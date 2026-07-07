@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -177,9 +177,9 @@ def get_coreui_history_engine():
 
 
 def _normalize_datetime_for_coreui(value: datetime) -> datetime:
-    if value.tzinfo is not None:
-        return value.replace(tzinfo=None)
-    return value
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _sqlalchemy_psycopg_url(value: str) -> str:
@@ -190,7 +190,7 @@ def _sqlalchemy_psycopg_url(value: str) -> str:
 
 def _normalize_row(row: Any) -> dict[str, Any]:
     return {
-        "time": row["time"],
+        "time": _utc_datetime(row["time"]),
         "pair_name": row["pair_name"],
         "granularity": row["granularity"],
         "volume": row["volume"],
@@ -201,6 +201,14 @@ def _normalize_row(row: Any) -> dict[str, Any]:
         "is_complete": row["complete"],
         "source": "coreui.oanda_candles",
     }
+
+
+def _utc_datetime(value: Any) -> Any:
+    if not isinstance(value, datetime):
+        return value
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _decimal_or_none(value: Any) -> Decimal | None:

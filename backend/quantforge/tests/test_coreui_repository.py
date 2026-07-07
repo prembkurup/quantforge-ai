@@ -9,8 +9,8 @@ def test_coreui_datetime_normalization_matches_coreui_queries() -> None:
 
     normalized = _normalize_datetime_for_coreui(value)
 
-    assert normalized.tzinfo is None
-    assert normalized == datetime(2026, 7, 4, 1, 0)
+    assert normalized.tzinfo == timezone.utc
+    assert normalized == value
 
 
 def test_coreui_row_is_normalized_to_quantforge_candle_shape() -> None:
@@ -30,6 +30,7 @@ def test_coreui_row_is_normalized_to_quantforge_candle_shape() -> None:
 
     assert normalized["pair_name"] == "EUR_USD"
     assert normalized["granularity"] == "M5"
+    assert normalized["time"] == datetime(2026, 7, 4, 1, 0, tzinfo=timezone.utc)
     assert normalized["open_price"] == Decimal("1.1")
     assert normalized["high_price"] == Decimal("1.2")
     assert normalized["low_price"] == Decimal("1.0")

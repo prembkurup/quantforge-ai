@@ -209,6 +209,8 @@ def _open_position_rows(positions: Any) -> list[dict[str, Any]]:
                 "p_l": _display_money(_field(position, "p_l", _field(position, "floating_pl", 0))),
                 "status": _field(position, "status", ""),
                 "opened_at": _field(position, "entry_time", _field(position, "opened_at", "")),
+                "entry_time": _field(position, "entry_time", ""),
+                "source_candle_time": _field(position, "source_candle_time", ""),
             }
         )
     return rows

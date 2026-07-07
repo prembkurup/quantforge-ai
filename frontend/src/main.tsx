@@ -1007,7 +1007,9 @@ function Paper() {
   const trades = useApi<Row[]>("/api/paper/trades/open");
   const drift = useApi<any>("/api/paper/drift");
   const replay = useApi<Row>("/api/paper/replay");
-  if (!summary || !trades || !drift || !replay) return <Loading />;
+  const practice = useApi<any>("/api/paper/practice/latest");
+  const practiceHistory = useApi<Row[]>("/api/paper/practice/history", []);
+  if (!summary || !trades || !drift || !replay || !practice || !practiceHistory) return <Loading />;
   return (
     <Page title="Paper Trading">
       <div className="kpi-grid">
@@ -1020,7 +1022,22 @@ function Paper() {
         <KpiCard title="Replay Signals" value={number(replay.generated_signals)} />
         <KpiCard title="Replay Orders" value={number(replay.paper_orders)} />
       </div>
+      <section className="card panel dashboard-card">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Latest 24/7 Paper-Practice Loop</div>
+        <div className="pipeline-detail-grid">
+          <MiniFact label="Updated" value={formatDate(practice.updated_at)} />
+          <MiniFact label="Connected" value={practice.connected ? "YES" : "NO"} />
+          <MiniFact label="Events" value={practice.events_processed ?? 0} />
+          <MiniFact label="Signals" value={practice.signals_generated ?? 0} />
+          <MiniFact label="Orders" value={practice.orders_executed ?? 0} />
+          <MiniFact label="Open Positions" value={practice.open_positions ?? 0} />
+          <MiniFact label="Execution Path" value={practice.execution_path ?? "UNKNOWN"} />
+          <MiniFact label="24/7 Ready" value={practice.run_24_7_ready ? "YES" : "NO"} />
+        </div>
+      </section>
       <JsonPanel title="Real Candle Replay Cursor" data={replay} />
+      <JsonPanel title="Latest Loop Detail" data={practice} />
+      <DataTable title="Recent 24/7 Paper-Practice Runs" rows={practiceHistory} />
       <DataTable title="Open Paper Trades" rows={trades} />
       <JsonPanel title="Drift" data={drift} />
     </Page>

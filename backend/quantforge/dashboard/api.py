@@ -346,6 +346,14 @@ def create_app() -> FastAPI:
     def paper_replay_status() -> dict[str, Any]:
         return service.paper_replay_status()
 
+    @app.get("/api/paper/practice/latest")
+    def paper_practice_latest() -> dict[str, Any]:
+        return service.paper_practice_latest()
+
+    @app.get("/api/paper/practice/history")
+    def paper_practice_history() -> list[dict[str, Any]]:
+        return service.paper_practice_history()
+
     @app.get("/api/ops/health")
     def ops_health() -> dict[str, Any]:
         return service.ops_health()

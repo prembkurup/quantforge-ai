@@ -1348,6 +1348,60 @@ class DashboardService:
             "timestamp": self._timestamp,
         }
 
+    def paper_practice_latest(self) -> dict[str, Any]:
+        path = _paper_practice_result_file()
+        if not path.exists():
+            return {
+                "status": "NOT_STARTED",
+                "updated_at": "",
+                "connected": False,
+                "events_processed": 0,
+                "signals_generated": 0,
+                "orders_executed": 0,
+                "open_positions": 0,
+                "run_24_7_ready": False,
+                "execution_path": "NO_RESULT_FILE",
+                "latest_signal": {},
+                "latest_execution": {},
+                "open_position_details": [],
+                "source": str(path.relative_to(_repo_root())),
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return {
+            "status": "RUNNING",
+            **payload,
+            "source": str(path.relative_to(_repo_root())),
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+
+    def paper_practice_history(self) -> list[dict[str, Any]]:
+        path = _paper_practice_history_file()
+        if not path.exists():
+            return []
+        rows: list[dict[str, Any]] = []
+        for line in path.read_text(encoding="utf-8").splitlines()[-50:]:
+            if not line.strip():
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            rows.append(
+                {
+                    "updated_at": payload.get("updated_at", ""),
+                    "connected": payload.get("connected", False),
+                    "events_processed": payload.get("events_processed", 0),
+                    "signals_generated": payload.get("signals_generated", 0),
+                    "orders_executed": payload.get("orders_executed", 0),
+                    "open_positions": payload.get("open_positions", 0),
+                    "execution_path": payload.get("execution_path", ""),
+                    "run_24_7_ready": payload.get("run_24_7_ready", False),
+                }
+            )
+        rows.reverse()
+        return rows
+
     def ops_health(self) -> dict[str, Any]:
         return {
             "platform_status": "HEALTHY",
@@ -1552,6 +1606,14 @@ def _approved_strategy_assets_file() -> Path:
 
 def _paper_replay_progress_file() -> Path:
     return _repo_root() / "var" / "paper_replay_progress.json"
+
+
+def _paper_practice_result_file() -> Path:
+    return _repo_root() / "var" / "paper_practice_trading_result.json"
+
+
+def _paper_practice_history_file() -> Path:
+    return _repo_root() / "var" / "paper_practice_trading_history.jsonl"
 
 
 def _full_history_research_cache_file() -> Path:

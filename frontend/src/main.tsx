@@ -1087,7 +1087,13 @@ function Paper() {
       </section>
       <OpenPaperPositionsTable rows={practice.open_paper_positions ?? []} selected={selectedPosition} onSelect={setSelectedPosition} />
       {selectedPosition && <PaperPositionChart position={selectedPosition} onClose={() => setSelectedPosition(null)} />}
-      <PaperPositionsTable title={`Closed Paper Positions (${(practice.closed_paper_positions ?? []).length})`} rows={practice.closed_paper_positions ?? []} emptyText="No closed paper positions." />
+      <PaperPositionsTable
+        title={`Closed Paper Positions (${(practice.closed_paper_positions ?? []).length})`}
+        rows={practice.closed_paper_positions ?? []}
+        emptyText="No closed paper positions."
+        selected={selectedPosition}
+        onSelect={setSelectedPosition}
+      />
       <PaginatedDataTable title={`Pair-Level Paper Scanner Results (${(practice.paper_scanner_pair_result ?? []).length})`} rows={practice.paper_scanner_pair_result ?? []} pageSize={30} />
       <JsonPanel title="Paper Scanner Skip Reasons" data={practice.skip_reasons ?? {}} />
       <JsonPanel title="Real Candle Replay Cursor" data={replay} />
@@ -1833,7 +1839,19 @@ function DataTable({ title, rows, linkKey }: { title: string; rows: Row[]; linkK
   );
 }
 
-function PaperPositionsTable({ title, rows, emptyText }: { title: string; rows: Row[]; emptyText: string }) {
+function PaperPositionsTable({
+  title,
+  rows,
+  emptyText,
+  selected,
+  onSelect
+}: {
+  title: string;
+  rows: Row[];
+  emptyText: string;
+  selected: Row | null;
+  onSelect: (row: Row) => void;
+}) {
   const columns = rows[0] ? Object.keys(rows[0]) : [];
   return (
     <div className="card panel dashboard-card overflow-hidden">
@@ -1842,17 +1860,26 @@ function PaperPositionsTable({ title, rows, emptyText }: { title: string; rows: 
         <table className="table table-dark table-hover dashboard-table w-full min-w-[920px] text-left text-sm">
           <thead className="bg-slate-900 text-xs uppercase text-slate-400">
             <tr>
+              <th className="px-3 py-2">chart</th>
               {columns.map((column) => <th key={column} className="px-3 py-2">{column.replace(/_/g, " ")}</th>)}
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
-              <tr key={index} className="border-t border-slate-800">
-                {columns.map((column) => (
-                  <td key={column} className={`px-3 py-2 ${paperPositionCellClass(column, row[column])}`}>{String(row[column])}</td>
-                ))}
-              </tr>
-            ))}
+            {rows.map((row, index) => {
+              const isSelected = selected === row;
+              return (
+                <tr key={index} className={`border-t border-slate-800 ${isSelected ? "selected-table-row" : ""}`}>
+                  <td className="px-3 py-2">
+                    <button className="icon-action-button" title="Pop out trade chart" type="button" onClick={() => onSelect(row)}>
+                      <CandlestickChart size={16} />
+                    </button>
+                  </td>
+                  {columns.map((column) => (
+                    <td key={column} className={`px-3 py-2 ${paperPositionCellClass(column, row[column])}`}>{String(row[column])}</td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1943,15 +1970,16 @@ function PaperPositionChart({ position, onClose }: { position: Row; onClose: () 
   const candles = data?.candles ?? [];
   return (
     <div className="trade-chart-modal-backdrop" role="presentation" onClick={onClose}>
-      <section className="card panel dashboard-card trade-chart-modal" role="dialog" aria-modal="true" aria-label="Open paper position chart" onClick={(event) => event.stopPropagation()}>
+      <section className="card panel dashboard-card trade-chart-modal" role="dialog" aria-modal="true" aria-label="Paper position chart" onClick={(event) => event.stopPropagation()}>
         <div className="trade-chart-header">
           <div>
             <div className="card-header border-0 bg-transparent p-0 font-medium">
-              {data ? `${data.display_pair} ${data.timeframe} Open Position Chart` : "Open Position Chart"}
+              {data ? `${data.display_pair} ${data.timeframe} Paper Position Chart` : "Paper Position Chart"}
             </div>
             <div className="trade-chart-subtitle">
               {candles.length.toLocaleString()} / 3000 candles
               {data?.trade.opened_at ? ` | Opened ${formatDate(data.trade.opened_at)}` : ""}
+              {position.closed_at ? ` | Closed ${formatDate(position.closed_at)}` : ""}
             </div>
           </div>
           <button className="icon-action-button" title="Close chart" type="button" onClick={onClose}>

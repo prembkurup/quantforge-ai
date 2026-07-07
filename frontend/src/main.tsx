@@ -1860,7 +1860,6 @@ function PaperPositionsTable({
         <table className="table table-dark table-hover dashboard-table w-full min-w-[920px] text-left text-sm">
           <thead className="bg-slate-900 text-xs uppercase text-slate-400">
             <tr>
-              <th className="px-3 py-2">chart</th>
               {columns.map((column) => <th key={column} className="px-3 py-2">{column.replace(/_/g, " ")}</th>)}
             </tr>
           </thead>
@@ -1868,12 +1867,15 @@ function PaperPositionsTable({
             {rows.map((row, index) => {
               const isSelected = selected === row;
               return (
-                <tr key={index} className={`border-t border-slate-800 ${isSelected ? "selected-table-row" : ""}`}>
-                  <td className="px-3 py-2">
-                    <button className="icon-action-button" title="Pop out trade chart" type="button" onClick={() => onSelect(row)}>
-                      <CandlestickChart size={16} />
-                    </button>
-                  </td>
+                <tr
+                  key={index}
+                  className={`cursor-pointer border-t border-slate-800 ${isSelected ? "selected-table-row" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  title="Open trade chart"
+                  onClick={() => onSelect(row)}
+                  onKeyDown={(event) => openPaperPositionRowFromKeyboard(event, row, onSelect)}
+                >
                   {columns.map((column) => (
                     <td key={column} className={`px-3 py-2 ${paperPositionCellClass(column, row[column])}`}>{String(row[column])}</td>
                   ))}
@@ -1905,7 +1907,6 @@ function OpenPaperPositionsTable({
         <table className="table table-dark table-hover dashboard-table w-full min-w-[920px] text-left text-sm">
           <thead className="bg-slate-900 text-xs uppercase text-slate-400">
             <tr>
-              <th className="px-3 py-2">chart</th>
               {columns.map((column) => <th key={column} className="px-3 py-2">{column.replace(/_/g, " ")}</th>)}
             </tr>
           </thead>
@@ -1913,12 +1914,15 @@ function OpenPaperPositionsTable({
             {rows.map((row, index) => {
               const isSelected = selected === row;
               return (
-                <tr key={index} className={`border-t border-slate-800 ${isSelected ? "selected-table-row" : ""}`}>
-                  <td className="px-3 py-2">
-                    <button className="icon-action-button" title="Pop out trade chart" type="button" onClick={() => onSelect(row)}>
-                      <CandlestickChart size={16} />
-                    </button>
-                  </td>
+                <tr
+                  key={index}
+                  className={`cursor-pointer border-t border-slate-800 ${isSelected ? "selected-table-row" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  title="Open trade chart"
+                  onClick={() => onSelect(row)}
+                  onKeyDown={(event) => openPaperPositionRowFromKeyboard(event, row, onSelect)}
+                >
                   {columns.map((column) => (
                     <td key={column} className={`px-3 py-2 ${paperPositionCellClass(column, row[column])}`}>{String(row[column])}</td>
                   ))}
@@ -1931,6 +1935,12 @@ function OpenPaperPositionsTable({
       {rows.length === 0 && <div className="pt-3 text-sm text-slate-400">No open paper positions.</div>}
     </div>
   );
+}
+
+function openPaperPositionRowFromKeyboard(event: React.KeyboardEvent<HTMLTableRowElement>, row: Row, onSelect: (row: Row) => void) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  onSelect(row);
 }
 
 function paperPositionCellClass(column: string, value: Row[string]) {

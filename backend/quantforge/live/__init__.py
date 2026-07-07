@@ -182,6 +182,17 @@ from quantforge.live.replay import (
     ReplayStatus,
     infer_replay_mode,
 )
+from quantforge.live.paper_scanner import (
+    DecisionTraceStore,
+    MultiPairPaperScanner,
+    MultiPairPaperScannerResult,
+    PairScanResult,
+    PaperPositionStore,
+    PaperScannerConfig,
+    ProcessedCandleStore,
+    StrategyAssetSelector,
+    load_paper_scanner_config,
+)
 
 __all__ = [
     "ExecutionManager",
@@ -354,4 +365,13 @@ __all__ = [
     "ReplaySession",
     "ReplayStatus",
     "infer_replay_mode",
+    "DecisionTraceStore",
+    "MultiPairPaperScanner",
+    "MultiPairPaperScannerResult",
+    "PairScanResult",
+    "PaperPositionStore",
+    "PaperScannerConfig",
+    "ProcessedCandleStore",
+    "StrategyAssetSelector",
+    "load_paper_scanner_config",
 ]

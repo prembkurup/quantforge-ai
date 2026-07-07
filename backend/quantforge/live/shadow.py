@@ -413,7 +413,7 @@ class ShadowTradingPlatform:
         self.knowledge = KnowledgeUpdater(knowledge_engine)
 
     def run(self, days_observed: int = 60) -> ShadowTradingRunResult:
-        live_result = self.live.run()
+        live_result = self.live.run(mode="demo")
         paper_orders = self.execution.execute(live_result.signals)
         fills = self.exchange.fill(paper_orders)
         portfolio = self.portfolio.apply_fills(fills)

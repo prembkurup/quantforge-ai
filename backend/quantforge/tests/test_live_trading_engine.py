@@ -12,7 +12,7 @@ from quantforge.live import (
 
 
 def test_live_trading_engine_runs_event_driven_pipeline() -> None:
-    result = LiveTradingEngine().run()
+    result = LiveTradingEngine().run(mode="demo")
 
     assert result.connected is True
     assert result.events_processed == 6
@@ -41,7 +41,7 @@ def test_trade_decision_engine_blocks_bad_market_quality_before_signal() -> None
 
 def test_state_store_recovery_and_synchronization_are_available() -> None:
     engine = LiveTradingEngine()
-    result = engine.run()
+    result = engine.run(mode="demo")
 
     assert engine.state.latest() == result.state_snapshot
     assert result.recovery_completed is True
@@ -50,7 +50,7 @@ def test_state_store_recovery_and_synchronization_are_available() -> None:
 
 
 def test_live_risk_blocks_oversized_orders() -> None:
-    result = LiveTradingEngine().run()
+    result = LiveTradingEngine().run(mode="demo")
     signal = result.signals[0]
     oversized_signal = type(signal)(
         signal_id="SIG-LIVE-OVERSIZE",
@@ -69,7 +69,7 @@ def test_live_risk_blocks_oversized_orders() -> None:
 
 
 def test_live_engine_uses_paper_oanda_path_without_real_credentials() -> None:
-    result = LiveTradingEngine().run()
+    result = LiveTradingEngine().run(mode="demo")
 
     assert result.executions[0].broker == "OANDA_PAPER"
     assert result.executions[0].order_id == "paper_oanda_order_0001"
@@ -79,6 +79,7 @@ def test_live_engine_forces_intraday_close_and_records_trade_journal(tmp_path) -
     journal = tmp_path / "intraday_trade_journal.json"
 
     result = LiveTradingEngine().run(
+        mode="demo",
         intraday_timestamp=datetime(2026, 7, 6, 21, 50, tzinfo=UTC),
         force_close_time_utc=time(21, 45),
         trade_journal_path=journal,
@@ -93,3 +94,12 @@ def test_live_engine_forces_intraday_close_and_records_trade_journal(tmp_path) -
     assert entries[0]["event_type"] == "FORCED_CLOSE"
     assert entries[0]["reason"] == "Forced end-of-day intraday close."
     assert entries[0]["evidence"]["policy"] == "INTRADAY_FORCE_CLOSE"
+
+
+def test_live_engine_requires_real_events_unless_demo_is_explicit() -> None:
+    try:
+        LiveTradingEngine().run()
+    except RuntimeError as exc:
+        assert "requires real events" in str(exc)
+    else:
+        raise AssertionError("LiveTradingEngine silently seeded demo events without explicit demo mode.")

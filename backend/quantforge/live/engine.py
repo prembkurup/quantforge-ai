@@ -336,7 +336,10 @@ class ExecutionManager:
             response = self._execution_client.create_order(payload)
             order_id = str(response.get("orderCreateTransaction", {}).get("id", "oanda_live_order"))
             return ExecutionReceipt(order_id, signal.signal_id, "submitted", "OANDA", payload)
-        return ExecutionReceipt("paper_oanda_order_0001", signal.signal_id, "filled", "OANDA_PAPER", payload)
+        order_id = "paper_oanda_order_0001"
+        if signal.signal_id != "SIG-LIVE-0001":
+            order_id = f"paper_{signal.signal_id.lower().replace(':', '_')}"
+        return ExecutionReceipt(order_id, signal.signal_id, "filled", "OANDA_PAPER", payload)
 
     def close_position(self, position: PositionSnapshot, reason: str) -> ExecutionReceipt:
         payload = {
@@ -460,17 +463,24 @@ class LiveTradingEngine:
         asset: StrategyAsset | None = None,
         *,
         events: tuple[LiveEvent, ...] | None = None,
-        demo: bool = True,
+        demo: bool = False,
+        mode: str = "real",
         intraday_timestamp: datetime | None = None,
         force_close_time_utc: time | None = None,
         trade_journal_path: Path | None = None,
     ) -> LiveTradingRunResult:
+        demo_enabled = demo or mode == "demo"
+        if events is None and not demo_enabled:
+            raise RuntimeError("LiveTradingEngine requires real events unless mode='demo' is explicitly enabled.")
         if asset is None:
-            if not demo:
+            if not demo_enabled:
                 raise ValueError("A real Strategy Asset is required when demo mode is disabled.")
             asset = ProductionStrategyManagementPlatform()._demo_asset()
         portfolio = self.portfolio.build(asset)
-        seeded_events = self.market_stream.seed(self.bus) if events is None else ()
+        if events is None and demo_enabled:
+            seeded_events = self.market_stream.seed(self.bus)
+        else:
+            seeded_events = ()
         events = self.bus.drain() if events is None else events
         signals: list[TradingSignal] = []
         executions: list[ExecutionReceipt] = []
@@ -490,7 +500,11 @@ class LiveTradingEngine:
                 regime,
                 selection,
                 decision,
-                signal_id=f"SIG-REPLAY-{index:06d}" if seeded_events == () else "SIG-LIVE-0001",
+                signal_id=(
+                    f"SIG-REPLAY-{feature_vector.instrument}-{feature_vector.timeframe}-{index:06d}"
+                    if seeded_events == ()
+                    else "SIG-LIVE-0001"
+                ),
             )
             risk_decision = self.risk.approve(signal)
             risk_blocks += int(not risk_decision.approved)

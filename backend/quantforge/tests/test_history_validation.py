@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 
 from quantforge.research.history_validation import (
     DEFAULT_PAIR_SPREAD_PIPS,
@@ -59,6 +60,36 @@ def test_history_validation_creates_improvement_request_for_failed_result(tmp_pa
         "INSUFFICIENT_TRADES",
         "STRATEGY_DEGRADATION",
     }
+
+
+def test_history_validation_requeues_researched_improvement_for_validation(tmp_path) -> None:
+    engine = _engine(
+        tmp_path,
+        asset_count=1,
+        config=HistoricalValidationConfig(batch_size=1, min_profit_factor=99.0),
+    )
+    engine.run_next_batch()
+    queue = engine.queue()
+    improvements = engine.improvements()
+    assert queue[0]["status"] == "Needs Research"
+
+    paths = default_historical_validation_paths(tmp_path)
+    payload = json.loads(paths.improvements_file.read_text(encoding="utf-8"))
+    payload["improvements"][0]["status"] = "RESEARCHED"
+    paths.improvements_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    retry_engine = _engine(
+        tmp_path,
+        asset_count=1,
+        config=HistoricalValidationConfig(batch_size=1, min_profit_factor=0.5, min_win_rate=0.2, max_drawdown=0.5),
+    )
+    retry_engine.run_next_batch()
+
+    queue = retry_engine.queue()
+    improvements = retry_engine.improvements()
+    assert queue[0]["status"] == "Completed"
+    assert queue[0]["retry_count"] == 1
+    assert improvements[0]["status"] == "VALIDATION_QUEUED"
 
 
 def test_history_validation_status_reports_dashboard_summary(tmp_path) -> None:

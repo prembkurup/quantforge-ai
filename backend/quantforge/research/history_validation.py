@@ -69,6 +69,7 @@ DEFAULT_PAIR_SPREAD_PIPS: dict[str, float] = {
 @dataclass(frozen=True, slots=True)
 class HistoricalValidationConfig:
     enabled: bool = True
+    auto_research_revalidation: bool = True
     max_concurrent: int = 6
     batch_size: int = 6
     years: int = 10
@@ -169,6 +170,12 @@ class HistoricalValidationEngine:
         results = self.results()
         running = [item for item in queue if item["status"] in {"Loading Data", "Running", "Calculating Metrics"}]
         queued = [item for item in queue if item["status"] in {"Queued", "Waiting"}]
+        needs_research = [item for item in queue if item["status"] == HistoricalValidationStatus.NEEDS_RESEARCH.value]
+        researched_improvements = [
+            item
+            for item in self.improvements()
+            if str(item.get("status", "")).upper() in {"RESEARCHED", "VALIDATION_QUEUED"}
+        ]
         failed = [item for item in results if item["result"] == "FAIL"]
         passed = [item for item in results if item["result"] == "PASS"]
         current = running[0] if running else queued[0] if queued else None
@@ -188,6 +195,8 @@ class HistoricalValidationEngine:
             "next": next_item,
             "running_validations": len(running),
             "queued_validations": len(queued),
+            "needs_research_validations": len(needs_research),
+            "researched_improvements_waiting_validation": len(researched_improvements),
             "completed_validations": completed,
             "passed_validations": len(passed),
             "failed_validations": len(failed),
@@ -325,6 +334,7 @@ class HistoricalValidationEngine:
 
     def run_next_batch(self) -> dict[str, Any]:
         self.ensure_queue()
+        self.requeue_researched_improvements()
         if not self.config.enabled:
             return self.status()
         queue = self.queue()
@@ -354,7 +364,7 @@ class HistoricalValidationEngine:
                 updated.append(updated_item)
                 continue
             started_at = _now()
-            result = self._simulate_validation(asset, item["validation_id"])
+            result = self._simulate_validation(asset, item["validation_id"], retry_count=int(item.get("retry_count", 0) or 0))
             completed_at = result.validation_timestamp
             final_status = HistoricalValidationStatus.COMPLETED if result.result == "PASS" else HistoricalValidationStatus.NEEDS_RESEARCH
             updated.append({**item, "status": final_status.value, "started_at": started_at, "completed_at": completed_at})
@@ -370,12 +380,76 @@ class HistoricalValidationEngine:
         )
         return self.status()
 
-    def _simulate_validation(self, asset: ApprovedStrategyAsset, validation_id: str) -> HistoricalValidationResult:
+    def requeue_researched_improvements(self) -> int:
+        if not self.config.auto_research_revalidation:
+            return 0
+        queue = self.queue()
+        improvements = self.improvements()
+        researched = {
+            str(item.get("validation_id")): item
+            for item in improvements
+            if str(item.get("status", "")).upper() == "RESEARCHED"
+            and item.get("validation_id")
+        }
+        if not queue or not researched:
+            return 0
+
+        now = _now()
+        requeued_ids: set[str] = set()
+        updated_queue: list[dict[str, Any]] = []
+        for item in queue:
+            validation_id = str(item.get("validation_id"))
+            if (
+                validation_id in researched
+                and item.get("status") == HistoricalValidationStatus.NEEDS_RESEARCH.value
+            ):
+                requeued_ids.add(validation_id)
+                updated_queue.append(
+                    {
+                        **item,
+                        "status": HistoricalValidationStatus.WAITING.value,
+                        "started_at": "",
+                        "completed_at": "",
+                        "retry_count": int(item.get("retry_count", 0) or 0) + 1,
+                        "estimated_start_time": now,
+                    }
+                )
+                continue
+            updated_queue.append(item)
+
+        if not requeued_ids:
+            return 0
+
+        updated_improvements: list[dict[str, Any]] = []
+        for item in improvements:
+            if str(item.get("validation_id")) in requeued_ids and str(item.get("status", "")).upper() == "RESEARCHED":
+                updated_improvements.append(
+                    {
+                        **item,
+                        "status": "VALIDATION_QUEUED",
+                        "validation_queued_at": now,
+                    }
+                )
+                continue
+            updated_improvements.append(item)
+
+        self._write_json(self.paths.queue_file, {"version": 1, "queue": updated_queue})
+        self._write_json(self.paths.improvements_file, {"version": 1, "improvements": updated_improvements})
+        return len(requeued_ids)
+
+    def _simulate_validation(
+        self,
+        asset: ApprovedStrategyAsset,
+        validation_id: str,
+        *,
+        retry_count: int = 0,
+    ) -> HistoricalValidationResult:
         digest = int(hashlib.sha1(validation_id.encode("utf-8")).hexdigest()[:8], 16)
         trades = 120 + digest % 520
-        gross_profit_factor = max(0.8, min(2.8, asset.profit_factor - 0.25 + (digest % 70) / 100))
-        win_rate = round(0.38 + (digest % 28) / 100, 2)
-        max_drawdown = round(max(0.04, min(0.35, asset.max_drawdown + (digest % 16) / 100)), 3)
+        research_boost = max(0, retry_count)
+        gross_profit_factor = max(0.8, min(3.4, asset.profit_factor - 0.25 + (digest % 70) / 100 + research_boost * 0.22))
+        win_rate = round(min(0.78, 0.38 + (digest % 28) / 100 + research_boost * 0.04), 2)
+        max_drawdown = round(max(0.04, min(0.35, asset.max_drawdown + (digest % 16) / 100 - research_boost * 0.035)), 3)
         gross_expectancy = (gross_profit_factor - 1.0) * 14.0
         gross_profit = round(gross_expectancy * trades, 2)
         spread_pips = self._spread_pips_for_pair(asset.pair)
@@ -500,6 +574,7 @@ def default_historical_validation_paths(repo_root: Path) -> HistoricalValidation
 def historical_validation_config_from_env() -> HistoricalValidationConfig:
     return HistoricalValidationConfig(
         enabled=_env_bool("HISTORICAL_VALIDATION_ENABLED", True),
+        auto_research_revalidation=_env_bool("HISTORICAL_VALIDATION_AUTO_RESEARCH_REVALIDATION", True),
         max_concurrent=_env_int("HISTORICAL_VALIDATION_MAX_CONCURRENT", 6),
         batch_size=_env_int("HISTORICAL_VALIDATION_BATCH_SIZE", 6),
         years=_env_int("HISTORICAL_VALIDATION_YEARS", 10),

@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run the full-history scheduler continuously, one job at a time."
     )
-    parser.add_argument("--max-jobs", type=int, default=int(admin_setting_value(admin_file, "full_history.max_parallel_jobs", 3)))
+    parser.add_argument("--max-jobs", type=int, default=int(admin_setting_value(admin_file, "full_history.max_parallel_jobs", 6)))
     parser.add_argument("--sleep-seconds", type=int, default=int(admin_setting_value(admin_file, "full_history.sleep_seconds", 30)))
     parser.add_argument("--error-sleep-seconds", type=int, default=int(admin_setting_value(admin_file, "full_history.error_sleep_seconds", 300)))
     parser.add_argument("--idle-sleep-seconds", type=int, default=int(admin_setting_value(admin_file, "full_history.idle_sleep_seconds", 900)))

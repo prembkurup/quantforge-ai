@@ -392,7 +392,7 @@ class DashboardService:
             "stage": (
                 "Full-history complete; worker idle watcher"
                 if pipeline_done
-                else "24/7 worker, 3 parallel scheduler jobs"
+                else "24/7 worker, 6 parallel scheduler jobs"
             ),
             "progress": full_history["progress_percent"],
             "started_at": full_history["latest_recorded_at"] or timestamp,

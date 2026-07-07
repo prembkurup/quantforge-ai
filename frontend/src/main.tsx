@@ -1920,7 +1920,6 @@ function PaperPositionChart({ position, onClose }: { position: Row; onClose: () 
             <X size={16} />
           </button>
         </div>
-        {data && <TradePriceList data={data} />}
         {!data && <div className="chart-loading">Loading historical candles...</div>}
         {data && data.database_status !== "available" && (
           <div className="callout callout-warning rounded border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-100">
@@ -1932,28 +1931,6 @@ function PaperPositionChart({ position, onClose }: { position: Row; onClose: () 
         )}
         {data && candles.length > 0 && <LightweightTradeChart data={data} />}
       </section>
-    </div>
-  );
-}
-
-function TradePriceList({ data }: { data: PaperPositionChartPayload }) {
-  const prices = [
-    { label: "Open", value: data.trade.open_price, className: "open" },
-    { label: "Stop Loss", value: data.trade.stop_loss, className: "sl" },
-    { label: "Take Profit", value: data.trade.take_profit, className: "tp" }
-  ].filter((item) => item.value !== null);
-  return (
-    <div className="trade-price-list">
-      <div className="trade-price-item direction">
-        <span>Direction</span>
-        <strong>{data.trade.direction || "N/A"}</strong>
-      </div>
-      {prices.map((item) => (
-        <div key={item.label} className={`trade-price-item ${item.className}`}>
-          <span>{item.label}</span>
-          <strong>{formatNumber(item.value ?? 0, 5)}</strong>
-        </div>
-      ))}
     </div>
   );
 }

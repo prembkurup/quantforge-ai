@@ -1056,11 +1056,11 @@ function Paper() {
         </div>
       </section>
       <DataTable title="Open Paper Positions" rows={practice.open_paper_positions ?? []} />
-      <DataTable title="Pair-Level Paper Scanner Results" rows={practice.paper_scanner_pair_result ?? []} />
+      <PaginatedDataTable title={`Pair-Level Paper Scanner Results (${(practice.paper_scanner_pair_result ?? []).length})`} rows={practice.paper_scanner_pair_result ?? []} pageSize={30} />
       <JsonPanel title="Paper Scanner Skip Reasons" data={practice.skip_reasons ?? {}} />
       <JsonPanel title="Real Candle Replay Cursor" data={replay} />
-      <DataTable title="Recent 24/7 Paper-Practice Runs" rows={practiceHistory} />
-      <DataTable title="Legacy Open Paper Trades" rows={trades} />
+      <PaginatedDataTable title={`Recent 24/7 Paper-Practice Runs (${practiceHistory.length})`} rows={practiceHistory} pageSize={30} />
+      <PaginatedDataTable title={`Legacy Open Paper Trades (${trades.length})`} rows={trades} pageSize={30} />
       <JsonPanel title="Drift" data={drift} />
     </Page>
   );

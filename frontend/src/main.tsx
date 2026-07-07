@@ -2088,7 +2088,7 @@ function addTradePriceLine(
 }
 
 function toChartTime(value: string): UTCTimestamp | null {
-  const timestamp = Date.parse(value);
+  const timestamp = Date.parse(normalizeUtcDateString(value));
   if (!Number.isFinite(timestamp)) return null;
   return Math.floor(timestamp / 1000) as UTCTimestamp;
 }
@@ -2167,16 +2167,26 @@ function number(value: unknown) {
 
 function formatDate(value: unknown) {
   if (!value) return "";
-  const parsed = new Date(String(value));
+  const parsed = new Date(normalizeUtcDateString(String(value)));
   if (Number.isNaN(parsed.getTime())) return String(value);
-  return parsed.toLocaleString();
+  return parsed.toLocaleString(undefined, { timeZone: "UTC", timeZoneName: "short" });
 }
 
 function shortTime(value: unknown) {
   if (!value) return "";
-  const parsed = new Date(String(value));
+  const parsed = new Date(normalizeUtcDateString(String(value)));
   if (Number.isNaN(parsed.getTime())) return String(value);
-  return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" });
+}
+
+function normalizeUtcDateString(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(trimmed)) return trimmed;
+  if (/^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?)?$/.test(trimmed)) {
+    return `${trimmed.replace(" ", "T")}Z`;
+  }
+  return trimmed;
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

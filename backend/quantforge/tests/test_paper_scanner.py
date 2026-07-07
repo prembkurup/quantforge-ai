@@ -11,6 +11,7 @@ from quantforge.live.paper_scanner import (
     PaperScannerConfig,
     ProcessedCandleStore,
     ProcessedSignalStore,
+    _coerce_datetime,
 )
 from quantforge.research.strategy_assets import (
     ApprovedStrategyAssetStatus,
@@ -207,6 +208,10 @@ def test_paper_position_store_prefers_source_candle_time_for_open_time(tmp_path:
 
     assert positions[0]["entry_time"] == "2026-07-07T03:30:00+00:00"
     assert positions[0]["opened_at"] == "2026-07-07T03:30:00+00:00"
+
+
+def test_paper_scanner_treats_naive_candle_times_as_utc() -> None:
+    assert _coerce_datetime("2026-07-07 03:30:00").isoformat() == "2026-07-07T03:30:00+00:00"
 
 
 def test_risk_rejection_prevents_order(tmp_path: Path) -> None:

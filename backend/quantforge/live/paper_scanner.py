@@ -1071,5 +1071,9 @@ def _timeframe_delta(timeframe: str) -> timedelta | None:
 
 def _coerce_datetime(value: Any) -> datetime:
     if isinstance(value, datetime):
-        return value
-    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        timestamp = value
+    else:
+        timestamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=UTC)
+    return timestamp.astimezone(UTC)

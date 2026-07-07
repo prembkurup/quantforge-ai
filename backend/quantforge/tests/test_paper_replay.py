@@ -14,6 +14,7 @@ from quantforge.research.strategy_assets import (
     StrategyAssetRepository,
 )
 from quantforge.validation import StrategyValidationPlatform
+from quantforge.live.replay import _coerce_datetime
 
 
 class FakeCandleRepository:
@@ -58,6 +59,10 @@ def test_historical_candle_replay_stream_emits_new_candle_events() -> None:
     assert events[0].payload["instrument"] == "EUR_USD"
     assert events[0].payload["timeframe"] == "H1"
     assert all(event.event_type.value == "new_candle" for event in events)
+
+
+def test_replay_treats_naive_candle_times_as_utc() -> None:
+    assert _coerce_datetime("2026-07-07 03:30:00").isoformat() == "2026-07-07T03:30:00+00:00"
 
 
 def test_paper_trading_replay_runner_processes_real_style_candle_events(tmp_path: Path) -> None:

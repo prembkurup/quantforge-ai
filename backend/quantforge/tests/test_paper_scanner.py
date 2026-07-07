@@ -297,6 +297,40 @@ def test_mark_to_market_closes_open_position_when_stop_loss_touched(tmp_path: Pa
     assert positions[0]["p_l"] == -10.0
 
 
+def test_mark_to_market_converts_jpy_quote_pl_to_usd_account_currency(tmp_path: Path) -> None:
+    position_store = PaperPositionStore(tmp_path / "positions.json")
+    position_store._save(
+        {
+            "positions": [
+                {
+                    "position_id": "jpy-cross",
+                    "pair": "AUD_JPY",
+                    "instrument": "AUD_JPY",
+                    "timeframe": "M15",
+                    "direction": "BUY",
+                    "status": "OPEN",
+                    "units": 10000,
+                    "entry_price": 100.0,
+                    "open_price": 100.0,
+                    "close_price": 99.9,
+                    "opened_at": "2026-07-07T03:00:00+00:00",
+                }
+            ]
+        }
+    )
+
+    position_store.mark_to_market(
+        {"AUD_JPY:M15": 99.9},
+        conversion_prices={"AUD_JPY": 99.9, "USD_JPY": 100.0},
+    )
+
+    positions = position_store._load()["positions"]
+    assert positions[0]["p_l_quote_currency"] == -1000.0
+    assert positions[0]["p_l_account_currency"] == -10.0
+    assert positions[0]["p_l_currency"] == "USD"
+    assert positions[0]["p_l"] == -10.0
+
+
 def test_risk_rejection_prevents_order(tmp_path: Path) -> None:
     scanner = MultiPairPaperScanner(
         FakeLatestCandleRepository(),

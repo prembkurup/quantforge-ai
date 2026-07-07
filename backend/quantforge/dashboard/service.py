@@ -1713,6 +1713,9 @@ def _paper_position_records() -> list[dict[str, Any]]:
 
 
 def _position_pl_value(position: dict[str, Any]) -> float:
+    value = _safe_float(position.get("p_l_account_currency"))
+    if value is not None:
+        return value
     value = _safe_float(position.get("p_l"))
     if value is not None:
         return value

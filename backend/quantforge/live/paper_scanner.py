@@ -212,6 +212,7 @@ class PaperPositionStore:
         positions: tuple[PositionSnapshot, ...],
         signal_by_pair: dict[str, PaperSignalRecord],
         price_by_pair_timeframe: dict[str, float],
+        conversion_prices: dict[str, float] | None = None,
     ) -> None:
         payload = self._load()
         existing = {
@@ -226,11 +227,13 @@ class PaperPositionStore:
             entry_time = _iso(signal.candle_time) if signal else now
             entry_price = price_by_pair_timeframe.get(_pair_timeframe_key(position.instrument, timeframe), 0.0)
             take_profit, stop_loss = _default_exit_prices(entry_price, signal.signal_type if signal else "")
-            floating_pl = _position_pl(
+            floating_pl = _position_pl_account_currency(
+                position.instrument,
                 entry_price,
                 entry_price,
                 position.units,
                 signal.signal_type if signal else "",
+                conversion_prices=conversion_prices,
                 fallback=position.floating_pl,
             )
             existing[position.position_id] = {
@@ -255,6 +258,8 @@ class PaperPositionStore:
                 "updated_at": now,
                 "floating_pl": floating_pl,
                 "p_l": floating_pl,
+                "p_l_account_currency": floating_pl,
+                "p_l_currency": "USD",
                 "margin_used": position.margin_used,
                 "exposure": position.exposure,
             }
@@ -265,12 +270,14 @@ class PaperPositionStore:
         self,
         price_by_pair_timeframe: dict[str, float],
         candle_by_pair_timeframe: dict[str, dict[str, Any]] | None = None,
+        conversion_prices: dict[str, float] | None = None,
     ) -> None:
         payload = self._load()
         now = datetime.now(UTC).isoformat(timespec="seconds")
         changed = self._enrich_open_positions(payload)
         candle_by_pair_timeframe = candle_by_pair_timeframe or {}
         for position in payload.get("positions", []):
+            changed = _normalize_position_pl(position, conversion_prices=conversion_prices) or changed
             if position.get("status") != "OPEN":
                 continue
             pair = str(position.get("pair") or position.get("instrument") or "")
@@ -285,28 +292,41 @@ class PaperPositionStore:
             candle = candle_by_pair_timeframe.get(key, {})
             exit_price, exit_reason = _exit_price_for_candle(position, candle)
             if exit_price is not None:
-                realized_pl = _position_pl(entry_price, exit_price, units, direction)
+                realized_pl = _position_pl_account_currency(
+                    pair,
+                    entry_price,
+                    exit_price,
+                    units,
+                    direction,
+                    conversion_prices=conversion_prices,
+                )
                 position["close_price"] = exit_price
                 position["current_price"] = exit_price
                 position["floating_pl"] = realized_pl
                 position["p_l"] = realized_pl
+                position["p_l_account_currency"] = realized_pl
+                position["p_l_currency"] = "USD"
                 position["status"] = "CLOSED"
                 position["close_reason"] = exit_reason
                 position["closed_at"] = _iso(candle.get("time")) if candle.get("time") else now
                 position["updated_at"] = now
                 changed = True
                 continue
-            floating_pl = _position_pl(
+            floating_pl = _position_pl_account_currency(
+                pair,
                 entry_price,
                 close_price,
                 units,
                 direction,
+                conversion_prices=conversion_prices,
                 fallback=_float_or_zero(position.get("floating_pl")),
             )
             position["close_price"] = close_price
             position["current_price"] = close_price
             position["floating_pl"] = floating_pl
             position["p_l"] = floating_pl
+            position["p_l_account_currency"] = floating_pl
+            position["p_l_currency"] = "USD"
             position["updated_at"] = now
             changed = True
         if changed:
@@ -434,6 +454,7 @@ class MultiPairPaperScanner:
         events_processed = 0
         price_by_pair_timeframe: dict[str, float] = {}
         candle_by_pair_timeframe: dict[str, dict[str, Any]] = {}
+        conversion_prices: dict[str, float] = {}
 
         for pair in self.config.pairs[: self.config.max_pairs_per_scan]:
             for timeframe in self.config.timeframes:
@@ -447,6 +468,7 @@ class MultiPairPaperScanner:
                 if rows:
                     key = _pair_timeframe_key(pair, timeframe)
                     price_by_pair_timeframe[key] = _candle_close(rows[-1])
+                    conversion_prices[pair] = _candle_close(rows[-1])
                     candle_by_pair_timeframe[key] = rows[-1]
                 candle_check = self._validate_candles(pair, timeframe, rows)
                 if candle_check.status != "ELIGIBLE":
@@ -699,8 +721,8 @@ class MultiPairPaperScanner:
                 )
 
         signal_by_pair = {signal.pair: signal for signal in paper_signals}
-        self.positions.add_many(tuple(new_positions), signal_by_pair, price_by_pair_timeframe)
-        self.positions.mark_to_market(price_by_pair_timeframe, candle_by_pair_timeframe)
+        self.positions.add_many(tuple(new_positions), signal_by_pair, price_by_pair_timeframe, conversion_prices)
+        self.positions.mark_to_market(price_by_pair_timeframe, candle_by_pair_timeframe, conversion_prices)
         open_position_records = self.positions.list_open()
         closed_position_records = self.positions.list_closed()
         open_positions = len(open_position_records)
@@ -1031,11 +1053,78 @@ def _default_exit_prices(entry_price: float, direction: str) -> tuple[float | No
     return round(entry_price * 1.0020, 8), round(entry_price * 0.9990, 8)
 
 
-def _position_pl(entry_price: float, close_price: float, units: float, direction: str, *, fallback: float = 0.0) -> float:
+def _position_pl_quote_currency(entry_price: float, close_price: float, units: float, direction: str, *, fallback: float = 0.0) -> float:
     if entry_price <= 0 or close_price <= 0 or units == 0:
         return round(fallback, 4)
     multiplier = -1.0 if direction.upper() == "SELL" else 1.0
     return round((close_price - entry_price) * abs(units) * multiplier, 4)
+
+
+def _position_pl_account_currency(
+    pair: str,
+    entry_price: float,
+    close_price: float,
+    units: float,
+    direction: str,
+    *,
+    conversion_prices: dict[str, float] | None = None,
+    fallback: float = 0.0,
+) -> float:
+    quote_pl = _position_pl_quote_currency(entry_price, close_price, units, direction, fallback=fallback)
+    conversion_rate = _quote_to_usd_rate(pair, close_price, conversion_prices or {})
+    return round(quote_pl * conversion_rate, 4)
+
+
+def _normalize_position_pl(position: dict[str, Any], *, conversion_prices: dict[str, float] | None = None) -> bool:
+    if position.get("p_l_currency") == "USD" and position.get("p_l_account_currency") is not None:
+        return False
+    pair = str(position.get("pair") or position.get("instrument") or "")
+    entry_price = _float_or_zero(position.get("entry_price") or position.get("open_price"))
+    close_price = _float_or_zero(position.get("close_price") or position.get("current_price"))
+    units = _float_or_zero(position.get("units"))
+    direction = str(position.get("direction") or "")
+    if pair == "" or entry_price <= 0 or close_price <= 0 or units == 0:
+        return False
+    quote_pl = _position_pl_quote_currency(entry_price, close_price, units, direction)
+    account_pl = _position_pl_account_currency(
+        pair,
+        entry_price,
+        close_price,
+        units,
+        direction,
+        conversion_prices=conversion_prices,
+    )
+    position["p_l_quote_currency"] = quote_pl
+    position["p_l_account_currency"] = account_pl
+    position["p_l_currency"] = "USD"
+    position["floating_pl"] = account_pl
+    position["p_l"] = account_pl
+    return True
+
+
+def _quote_to_usd_rate(pair: str, close_price: float, conversion_prices: dict[str, float]) -> float:
+    base, quote = _split_pair(pair)
+    if quote in {"", "USD"}:
+        return 1.0
+    direct = conversion_prices.get(f"{quote}_USD")
+    if direct and direct > 0:
+        return direct
+    inverse = conversion_prices.get(f"USD_{quote}")
+    if inverse and inverse > 0:
+        return 1.0 / inverse
+    if base == "USD" and close_price > 0:
+        return 1.0 / close_price
+    return 1.0
+
+
+def _split_pair(pair: str) -> tuple[str, str]:
+    normalized = pair.replace("/", "_").upper()
+    parts = normalized.split("_")
+    if len(parts) >= 2:
+        return parts[0], parts[1]
+    if len(normalized) == 6:
+        return normalized[:3], normalized[3:]
+    return normalized, ""
 
 
 def _exit_price_for_candle(position: dict[str, Any], candle: dict[str, Any]) -> tuple[float | None, str]:

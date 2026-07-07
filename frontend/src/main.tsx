@@ -1039,12 +1039,12 @@ function Paper() {
           <MiniFact label="24/7 Ready" value={practice.run_24_7_ready ? "YES" : "NO"} />
         </div>
       </section>
+      <DataTable title="Open Paper Positions" rows={practice.open_paper_positions ?? []} />
       <DataTable title="Pair-Level Paper Scanner Results" rows={practice.paper_scanner_pair_result ?? []} />
       <JsonPanel title="Paper Scanner Skip Reasons" data={practice.skip_reasons ?? {}} />
       <JsonPanel title="Real Candle Replay Cursor" data={replay} />
-      <JsonPanel title="Latest Loop Detail" data={practice} />
       <DataTable title="Recent 24/7 Paper-Practice Runs" rows={practiceHistory} />
-      <DataTable title="Open Paper Trades" rows={trades} />
+      <DataTable title="Legacy Open Paper Trades" rows={trades} />
       <JsonPanel title="Drift" data={drift} />
     </Page>
   );

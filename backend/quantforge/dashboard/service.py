@@ -1365,6 +1365,7 @@ class DashboardService:
                 "candles_checked": 0,
                 "skip_reasons": {},
                 "paper_scanner_pair_result": [],
+                "open_paper_positions": [],
                 "run_24_7_ready": False,
                 "execution_path": "NO_RESULT_FILE",
                 "latest_signal": {},

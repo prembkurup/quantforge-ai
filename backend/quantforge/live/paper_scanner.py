@@ -198,7 +198,12 @@ class PaperPositionStore:
             for position in self.list_open()
         )
 
-    def add_many(self, positions: tuple[PositionSnapshot, ...], signal_by_pair: dict[str, PaperSignalRecord]) -> None:
+    def add_many(
+        self,
+        positions: tuple[PositionSnapshot, ...],
+        signal_by_pair: dict[str, PaperSignalRecord],
+        price_by_pair_timeframe: dict[str, float],
+    ) -> None:
         payload = self._load()
         existing = {
             str(position.get("position_id")): position
@@ -208,31 +213,74 @@ class PaperPositionStore:
         now = datetime.now(UTC).isoformat(timespec="seconds")
         for position in positions:
             signal = signal_by_pair.get(position.instrument)
-            entry_price = 0.0
+            timeframe = signal.timeframe if signal else ""
+            entry_price = price_by_pair_timeframe.get(_pair_timeframe_key(position.instrument, timeframe), 0.0)
+            take_profit, stop_loss = _default_exit_prices(entry_price, signal.signal_type if signal else "")
+            floating_pl = _position_pl(
+                entry_price,
+                entry_price,
+                position.units,
+                signal.signal_type if signal else "",
+                fallback=position.floating_pl,
+            )
             existing[position.position_id] = {
                 "position_id": position.position_id,
                 "strategy_asset_id": signal.strategy_asset_id if signal else position.strategy_id,
                 "pair": position.instrument,
                 "instrument": position.instrument,
-                "timeframe": signal.timeframe if signal else "",
+                "timeframe": timeframe,
                 "direction": signal.signal_type if signal else "",
                 "units": position.units,
                 "entry_time": now,
                 "entry_price": entry_price,
-                "stop_loss": None,
-                "take_profit": None,
+                "open_price": entry_price,
+                "close_price": entry_price,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
                 "status": "OPEN",
                 "source_signal_id": signal.signal_id if signal else "",
                 "source_candle_time": signal.candle_time if signal else "",
                 "opened_at": now,
                 "created_at": now,
                 "updated_at": now,
-                "floating_pl": position.floating_pl,
+                "floating_pl": floating_pl,
+                "p_l": floating_pl,
                 "margin_used": position.margin_used,
                 "exposure": position.exposure,
             }
         payload["positions"] = sorted(existing.values(), key=lambda item: str(item.get("opened_at", "")))
         self._save(payload)
+
+    def mark_to_market(self, price_by_pair_timeframe: dict[str, float]) -> None:
+        payload = self._load()
+        now = datetime.now(UTC).isoformat(timespec="seconds")
+        changed = False
+        for position in payload.get("positions", []):
+            if position.get("status") != "OPEN":
+                continue
+            pair = str(position.get("pair") or position.get("instrument") or "")
+            timeframe = str(position.get("timeframe") or "")
+            close_price = price_by_pair_timeframe.get(_pair_timeframe_key(pair, timeframe))
+            if close_price is None:
+                continue
+            entry_price = _float_or_zero(position.get("entry_price") or position.get("open_price"))
+            direction = str(position.get("direction") or "")
+            units = _float_or_zero(position.get("units"))
+            floating_pl = _position_pl(
+                entry_price,
+                close_price,
+                units,
+                direction,
+                fallback=_float_or_zero(position.get("floating_pl")),
+            )
+            position["close_price"] = close_price
+            position["current_price"] = close_price
+            position["floating_pl"] = floating_pl
+            position["p_l"] = floating_pl
+            position["updated_at"] = now
+            changed = True
+        if changed:
+            self._save(payload)
 
     def _load(self) -> dict[str, Any]:
         if not self.path.exists():
@@ -345,6 +393,7 @@ class MultiPairPaperScanner:
         candles_loaded = 0
         new_candles = 0
         events_processed = 0
+        price_by_pair_timeframe: dict[str, float] = {}
 
         for pair in self.config.pairs[: self.config.max_pairs_per_scan]:
             for timeframe in self.config.timeframes:
@@ -355,6 +404,8 @@ class MultiPairPaperScanner:
                     limit=max(1, self.config.candle_lookback),
                 )
                 candles_loaded += len(rows)
+                if rows:
+                    price_by_pair_timeframe[_pair_timeframe_key(pair, timeframe)] = _candle_close(rows[-1])
                 candle_check = self._validate_candles(pair, timeframe, rows)
                 if candle_check.status != "ELIGIBLE":
                     candle_time = _iso(rows[-1]["time"]) if rows else ""
@@ -606,7 +657,8 @@ class MultiPairPaperScanner:
                 )
 
         signal_by_pair = {signal.pair: signal for signal in paper_signals}
-        self.positions.add_many(tuple(new_positions), signal_by_pair)
+        self.positions.add_many(tuple(new_positions), signal_by_pair, price_by_pair_timeframe)
+        self.positions.mark_to_market(price_by_pair_timeframe)
         open_position_records = self.positions.list_open()
         open_positions = len(open_position_records)
         skip_reasons = dict(Counter(result.reason for result in pair_results if result.reason))
@@ -804,8 +856,39 @@ def _iso(value: Any) -> str:
     return str(value)
 
 
+def _pair_timeframe_key(pair: str, timeframe: str) -> str:
+    return f"{pair}:{timeframe}"
+
+
 def _safe_key(value: str) -> str:
     return value.replace(":", "").replace("+", "p").replace("-", "").replace(".", "")
+
+
+def _candle_close(row: dict[str, Any]) -> float:
+    return _float_or_zero(row.get("close_price") or row.get("mid_c") or row.get("close"))
+
+
+def _float_or_zero(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _default_exit_prices(entry_price: float, direction: str) -> tuple[float | None, float | None]:
+    if entry_price <= 0:
+        return None, None
+    normalized = direction.upper()
+    if normalized == "SELL":
+        return round(entry_price * 0.9980, 8), round(entry_price * 1.0010, 8)
+    return round(entry_price * 1.0020, 8), round(entry_price * 0.9990, 8)
+
+
+def _position_pl(entry_price: float, close_price: float, units: float, direction: str, *, fallback: float = 0.0) -> float:
+    if entry_price <= 0 or close_price <= 0 or units == 0:
+        return round(fallback, 4)
+    multiplier = -1.0 if direction.upper() == "SELL" else 1.0
+    return round((close_price - entry_price) * abs(units) * multiplier, 4)
 
 
 def _paper_signal(

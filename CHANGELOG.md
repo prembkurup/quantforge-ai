@@ -25,4 +25,5 @@
 - Added always-on research orchestration and historical validation worker entry points.
 - Added a QuantForge 24/7 supervisor with Windows start/stop/status launchers for dashboard, research, validation, daily intelligence, and paper/practice trading loops.
 - Added a Windows Task Scheduler installer for the QuantForge 24/7 supervisor and disabled legacy per-process QuantForge tasks.
+- Added dedicated QuantForge 24/7 supervisor and launcher logs.
 - Added dashboard/API test coverage for live trading status, workflow state, research orchestration, and history validation.

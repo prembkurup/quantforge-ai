@@ -48,6 +48,18 @@ class RecurringJob:
     cwd: Path = PROJECT_ROOT
 
 
+class SupervisorLog:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def write(self, message: str = "") -> None:
+        line = message if message else ""
+        print(line)
+        with self.path.open("a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run QuantForge AI as a local 24/7 process supervisor.")
     parser.add_argument("--no-frontend", action="store_true", help="Do not start the Vite dashboard frontend.")
@@ -55,6 +67,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--trading-interval-seconds", type=int, default=60)
     parser.add_argument("--operations-interval-seconds", type=int, default=3600)
     parser.add_argument("--status-file", default="var/quantforge_247_status.json")
+    parser.add_argument("--supervisor-log-file", default="var/log/quantforge-247-supervisor.log")
     return parser.parse_args()
 
 
@@ -76,19 +89,22 @@ def main() -> None:
         operations_interval_seconds=max(args.operations_interval_seconds, 300),
     )
     status_file = PROJECT_ROOT / args.status_file
+    supervisor_log = SupervisorLog(PROJECT_ROOT / args.supervisor_log_file)
 
     running: dict[str, RunningService] = {}
-    _install_shutdown_handlers(running)
+    _install_shutdown_handlers(running, supervisor_log)
 
-    print("QuantForge AI 24/7 Supervisor")
-    print(f"Started At: {_now()}")
-    print(f"Practice URL: {get_settings().oanda_api_url}")
-    print(f"Trading Loop: {'ON' if not args.no_trading else 'OFF'}")
-    print()
+    supervisor_log.write("")
+    supervisor_log.write("QuantForge AI 24/7 Supervisor")
+    supervisor_log.write(f"Started At: {_now()}")
+    supervisor_log.write(f"Practice URL: {get_settings().oanda_api_url}")
+    supervisor_log.write(f"Trading Loop: {'ON' if not args.no_trading else 'OFF'}")
+    supervisor_log.write(f"Supervisor Log: {supervisor_log.path}")
+    supervisor_log.write()
     sys.stdout.flush()
 
     for service in services:
-        running[service.name] = _start_service(service, env)
+        running[service.name] = _start_service(service, env, supervisor_log)
 
     job_schedule = {job.name: time.time() for job in jobs}
     while True:
@@ -98,20 +114,20 @@ def main() -> None:
             exit_code = item.process.returncode
             if not item.spec.restart:
                 continue
-            print(f"[{_now()}] {name} exited with {exit_code}; restarting")
+            supervisor_log.write(f"[{_now()}] {name} exited with {exit_code}; restarting")
             sys.stdout.flush()
-            running[name] = _start_service(item.spec, env, restarts=item.restarts + 1)
+            running[name] = _start_service(item.spec, env, supervisor_log, restarts=item.restarts + 1)
 
         for job in jobs:
             next_run = job_schedule.get(job.name, 0.0)
             if time.time() < next_run:
                 continue
             exit_code = _run_job(job, env)
-            print(f"[{_now()}] recurring job {job.name} finished with {exit_code}")
+            supervisor_log.write(f"[{_now()}] recurring job {job.name} finished with {exit_code}")
             sys.stdout.flush()
             job_schedule[job.name] = time.time() + job.interval_seconds
 
-        _write_status(status_file, running, jobs, job_schedule)
+        _write_status(status_file, running, jobs, job_schedule, supervisor_log.path)
         time.sleep(10)
 
 
@@ -197,11 +213,18 @@ def _jobs(
     return tuple(jobs)
 
 
-def _start_service(spec: ManagedService, env: dict[str, str], *, restarts: int = 0) -> RunningService:
+def _start_service(
+    spec: ManagedService,
+    env: dict[str, str],
+    supervisor_log: SupervisorLog,
+    *,
+    restarts: int = 0,
+) -> RunningService:
     spec.log_file.parent.mkdir(parents=True, exist_ok=True)
     handle = spec.log_file.open("a", encoding="utf-8")
     handle.write(f"\n[{_now()}] starting {spec.name}: {' '.join(spec.command)}\n")
     handle.flush()
+    supervisor_log.write(f"[{_now()}] starting service {spec.name} pid=pending log={spec.log_file}")
     process = subprocess.Popen(
         spec.command,
         cwd=spec.cwd,
@@ -211,6 +234,7 @@ def _start_service(spec: ManagedService, env: dict[str, str], *, restarts: int =
         text=True,
         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
     )
+    supervisor_log.write(f"[{_now()}] service {spec.name} started pid={process.pid}")
     return RunningService(spec=spec, process=process, started_at=_now(), restarts=restarts)
 
 
@@ -247,11 +271,13 @@ def _write_status(
     running: dict[str, RunningService],
     jobs: tuple[RecurringJob, ...],
     schedule: dict[str, float],
+    supervisor_log_file: Path,
 ) -> None:
     payload: dict[str, Any] = {
         "status": "RUNNING",
         "updated_at": _now(),
         "supervisor_pid": os.getpid(),
+        "supervisor_log_file": str(supervisor_log_file.relative_to(PROJECT_ROOT)),
         "services": [
             {
                 "name": item.spec.name,
@@ -282,11 +308,14 @@ def _write_status(
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
-def _install_shutdown_handlers(running: dict[str, RunningService]) -> None:
+def _install_shutdown_handlers(running: dict[str, RunningService], supervisor_log: SupervisorLog) -> None:
     def shutdown(_: int, __: Any) -> None:
+        supervisor_log.write(f"[{_now()}] shutdown requested; stopping {len(running)} service(s)")
         for item in running.values():
             if item.process.poll() is None:
+                supervisor_log.write(f"[{_now()}] stopping service {item.spec.name} pid={item.process.pid}")
                 item.process.terminate()
+        supervisor_log.write(f"[{_now()}] supervisor stopped")
         raise SystemExit(0)
 
     signal.signal(signal.SIGINT, shutdown)

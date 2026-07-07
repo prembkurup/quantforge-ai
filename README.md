@@ -243,6 +243,8 @@ The supervisor starts the dashboard API, dashboard frontend, full-history worker
 
 When the supervisor is running, open the dashboard locally at `http://127.0.0.1:5174` or from another device on the same private network at `http://192.168.1.113:5174`. The `127.0.0.1` address only works on the QuantForge PC itself.
 
+Supervisor and launcher logs are written to `var\log\quantforge-247-supervisor.log` and `var\log\quantforge-247-launcher.log`. The status command also prints the latest supervisor log tail.
+
 Run the Version 2.0 intraday daily operations snapshot:
 
 ```powershell

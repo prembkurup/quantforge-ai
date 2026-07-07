@@ -14,7 +14,7 @@ from quantforge.admin.settings import admin_setting_value
 from quantforge.config.settings import get_settings
 from quantforge.infrastructure.operations import AutonomousOperationsManager
 from quantforge.live.shadow import ShadowTradingPlatform
-from quantforge.market_data.coreui_repository import get_coreui_history_engine
+from quantforge.market_data.coreui_repository import CoreUiCandleRepository, get_coreui_history_engine
 from quantforge.research.approvals import ApprovalAuditLog, ApprovalRepository, ApprovalService
 from quantforge.research.families import ResearchProgramFamily
 from quantforge.research.full_history_scheduler import (
@@ -1409,6 +1409,65 @@ class DashboardService:
         rows.reverse()
         return rows
 
+    def paper_position_chart(
+        self,
+        *,
+        pair: str,
+        timeframe: str,
+        direction: str = "",
+        open_price: str | float | None = None,
+        stop_loss: str | float | None = None,
+        take_profit: str | float | None = None,
+        opened_at: str = "",
+        limit: int = 3000,
+    ) -> dict[str, Any]:
+        pair_name = _chart_pair_name(pair)
+        candle_limit = max(1, min(int(limit or 3000), 3000))
+        candles: list[dict[str, Any]] = []
+        database_status = "available"
+        error = ""
+        try:
+            with get_coreui_history_engine().connect() as connection:
+                repository = CoreUiCandleRepository(connection, get_settings().coreui_candle_table)
+                rows = repository.load_latest(pair_name, timeframe, limit=candle_limit)
+            candles = [
+                {
+                    "time": _chart_time(row.get("time")),
+                    "open": _safe_float(row.get("open_price")),
+                    "high": _safe_float(row.get("high_price")),
+                    "low": _safe_float(row.get("low_price")),
+                    "close": _safe_float(row.get("close_price")),
+                    "volume": int(row.get("volume") or 0),
+                }
+                for row in rows
+                if _safe_float(row.get("open_price")) is not None
+                and _safe_float(row.get("high_price")) is not None
+                and _safe_float(row.get("low_price")) is not None
+                and _safe_float(row.get("close_price")) is not None
+            ]
+        except Exception as exc:
+            database_status = "unavailable"
+            error = str(exc)
+
+        return {
+            "pair": pair_name,
+            "display_pair": _display_pair(pair_name),
+            "timeframe": timeframe,
+            "limit": candle_limit,
+            "candles": candles,
+            "trade": {
+                "direction": direction,
+                "open_price": _safe_float(open_price),
+                "stop_loss": _safe_float(stop_loss),
+                "take_profit": _safe_float(take_profit),
+                "opened_at": opened_at,
+            },
+            "database_status": database_status,
+            "error": error,
+            "source": "coreui.oanda_candles",
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+
     def ops_health(self) -> dict[str, Any]:
         return {
             "platform_status": "HEALTHY",
@@ -1864,8 +1923,31 @@ def _display_pair(pair: str) -> str:
     return {"NAS100_USD": "NAS100", "SPX500_USD": "SPX500"}.get(pair, pair)
 
 
+def _chart_pair_name(pair: str) -> str:
+    value = pair.strip().upper().replace("/", "_")
+    return {"NAS100": "NAS100_USD", "SPX500": "SPX500_USD"}.get(value, value)
+
+
 def _instrument_type(pair: str) -> str:
     return "index" if pair in {"NAS100_USD", "SPX500_USD"} else "fx"
+
+
+def _chart_time(value: Any) -> str:
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        return value.isoformat()
+    return str(value) if value else ""
+
+
+def _safe_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number:
+        return None
+    return number
 
 
 def _date_string(value: Any) -> str:

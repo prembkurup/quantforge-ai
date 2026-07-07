@@ -354,6 +354,28 @@ def create_app() -> FastAPI:
     def paper_practice_history() -> list[dict[str, Any]]:
         return service.paper_practice_history()
 
+    @app.get("/api/paper/positions/chart")
+    def paper_position_chart(
+        pair: str,
+        timeframe: str,
+        direction: str = "",
+        open_price: str | None = None,
+        stop_loss: str | None = None,
+        take_profit: str | None = None,
+        opened_at: str = "",
+        limit: int = 3000,
+    ) -> dict[str, Any]:
+        return service.paper_position_chart(
+            pair=pair,
+            timeframe=timeframe,
+            direction=direction,
+            open_price=open_price,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            opened_at=opened_at,
+            limit=limit,
+        )
+
     @app.get("/api/ops/health")
     def ops_health() -> dict[str, Any]:
         return service.ops_health()

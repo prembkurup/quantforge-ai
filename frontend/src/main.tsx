@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
+import { CandlestickSeries, ColorType, LineStyle, createChart, createSeriesMarkers, type CandlestickData, type UTCTimestamp } from "lightweight-charts";
 import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, GitBranch, HeartPulse, Library, LineChart, ListChecks, Menu, PieChart, Save, ScrollText, Settings, ShieldCheck, Workflow as WorkflowIcon, X } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
@@ -10,6 +11,33 @@ import "./styles.css";
 const apiBase = import.meta.env.VITE_API_BASE ?? "";
 
 type Row = Record<string, string | number | boolean>;
+
+type PaperPositionChartCandle = {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+};
+
+type PaperPositionChartPayload = {
+  pair: string;
+  display_pair: string;
+  timeframe: string;
+  limit: number;
+  candles: PaperPositionChartCandle[];
+  trade: {
+    direction: string;
+    open_price: number | null;
+    stop_loss: number | null;
+    take_profit: number | null;
+    opened_at: string;
+  };
+  database_status: string;
+  error: string;
+  source: string;
+};
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${apiBase}${path}`);
@@ -1019,6 +1047,7 @@ function DecisionIntelligence() {
 }
 
 function Paper() {
+  const [selectedPosition, setSelectedPosition] = React.useState<Row | null>(null);
   const summary = useApi<Row>("/api/paper/summary");
   const trades = useApi<Row[]>("/api/paper/trades/open");
   const drift = useApi<any>("/api/paper/drift");
@@ -1055,7 +1084,8 @@ function Paper() {
           <MiniFact label="24/7 Ready" value={practice.run_24_7_ready ? "YES" : "NO"} />
         </div>
       </section>
-      <DataTable title="Open Paper Positions" rows={practice.open_paper_positions ?? []} />
+      <OpenPaperPositionsTable rows={practice.open_paper_positions ?? []} selected={selectedPosition} onSelect={setSelectedPosition} />
+      {selectedPosition && <PaperPositionChart position={selectedPosition} onClose={() => setSelectedPosition(null)} />}
       <PaginatedDataTable title={`Pair-Level Paper Scanner Results (${(practice.paper_scanner_pair_result ?? []).length})`} rows={practice.paper_scanner_pair_result ?? []} pageSize={30} />
       <JsonPanel title="Paper Scanner Skip Reasons" data={practice.skip_reasons ?? {}} />
       <JsonPanel title="Real Candle Replay Cursor" data={replay} />
@@ -1799,6 +1829,192 @@ function DataTable({ title, rows, linkKey }: { title: string; rows: Row[]; linkK
       </div>
     </div>
   );
+}
+
+function OpenPaperPositionsTable({
+  rows,
+  selected,
+  onSelect
+}: {
+  rows: Row[];
+  selected: Row | null;
+  onSelect: (row: Row) => void;
+}) {
+  const columns = rows[0] ? Object.keys(rows[0]) : [];
+  return (
+    <div className="card panel dashboard-card overflow-hidden">
+      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Open Paper Positions</div>
+      <div className="overflow-auto">
+        <table className="table table-dark table-hover dashboard-table w-full min-w-[920px] text-left text-sm">
+          <thead className="bg-slate-900 text-xs uppercase text-slate-400">
+            <tr>
+              <th className="px-3 py-2">chart</th>
+              {columns.map((column) => <th key={column} className="px-3 py-2">{column.replace(/_/g, " ")}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => {
+              const isSelected = selected === row;
+              return (
+                <tr key={index} className={`border-t border-slate-800 ${isSelected ? "selected-table-row" : ""}`}>
+                  <td className="px-3 py-2">
+                    <button className="icon-action-button" title="Open trade chart" type="button" onClick={() => onSelect(row)}>
+                      <CandlestickChart size={16} />
+                    </button>
+                  </td>
+                  {columns.map((column) => (
+                    <td key={column} className="px-3 py-2 text-slate-200">{String(row[column])}</td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {rows.length === 0 && <div className="pt-3 text-sm text-slate-400">No open paper positions.</div>}
+    </div>
+  );
+}
+
+function PaperPositionChart({ position, onClose }: { position: Row; onClose: () => void }) {
+  const query = React.useMemo(() => {
+    const params = new URLSearchParams({
+      pair: String(position.pair ?? ""),
+      timeframe: String(position.timeframe ?? ""),
+      direction: String(position.direction ?? ""),
+      open_price: String(position.open_price ?? ""),
+      stop_loss: String(position.stop_loss ?? ""),
+      take_profit: String(position.take_profit ?? ""),
+      opened_at: String(position.opened_at ?? ""),
+      limit: "3000"
+    });
+    return params.toString();
+  }, [position]);
+  const data = useApi<PaperPositionChartPayload>(`/api/paper/positions/chart?${query}`);
+  const candles = data?.candles ?? [];
+  return (
+    <section className="card panel dashboard-card trade-chart-panel">
+      <div className="trade-chart-header">
+        <div>
+          <div className="card-header border-0 bg-transparent p-0 font-medium">
+            {data ? `${data.display_pair} ${data.timeframe} Open Position Chart` : "Open Position Chart"}
+          </div>
+          <div className="trade-chart-subtitle">
+            {candles.length.toLocaleString()} / 3000 candles
+            {data?.trade.open_price ? ` | Open ${formatNumber(data.trade.open_price, 5)}` : ""}
+            {data?.trade.stop_loss ? ` | SL ${formatNumber(data.trade.stop_loss, 5)}` : ""}
+            {data?.trade.take_profit ? ` | TP ${formatNumber(data.trade.take_profit, 5)}` : ""}
+          </div>
+        </div>
+        <button className="icon-action-button" title="Close chart" type="button" onClick={onClose}>
+          <X size={16} />
+        </button>
+      </div>
+      {!data && <div className="chart-loading">Loading historical candles...</div>}
+      {data && data.database_status !== "available" && (
+        <div className="callout callout-warning rounded border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-100">
+          Historical candle database unavailable: {data.error || "no detail returned"}
+        </div>
+      )}
+      {data && data.database_status === "available" && candles.length === 0 && (
+        <div className="chart-loading">No historical candles returned for this position.</div>
+      )}
+      {data && candles.length > 0 && <LightweightTradeChart data={data} />}
+    </section>
+  );
+}
+
+function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: 430,
+      layout: {
+        background: { type: ColorType.Solid, color: "#0f172a" },
+        textColor: "#cbd5e1"
+      },
+      grid: {
+        vertLines: { color: "rgba(51, 65, 85, 0.42)" },
+        horzLines: { color: "rgba(51, 65, 85, 0.42)" }
+      },
+      rightPriceScale: { borderColor: "#334155" },
+      timeScale: { borderColor: "#334155", timeVisible: true, secondsVisible: false },
+      crosshair: { mode: 1 }
+    });
+    const candleSeries = chart.addSeries(CandlestickSeries, {
+      upColor: "#22c55e",
+      downColor: "#ef4444",
+      borderUpColor: "#22c55e",
+      borderDownColor: "#ef4444",
+      wickUpColor: "#86efac",
+      wickDownColor: "#fca5a5"
+    });
+    const candleData = data.candles
+      .map((item) => ({
+        time: toChartTime(item.time),
+        open: item.open,
+        high: item.high,
+        low: item.low,
+        close: item.close
+      }))
+      .filter((item): item is CandlestickData<UTCTimestamp> => item.time !== null);
+    candleSeries.setData(candleData);
+    addTradePriceLine(candleSeries, data.trade.open_price, "Open", "#38bdf8", LineStyle.Solid);
+    addTradePriceLine(candleSeries, data.trade.stop_loss, "SL", "#f43f5e", LineStyle.Dashed);
+    addTradePriceLine(candleSeries, data.trade.take_profit, "TP", "#22c55e", LineStyle.Dashed);
+    const openTime = toChartTime(data.trade.opened_at);
+    if (openTime && data.trade.open_price) {
+      createSeriesMarkers(candleSeries, [{
+        time: openTime,
+        position: "atPriceMiddle",
+        price: data.trade.open_price,
+        shape: data.trade.direction.toUpperCase().includes("SELL") ? "arrowDown" : "arrowUp",
+        color: data.trade.direction.toUpperCase().includes("SELL") ? "#f43f5e" : "#22c55e",
+        text: `Open ${data.trade.direction || ""}`.trim()
+      }]);
+    }
+    chart.timeScale().fitContent();
+    const resizeObserver = new ResizeObserver(() => {
+      chart.applyOptions({ width: container.clientWidth });
+    });
+    resizeObserver.observe(container);
+    return () => {
+      resizeObserver.disconnect();
+      chart.remove();
+    };
+  }, [data]);
+  return <div ref={containerRef} className="trade-chart-canvas" />;
+}
+
+function addTradePriceLine(
+  series: ReturnType<ReturnType<typeof createChart>["addSeries"]>,
+  price: number | null,
+  title: string,
+  color: string,
+  lineStyle: LineStyle
+) {
+  if (!price) return;
+  series.createPriceLine({
+    price,
+    color,
+    lineWidth: 2,
+    lineStyle,
+    axisLabelVisible: true,
+    title
+  });
+}
+
+function toChartTime(value: string): UTCTimestamp | null {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+  return Math.floor(timestamp / 1000) as UTCTimestamp;
+}
+
+function formatNumber(value: number, digits = 2): string {
+  return value.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: Math.min(2, digits) });
 }
 
 function PaginatedDataTable({

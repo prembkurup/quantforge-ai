@@ -260,8 +260,8 @@ body.modal-open {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   width: min(96vw, 1360px);
-  height: min(92vh, 900px);
-  max-height: min(92vh, 900px);
+  height: clamp(420px, 50vh, 520px);
+  max-height: 50vh;
   gap: 12px;
   overflow: hidden;
   border-color: rgba(56, 189, 248, 0.38);
@@ -307,8 +307,8 @@ body.modal-open {
 
   .trade-chart-modal {
     width: 100%;
-    height: calc(96vh - 20px);
-    max-height: 96vh;
+    height: min(58vh, 520px);
+    max-height: calc(96vh - 20px);
   }
 
   .trade-chart-canvas {

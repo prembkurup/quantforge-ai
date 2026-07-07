@@ -1944,10 +1944,25 @@ function openPaperPositionRowFromKeyboard(event: React.KeyboardEvent<HTMLTableRo
 }
 
 function paperPositionCellClass(column: string, value: Row[string]) {
-  if (column !== "p_l") return "text-slate-200";
-  const number = Number(String(value).replace(/[$,]/g, ""));
-  if (Number.isNaN(number) || number === 0) return "text-slate-200";
-  return number > 0 ? "font-semibold text-emerald-300" : "font-semibold text-rose-300";
+  if (!isProfitLossColumn(column)) return "text-slate-200";
+  const number = parseMoneyValue(value);
+  if (number === null || number === 0) return "text-slate-200";
+  return number > 0 ? "paper-pl-positive" : "paper-pl-negative";
+}
+
+function isProfitLossColumn(column: string) {
+  const normalized = column.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return ["pl", "pnl", "profitloss", "profitandloss", "floatingpl", "realizedpl", "unrealizedpl"].includes(normalized);
+}
+
+function parseMoneyValue(value: Row[string]) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const isParenthesizedLoss = /^\(.*\)$/.test(text);
+  const cleaned = text.replace(/[$,\s()]/g, "");
+  const number = Number(cleaned);
+  if (Number.isNaN(number)) return null;
+  return isParenthesizedLoss ? -Math.abs(number) : number;
 }
 
 function PaperPositionChart({ position, onClose }: { position: Row; onClose: () => void }) {

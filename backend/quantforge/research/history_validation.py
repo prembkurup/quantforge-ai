@@ -69,8 +69,8 @@ DEFAULT_PAIR_SPREAD_PIPS: dict[str, float] = {
 @dataclass(frozen=True, slots=True)
 class HistoricalValidationConfig:
     enabled: bool = True
-    max_concurrent: int = 2
-    batch_size: int = 1
+    max_concurrent: int = 6
+    batch_size: int = 6
     years: int = 10
     starting_balance: float = 100_000.0
     spread_pips: float = 1.2
@@ -500,8 +500,8 @@ def default_historical_validation_paths(repo_root: Path) -> HistoricalValidation
 def historical_validation_config_from_env() -> HistoricalValidationConfig:
     return HistoricalValidationConfig(
         enabled=_env_bool("HISTORICAL_VALIDATION_ENABLED", True),
-        max_concurrent=_env_int("HISTORICAL_VALIDATION_MAX_CONCURRENT", 2),
-        batch_size=_env_int("HISTORICAL_VALIDATION_BATCH_SIZE", 1),
+        max_concurrent=_env_int("HISTORICAL_VALIDATION_MAX_CONCURRENT", 6),
+        batch_size=_env_int("HISTORICAL_VALIDATION_BATCH_SIZE", 6),
         years=_env_int("HISTORICAL_VALIDATION_YEARS", 10),
         starting_balance=_env_float("HISTORICAL_VALIDATION_STARTING_BALANCE", 100_000.0),
         spread_pips=_env_float("HISTORICAL_VALIDATION_SPREAD_PIPS", 1.2),

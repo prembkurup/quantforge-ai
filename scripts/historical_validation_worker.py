@@ -15,7 +15,7 @@ from quantforge.research.strategy_assets import StrategyAssetRepository
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run historical validation in controlled batches.")
     parser.add_argument("--once", action="store_true", help="Run one validation batch and exit.")
-    parser.add_argument("--sleep-seconds", type=int, default=900)
+    parser.add_argument("--sleep-seconds", type=int, default=30)
     return parser.parse_args()
 
 
@@ -30,13 +30,14 @@ def main() -> None:
     if args.once:
         status = engine.run_next_batch()
         progress = status["progress"]
-        print(f"{status['state']} {progress['completed']}/{progress['total']} queue={status['queue_length']}")
+        print(f"{status['state']} {progress['completed']}/{progress['total']} queue={status['queue_length']}", flush=True)
         return
     while True:
         status = engine.run_next_batch()
         progress = status["progress"]
-        print(f"{status['state']} {progress['completed']}/{progress['total']} queue={status['queue_length']}")
-        time.sleep(args.sleep_seconds)
+        print(f"{status['state']} {progress['completed']}/{progress['total']} queue={status['queue_length']}", flush=True)
+        sleep_seconds = 30 if status["queue_length"] else max(args.sleep_seconds, 300)
+        time.sleep(sleep_seconds)
 
 
 if __name__ == "__main__":

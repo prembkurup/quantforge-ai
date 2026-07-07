@@ -143,7 +143,7 @@ def _services(python: Path, npm: str, *, include_frontend: bool) -> tuple[Manage
             1,
             ManagedService(
                 name="dashboard-frontend",
-                command=(npm, "run", "dev", "--", "--host", "127.0.0.1"),
+                command=(npm, "run", "dev"),
                 log_file=PROJECT_ROOT / "var" / "log" / "dashboard-frontend.log",
                 cwd=PROJECT_ROOT / "frontend",
             ),
@@ -307,6 +307,7 @@ def _process_env() -> dict[str, str]:
     env = os.environ.copy()
     backend = str(BACKEND_PATH)
     env["PYTHONPATH"] = backend + os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else backend
+    env["QUANTFORGE_DASHBOARD_API_HOST"] = "0.0.0.0"
     return env
 
 

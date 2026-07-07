@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import asdict, is_dataclass
+import time
+from dataclasses import asdict, is_dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -21,24 +22,63 @@ HISTORY_FILE = PROJECT_ROOT / "var" / "paper_practice_trading_history.jsonl"
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run QuantForge paper/practice trading.")
     parser.add_argument("--mode", choices=("paper-scanner", "demo"), default="paper-scanner")
+    parser.add_argument("--pairs", help="Comma-separated pair override for paper-scanner mode.")
+    parser.add_argument("--timeframes", help="Comma-separated timeframe override for paper-scanner mode.")
+    parser.add_argument("--max-pairs", type=int, help="Maximum enabled pairs to scan.")
+    parser.add_argument("--dry-run", action="store_true", help="Scan and decide without placing paper orders.")
+    parser.add_argument("--once", action="store_true", help="Run one scanner cycle and exit.")
+    parser.add_argument("--loop", action="store_true", help="Keep scanning until stopped.")
+    parser.add_argument("--interval-seconds", type=int, default=60, help="Loop interval for --loop.")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.loop and args.mode == "demo":
+        raise SystemExit("--loop is only supported for --mode paper-scanner.")
     if args.mode == "demo":
         result = LiveTradingEngine().run(mode="demo")
+        _write_result(result)
+        _print_result(result)
+    elif args.loop:
+        while True:
+            result = _run_paper_scanner(args)
+            _write_result(result)
+            _print_result(result)
+            time.sleep(max(1, args.interval_seconds))
     else:
-        settings = get_settings()
-        engine = get_coreui_history_engine()
-        with engine.connect() as connection:
-            scanner = MultiPairPaperScanner(
-                CoreUiCandleRepository(connection, settings.coreui_candle_table),
-                config=load_paper_scanner_config(),
-            )
-            result = scanner.run()
-    _write_result(result)
+        result = _run_paper_scanner(args)
+        _write_result(result)
+        _print_result(result)
 
+
+def _run_paper_scanner(args: argparse.Namespace) -> Any:
+    settings = get_settings()
+    config = _config_from_args(args)
+    engine = get_coreui_history_engine()
+    with engine.connect() as connection:
+        scanner = MultiPairPaperScanner(
+            CoreUiCandleRepository(connection, settings.coreui_candle_table),
+            config=config,
+        )
+        return scanner.run()
+
+
+def _config_from_args(args: argparse.Namespace):
+    config = load_paper_scanner_config()
+    updates: dict[str, Any] = {}
+    if args.pairs:
+        updates["pairs"] = tuple(item.strip().upper() for item in args.pairs.split(",") if item.strip())
+    if args.timeframes:
+        updates["timeframes"] = tuple(item.strip().upper() for item in args.timeframes.split(",") if item.strip())
+    if args.max_pairs is not None:
+        updates["max_pairs_per_scan"] = args.max_pairs
+    if args.dry_run:
+        updates["dry_run"] = True
+    return replace(config, **updates) if updates else config
+
+
+def _print_result(result: Any) -> None:
     print("System")
     print()
     print("Connect")
@@ -77,6 +117,7 @@ def _write_result(result: Any) -> None:
         "events_processed": result.events_processed,
         "signals_generated": getattr(result, "signals_generated", len(signals)),
         "orders_executed": getattr(result, "orders_executed", len(executions)),
+        "orders_blocked": getattr(result, "orders_blocked", 0),
         "open_positions": getattr(result, "open_positions", len(positions)),
         "recovery_completed": getattr(result, "recovery_completed", True),
         "synchronized": not result.synchronization.repaired if hasattr(result, "synchronization") else True,
@@ -87,11 +128,16 @@ def _write_result(result: Any) -> None:
         "open_position_details": [_to_jsonable(position) for position in positions],
         "mode": getattr(result, "mode", "demo"),
         "pairs_loaded": getattr(result, "pairs_loaded", 0),
+        "pairs_scanned": getattr(result, "pairs_loaded", 0),
         "timeframes_loaded": getattr(result, "timeframes_loaded", 0),
+        "timeframes_scanned": getattr(result, "timeframes_loaded", 0),
         "pair_timeframes_scanned": getattr(result, "pair_timeframes_scanned", 0),
         "candles_loaded": getattr(result, "candles_loaded", 0),
+        "candles_checked": getattr(result, "candles_loaded", 0),
         "new_candles": getattr(result, "new_candles", 0),
+        "skip_reasons": _to_jsonable(getattr(result, "skip_reasons", {})),
         "pair_results": _to_jsonable(getattr(result, "pair_results", ())),
+        "paper_scanner_pair_result": _to_jsonable(_pair_table_rows(getattr(result, "pair_results", ()))),
         "paper_scanner_run": _to_jsonable(getattr(result, "paper_scanner_run", {})),
         "paper_signals": _to_jsonable(getattr(result, "paper_signals", ())),
         "paper_orders": _to_jsonable(getattr(result, "paper_orders", ())),
@@ -119,6 +165,29 @@ def _to_jsonable(value: Any) -> Any:
     if hasattr(value, "value"):
         return value.value
     return value
+
+
+def _pair_table_rows(pair_results: Any) -> list[dict[str, Any]]:
+    rows = []
+    for item in pair_results:
+        regime = getattr(item, "regime_result", None)
+        risk = getattr(item, "risk_result", None)
+        rows.append(
+            {
+                "pair": getattr(item, "pair", ""),
+                "timeframe": getattr(item, "timeframe", ""),
+                "candle_time": getattr(item, "candle_time", ""),
+                "regime": getattr(regime, "regime", ""),
+                "strategy_asset": getattr(item, "strategy_asset_id", ""),
+                "signal": getattr(item, "signal_action", ""),
+                "decision": getattr(item, "status", ""),
+                "order_status": getattr(item, "execution_status", ""),
+                "skip_reason": getattr(item, "reason", ""),
+                "risk_result": getattr(risk, "status", ""),
+                "execution_path": getattr(item, "execution_status", "") and "OANDA_PAPER",
+            }
+        )
+    return rows
 
 
 if __name__ == "__main__":

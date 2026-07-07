@@ -205,7 +205,7 @@ def _jobs(
             0,
             RecurringJob(
                 name="paper-practice-trading",
-                command=(str(python), str(PROJECT_ROOT / "scripts" / "live_trading.py"), "--mode", "paper-scanner"),
+                command=(str(python), str(PROJECT_ROOT / "scripts" / "live_trading.py"), "--mode", "paper-scanner", "--once"),
                 log_file=PROJECT_ROOT / "var" / "log" / "paper-practice-trading.log",
                 interval_seconds=trading_interval_seconds,
             ),

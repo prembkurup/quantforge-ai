@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -38,6 +39,7 @@ class PaperScannerConfig:
     candle_lookback: int = 2
     max_open_positions: int = 30
     max_trades_per_day: int = 60
+    dry_run: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,8 +136,10 @@ class MultiPairPaperScannerResult:
     events_processed: int
     signals_generated: int
     orders_executed: int
+    orders_blocked: int
     open_positions: int
     execution_path: str
+    skip_reasons: dict[str, int]
     pair_results: tuple[PairScanResult, ...]
     paper_scanner_run: dict[str, Any] = field(default_factory=dict)
     paper_signals: tuple[PaperSignalRecord, ...] = ()
@@ -521,6 +525,39 @@ class MultiPairPaperScanner:
                         )
                     )
                     continue
+                if self.config.dry_run:
+                    self.processed.mark(pair, timeframe, candle_time)
+                    pair_results.append(
+                        PairScanResult(
+                            pair,
+                            timeframe,
+                            "BLOCKED",
+                            "DRY_RUN",
+                            candle_time,
+                            strategy_asset_id=selected.strategy_asset_id,
+                            signal_id=paper_signal.signal_id,
+                            signal_action=paper_signal.signal_type,
+                            feature_vector=feature_trace,
+                            regime_result=regime_trace,
+                            strategy_selection=selection_trace,
+                            trade_eligibility=eligibility,
+                            risk_result=GateResult("REJECTED", ("DRY_RUN",)),
+                            rejection_reasons=("DRY_RUN",),
+                        )
+                    )
+                    self._append_decision_trace(
+                        pair,
+                        timeframe,
+                        candle_time,
+                        "BLOCKED",
+                        feature_trace,
+                        regime_trace,
+                        selection_trace,
+                        eligibility,
+                        GateResult("REJECTED", ("DRY_RUN",)),
+                        paper_signal,
+                    )
+                    continue
                 signals.extend(live_result.signals)
                 paper_signals.append(paper_signal)
                 approved_executions = tuple(
@@ -572,6 +609,8 @@ class MultiPairPaperScanner:
         self.positions.add_many(tuple(new_positions), signal_by_pair)
         open_position_records = self.positions.list_open()
         open_positions = len(open_position_records)
+        skip_reasons = dict(Counter(result.reason for result in pair_results if result.reason))
+        orders_blocked = sum(result.status in {"BLOCKED", "SKIPPED", "NO_SIGNAL"} for result in pair_results)
         run_payload = {
             "run_id": f"PAPER-SCANNER-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
             "mode": "paper-scanner",
@@ -581,6 +620,8 @@ class MultiPairPaperScanner:
             "candles_loaded": candles_loaded,
             "new_candles": new_candles,
             "execution_path": self.config.execution_path,
+            "orders_blocked": orders_blocked,
+            "skip_reasons": skip_reasons,
         }
         return MultiPairPaperScannerResult(
             updated_at=datetime.now(UTC).isoformat(timespec="seconds"),
@@ -594,8 +635,10 @@ class MultiPairPaperScanner:
             events_processed=events_processed,
             signals_generated=len(signals),
             orders_executed=len(executions),
+            orders_blocked=orders_blocked,
             open_positions=open_positions,
             execution_path=self.config.execution_path,
+            skip_reasons=skip_reasons,
             pair_results=tuple(pair_results),
             paper_scanner_run=run_payload,
             paper_signals=tuple(paper_signals),
@@ -707,8 +750,10 @@ class MultiPairPaperScanner:
             events_processed=0,
             signals_generated=0,
             orders_executed=0,
+            orders_blocked=1,
             open_positions=len(self.positions.list_open()),
             execution_path=self.config.execution_path,
+            skip_reasons={reason: 1},
             pair_results=(PairScanResult("", "", "SKIPPED", reason),),
         )
 
@@ -725,6 +770,7 @@ def load_paper_scanner_config(path: Path | None = None) -> PaperScannerConfig:
         candle_lookback=int(payload.get("candle_lookback", 2)),
         max_open_positions=int(payload.get("max_open_positions", 30)),
         max_trades_per_day=int(payload.get("max_trades_per_day", 60)),
+        dry_run=bool(payload.get("dry_run", False)),
     )
 
 

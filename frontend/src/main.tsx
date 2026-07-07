@@ -1030,11 +1030,17 @@ function Paper() {
           <MiniFact label="Events" value={practice.events_processed ?? 0} />
           <MiniFact label="Signals" value={practice.signals_generated ?? 0} />
           <MiniFact label="Orders" value={practice.orders_executed ?? 0} />
+          <MiniFact label="Blocked" value={practice.orders_blocked ?? 0} />
           <MiniFact label="Open Positions" value={practice.open_positions ?? 0} />
+          <MiniFact label="Pairs" value={practice.pairs_scanned ?? practice.pairs_loaded ?? 0} />
+          <MiniFact label="Timeframes" value={practice.timeframes_scanned ?? practice.timeframes_loaded ?? 0} />
+          <MiniFact label="Candles" value={practice.candles_checked ?? practice.candles_loaded ?? 0} />
           <MiniFact label="Execution Path" value={practice.execution_path ?? "UNKNOWN"} />
           <MiniFact label="24/7 Ready" value={practice.run_24_7_ready ? "YES" : "NO"} />
         </div>
       </section>
+      <DataTable title="Pair-Level Paper Scanner Results" rows={practice.paper_scanner_pair_result ?? []} />
+      <JsonPanel title="Paper Scanner Skip Reasons" data={practice.skip_reasons ?? {}} />
       <JsonPanel title="Real Candle Replay Cursor" data={replay} />
       <JsonPanel title="Latest Loop Detail" data={practice} />
       <DataTable title="Recent 24/7 Paper-Practice Runs" rows={practiceHistory} />

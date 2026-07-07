@@ -88,7 +88,10 @@ def test_multi_pair_paper_scanner_reads_latest_candles_and_blocks_duplicate_runs
     assert result.events_processed == 1
     assert result.signals_generated == 1
     assert result.orders_executed == 1
+    assert result.orders_blocked == 1
     assert result.open_positions == 1
+    assert result.skip_reasons["filled"] == 1
+    assert result.skip_reasons["no_compatible_approved_strategy"] == 1
     assert result.pair_results[0].strategy_asset_id == "QF-2026-00431"
     assert result.pair_results[0].feature_vector is not None
     assert result.pair_results[0].feature_vector.candle_time == "2026-07-07T03:30:00+00:00"
@@ -106,6 +109,68 @@ def test_multi_pair_paper_scanner_reads_latest_candles_and_blocks_duplicate_runs
     assert second.orders_executed == 0
     assert second.open_positions == 1
     assert {item.reason for item in second.pair_results} == {"CANDLE_ALREADY_PROCESSED"}
+
+
+def test_existing_paper_position_blocks_duplicate_order(tmp_path: Path) -> None:
+    position_store = PaperPositionStore(tmp_path / "positions.json")
+    position_store._save(
+        {
+            "positions": [
+                {
+                    "position_id": "existing",
+                    "instrument": "EUR_USD",
+                    "pair": "EUR_USD",
+                    "timeframe": "H1",
+                    "status": "OPEN",
+                }
+            ]
+        }
+    )
+    scanner = MultiPairPaperScanner(
+        FakeLatestCandleRepository(),
+        config=PaperScannerConfig(
+            enabled=True,
+            pairs=("EUR_USD",),
+            timeframes=("H1",),
+            max_pairs_per_scan=30,
+        ),
+        strategy_repository=_strategy_repository(tmp_path),
+        processed_store=ProcessedCandleStore(tmp_path / "processed.json"),
+        signal_store=ProcessedSignalStore(tmp_path / "signals.json"),
+        position_store=position_store,
+        decision_store=DecisionTraceStore(tmp_path / "decisions.jsonl"),
+    )
+
+    result = scanner.run()
+
+    assert result.orders_executed == 0
+    assert result.pair_results[0].reason == "CONFLICTING_PAPER_POSITION"
+    assert result.open_positions == 1
+
+
+def test_risk_rejection_prevents_order(tmp_path: Path) -> None:
+    scanner = MultiPairPaperScanner(
+        FakeLatestCandleRepository(),
+        config=PaperScannerConfig(
+            enabled=True,
+            pairs=("EUR_USD",),
+            timeframes=("H1",),
+            max_pairs_per_scan=30,
+            max_open_positions=0,
+        ),
+        strategy_repository=_strategy_repository(tmp_path),
+        processed_store=ProcessedCandleStore(tmp_path / "processed.json"),
+        signal_store=ProcessedSignalStore(tmp_path / "signals.json"),
+        position_store=PaperPositionStore(tmp_path / "positions.json"),
+        decision_store=DecisionTraceStore(tmp_path / "decisions.jsonl"),
+    )
+
+    result = scanner.run()
+
+    assert result.orders_executed == 0
+    assert result.pair_results[0].risk_result is not None
+    assert result.pair_results[0].risk_result.status == "REJECTED"
+    assert "MAX_OPEN_POSITIONS_EXCEEDED" in result.pair_results[0].reason
 
 
 def test_scanner_rejects_major_recent_candle_gap(tmp_path: Path) -> None:

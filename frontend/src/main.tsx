@@ -1056,6 +1056,9 @@ function Paper() {
   const practice = useApi<any>("/api/paper/practice/latest");
   const practiceHistory = useApi<Row[]>("/api/paper/practice/history", []);
   if (!summary || !trades || !drift || !replay || !practice || !practiceHistory) return <Loading />;
+  const openPositions = practice.open_paper_positions ?? [];
+  const closedPositions = practice.closed_paper_positions ?? [];
+  const paperMetrics = calculatePaperMetrics(closedPositions, summary);
   return (
     <Page title="Paper Trading">
       <div className="kpi-grid">
@@ -1068,6 +1071,31 @@ function Paper() {
         <KpiCard title="Replay Signals" value={number(replay.generated_signals)} />
         <KpiCard title="Replay Orders" value={number(replay.paper_orders)} />
       </div>
+      <div className="kpi-grid">
+        <KpiCard title="Profit Factor" value={paperMetrics.profitFactor} tone={paperMetrics.profitFactorTone} />
+        <KpiCard title="Expectancy" value={paperMetrics.expectancy} tone={paperMetrics.expectancyTone} />
+        <KpiCard title="Average Win" value={paperMetrics.averageWin} tone="good" />
+        <KpiCard title="Average Loss" value={paperMetrics.averageLoss} tone="warn" />
+        <KpiCard title="R Multiple" value={paperMetrics.rMultiple} tone={paperMetrics.rMultipleTone} />
+        <KpiCard title="Sharpe" value={paperMetrics.sharpe} tone={paperMetrics.sharpeTone} />
+        <KpiCard title="Drawdown" value={paperMetrics.drawdown} tone={paperMetrics.drawdownTone} />
+        <KpiCard title="Winning Days" value={paperMetrics.winningDays} tone="good" />
+        <KpiCard title="Portfolio Equity" value={paperMetrics.portfolioEquity} />
+        <KpiCard title="Trading Quality" value={paperMetrics.tradingQuality} tone={paperMetrics.tradingQualityTone} />
+      </div>
+      <section className="card panel dashboard-card">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Today's Trades</div>
+        <div className="pipeline-detail-grid">
+          <MiniFact label="Today's Trades" value={paperMetrics.todaysTrades} />
+          <MiniFact label="Winning Trades" value={paperMetrics.todaysWinningTrades} />
+          <MiniFact label="Losing Trades" value={paperMetrics.todaysLosingTrades} />
+          <MiniFact label="Average Win" value={paperMetrics.todaysAverageWin} />
+          <MiniFact label="Average Loss" value={paperMetrics.todaysAverageLoss} />
+          <MiniFact label="Win Rate" value={paperMetrics.todaysWinRate} />
+          <MiniFact label="Profit Factor" value={paperMetrics.todaysProfitFactor} />
+          <MiniFact label="Expectancy" value={paperMetrics.todaysExpectancy} />
+        </div>
+      </section>
       <section className="card panel dashboard-card">
         <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Latest 24/7 Paper-Practice Loop</div>
         <div className="pipeline-detail-grid">
@@ -1085,11 +1113,11 @@ function Paper() {
           <MiniFact label="24/7 Ready" value={practice.run_24_7_ready ? "YES" : "NO"} />
         </div>
       </section>
-      <OpenPaperPositionsTable rows={practice.open_paper_positions ?? []} selected={selectedPosition} onSelect={setSelectedPosition} />
+      <OpenPaperPositionsTable rows={openPositions} selected={selectedPosition} onSelect={setSelectedPosition} />
       {selectedPosition && <PaperPositionChart position={selectedPosition} onClose={() => setSelectedPosition(null)} />}
       <PaperPositionsTable
-        title={`Closed Paper Positions (${(practice.closed_paper_positions ?? []).length})`}
-        rows={practice.closed_paper_positions ?? []}
+        title={`Closed Paper Positions (${closedPositions.length})`}
+        rows={closedPositions}
         emptyText="No closed paper positions."
         selected={selectedPosition}
         onSelect={setSelectedPosition}
@@ -1124,6 +1152,147 @@ function Operations() {
       <DataTable title="Service Health" rows={services} />
     </Page>
   );
+}
+
+function calculatePaperMetrics(closedRows: Row[], summary: Row) {
+  const closedPl = closedRows.map((row) => moneyNumber(row.p_l)).filter((value): value is number => value !== null);
+  const todayRows = closedRows.filter(isTodayPaperTrade);
+  const todayPl = todayRows.map((row) => moneyNumber(row.p_l)).filter((value): value is number => value !== null);
+  const wins = closedPl.filter((value) => value > 0);
+  const losses = closedPl.filter((value) => value < 0);
+  const todayWins = todayPl.filter((value) => value > 0);
+  const todayLosses = todayPl.filter((value) => value < 0);
+  const profitFactor = profitFactorValue(wins, losses);
+  const expectancy = average(closedPl);
+  const averageWin = average(wins);
+  const averageLoss = average(losses);
+  const rMultiple = losses.length ? expectancy / Math.abs(averageLoss) : null;
+  const sharpe = tradeSharpe(closedPl);
+  const drawdownRatio = Number(summary.paper_drawdown ?? 0);
+  const winRate = closedPl.length ? wins.length / closedPl.length : 0;
+  const qualityScore = tradingQualityScore({ profitFactor, expectancy, rMultiple, sharpe, drawdownRatio, winRate });
+
+  return {
+    profitFactor: formatRatio(profitFactor),
+    profitFactorTone: profitFactor >= 1 ? "good" as const : "warn" as const,
+    expectancy: formatUsd(expectancy),
+    expectancyTone: expectancy >= 0 ? "good" as const : "warn" as const,
+    averageWin: wins.length ? formatUsd(averageWin) : "N/A",
+    averageLoss: losses.length ? formatUsd(averageLoss) : "N/A",
+    rMultiple: rMultiple === null ? "N/A" : `${formatNumber(rMultiple, 2)}R`,
+    rMultipleTone: (rMultiple ?? 0) >= 1 ? "good" as const : "warn" as const,
+    sharpe: sharpe === null ? "N/A" : formatNumber(sharpe, 2),
+    sharpeTone: (sharpe ?? 0) >= 1 ? "good" as const : "warn" as const,
+    drawdown: `${formatNumber(drawdownRatio * 100, 2)}%`,
+    drawdownTone: drawdownRatio <= 0.05 ? "good" as const : "warn" as const,
+    winningDays: winningDayCount(closedRows),
+    portfolioEquity: formatUsd(Number(summary.paper_equity ?? 0)),
+    tradingQuality: `${qualityScore}/100`,
+    tradingQualityTone: qualityScore >= 60 ? "good" as const : "warn" as const,
+    todaysTrades: todayPl.length,
+    todaysWinningTrades: todayWins.length,
+    todaysLosingTrades: todayLosses.length,
+    todaysAverageWin: todayWins.length ? formatUsd(average(todayWins)) : "N/A",
+    todaysAverageLoss: todayLosses.length ? formatUsd(average(todayLosses)) : "N/A",
+    todaysWinRate: formatPercent(todayPl.length ? todayWins.length / todayPl.length : 0),
+    todaysProfitFactor: formatRatio(profitFactorValue(todayWins, todayLosses)),
+    todaysExpectancy: todayPl.length ? formatUsd(average(todayPl)) : "N/A",
+  };
+}
+
+function moneyNumber(value: unknown) {
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") return null;
+  return parseMoneyValue(value);
+}
+
+function average(values: number[]) {
+  if (!values.length) return 0;
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+function profitFactorValue(wins: number[], losses: number[]) {
+  const grossWin = wins.reduce((total, value) => total + value, 0);
+  const grossLoss = Math.abs(losses.reduce((total, value) => total + value, 0));
+  if (grossLoss === 0) return grossWin > 0 ? Number.POSITIVE_INFINITY : 0;
+  return grossWin / grossLoss;
+}
+
+function tradeSharpe(values: number[]) {
+  if (values.length < 2) return null;
+  const mean = average(values);
+  const variance = average(values.map((value) => (value - mean) ** 2));
+  const deviation = Math.sqrt(variance);
+  if (deviation === 0) return null;
+  return (mean / deviation) * Math.sqrt(values.length);
+}
+
+function winningDayCount(rows: Row[]) {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    const date = paperTradeDateKey(row);
+    const pl = moneyNumber(row.p_l);
+    if (!date || pl === null) continue;
+    totals.set(date, (totals.get(date) ?? 0) + pl);
+  }
+  return Array.from(totals.values()).filter((value) => value > 0).length;
+}
+
+function isTodayPaperTrade(row: Row) {
+  const date = paperTradeDateKey(row);
+  if (!date) return false;
+  return date === localDateKey(new Date());
+}
+
+function paperTradeDateKey(row: Row) {
+  const value = row.closed_at ?? row.opened_at ?? row.entry_time ?? "";
+  if (!value) return "";
+  const parsed = new Date(normalizeUtcDateString(String(value)));
+  if (Number.isNaN(parsed.getTime())) return String(value).slice(0, 10);
+  return localDateKey(parsed);
+}
+
+function localDateKey(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function tradingQualityScore({
+  profitFactor,
+  expectancy,
+  rMultiple,
+  sharpe,
+  drawdownRatio,
+  winRate,
+}: {
+  profitFactor: number;
+  expectancy: number;
+  rMultiple: number | null;
+  sharpe: number | null;
+  drawdownRatio: number;
+  winRate: number;
+}) {
+  const profitFactorScore = Math.min(25, (Number.isFinite(profitFactor) ? profitFactor : 3) / 2 * 25);
+  const expectancyScore = expectancy > 0 ? 20 : 0;
+  const rMultipleScore = Math.min(20, Math.max(0, (rMultiple ?? 0) / 1.5 * 20));
+  const sharpeScore = Math.min(15, Math.max(0, (sharpe ?? 0) / 2 * 15));
+  const drawdownScore = Math.max(0, 10 - drawdownRatio * 200);
+  const winRateScore = Math.min(10, Math.max(0, winRate * 10));
+  return Math.round(profitFactorScore + expectancyScore + rMultipleScore + sharpeScore + drawdownScore + winRateScore);
+}
+
+function formatUsd(value: number) {
+  return `$${formatNumber(value, 2)}`;
+}
+
+function formatRatio(value: number) {
+  if (value === Number.POSITIVE_INFINITY) return "∞";
+  return formatNumber(value, 2);
+}
+
+function formatPercent(value: number) {
+  return `${formatNumber(value * 100, 1)}%`;
 }
 
 function Logs() {

@@ -268,12 +268,12 @@ body.modal-open {
 
 .trade-chart-modal {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(360px, 1fr) auto;
   width: min(96vw, 1360px);
-  height: 520px;
+  height: min(90vh, 920px);
   max-height: calc(100vh - 36px);
   gap: 12px;
-  overflow: hidden;
+  overflow: auto;
   border-color: rgba(56, 189, 248, 0.38);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
 }
@@ -309,6 +309,57 @@ body.modal-open {
   background: rgba(2, 6, 23, 0.34);
 }
 
+.trade-explanation-panel {
+  border-top: 1px solid rgba(51, 65, 85, 0.85);
+  margin-top: 4px;
+  padding-top: 14px;
+}
+
+.trade-explanation-title {
+  color: #e2e8f0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.trade-explanation-flow {
+  display: grid;
+  gap: 8px;
+}
+
+.trade-explanation-step {
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(51, 65, 85, 0.72);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.trade-explanation-stage {
+  color: #94a3b8;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.trade-explanation-value {
+  color: #f8fafc;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.trade-explanation-detail {
+  color: #cbd5e1;
+  font-size: 0.82rem;
+}
+
+.trade-explanation-arrow {
+  color: #38bdf8;
+  font-size: 1rem;
+  line-height: 1;
+  text-align: center;
+}
+
 @media (max-width: 900px) {
   .trade-chart-modal-backdrop {
     align-items: stretch;
@@ -317,12 +368,12 @@ body.modal-open {
 
   .trade-chart-modal {
     width: 100%;
-    height: 460px;
+    height: auto;
     max-height: calc(96vh - 20px);
   }
 
   .trade-chart-canvas {
-    height: 100%;
+    height: 360px;
   }
 }
 

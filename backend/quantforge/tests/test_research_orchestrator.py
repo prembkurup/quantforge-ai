@@ -178,6 +178,48 @@ def test_always_on_orchestrator_launches_research_for_weak_programs(tmp_path) ->
     assert status["idle_reason"]["reason_code"] == "WAITING_FOR_SCHEDULE"
 
 
+def test_always_on_orchestrator_launches_research_for_validation_improvements(tmp_path) -> None:
+    state_file, planned = _completed_full_history_plan(tmp_path)
+    paths = _always_on_paths(tmp_path)
+    paths.history_validation_improvements_file.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "improvements": [
+                    {
+                        "improvement_id": "imp_hv_EUR_USD_H1",
+                        "pair": "EUR_USD",
+                        "timeframe": "H1",
+                        "reason_code": "LOW_WIN_RATE",
+                        "research_program_id": "RP-EUR_USD-H1",
+                        "status": "REQUESTED",
+                    }
+                ],
+            }
+        )
+    )
+    launched: list[str] = []
+
+    def runner(programs) -> None:
+        launched.extend(program.program_id for program in programs)
+
+    orchestrator = AlwaysOnAutonomousResearchOrchestrator(
+        planned_jobs=planned,
+        full_history_state_file=state_file,
+        paths=paths,
+        thresholds=AlwaysOnResearchThresholds(min_assets_per_program=0, target_families=0, target_regimes=0),
+        research_runner=runner,
+    )
+
+    record = orchestrator.run_once(trigger="test")
+    payload = json.loads(paths.history_validation_improvements_file.read_text())
+
+    assert record.jobs_launched == 1
+    assert launched == ["RP-EUR_USD-H1"]
+    assert payload["improvements"][0]["status"] == "RESEARCHED"
+    assert payload["improvements"][0]["research_run_id"] == record.run_id
+
+
 def test_orchestrator_respects_max_jobs_per_cycle(tmp_path) -> None:
     state_file, planned = _completed_full_history_plan(tmp_path, pairs=("EUR_USD", "GBP_USD"), timeframes=("H1", "M15"))
     launched: list[str] = []
@@ -288,4 +330,5 @@ def _always_on_paths(tmp_path) -> AlwaysOnOrchestratorPaths:
         runs_file=tmp_path / "research_orchestrator_runs.json",
         idle_reasons_file=tmp_path / "research_orchestrator_idle_reasons.json",
         guardrails_file=tmp_path / "research_orchestrator_guardrails.json",
+        history_validation_improvements_file=tmp_path / "history_validation_improvements.json",
     )

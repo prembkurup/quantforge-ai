@@ -503,6 +503,7 @@ class AlwaysOnOrchestratorPaths:
     runs_file: Path
     idle_reasons_file: Path
     guardrails_file: Path
+    history_validation_improvements_file: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -679,8 +680,9 @@ class AlwaysOnAutonomousResearchOrchestrator:
             assets_before = len(assets)
             rejected_before = len(rejected)
             priorities = self.score_programs(rows, programs, assets, rejected, checked_at=started)
-            targets = self._target_programs(programs, priorities)
-            idle_reason = self._idle_reason_if_no_work(rows, programs, targets, started)
+            improvement_requests = self._requested_improvements()
+            targets = self._target_programs(programs, priorities, improvement_requests=improvement_requests)
+            idle_reason = self._idle_reason_if_no_work(rows, programs, targets, started, improvement_requests)
             if idle_reason is None:
                 self._persist_status(
                     AlwaysOnResearchState.CHECKING_GUARDRAILS,
@@ -690,9 +692,17 @@ class AlwaysOnAutonomousResearchOrchestrator:
                     jobs_in_flight=0,
                     last_jobs_launched=0,
                     last_error=None,
-                    totals=self._totals_from_priorities(rows, programs, priorities),
+                    totals=self._totals_from_priorities(rows, programs, priorities, improvement_requests),
                 )
-                guardrails = self._guardrail_decisions(rows, targets, assets, rejected, started, previous_status)
+                guardrails = self._guardrail_decisions(
+                    rows,
+                    targets,
+                    assets,
+                    rejected,
+                    started,
+                    previous_status,
+                    improvement_requests=improvement_requests,
+                )
                 self._record_guardrails(guardrails)
                 targets = tuple(
                     program
@@ -727,10 +737,14 @@ class AlwaysOnAutonomousResearchOrchestrator:
                     jobs_in_flight=0,
                     last_jobs_launched=0,
                     last_error=None,
-                    totals=self._totals_from_priorities(rows, programs, priorities),
+                    totals=self._totals_from_priorities(rows, programs, priorities, improvement_requests),
                 )
                 return record
 
+            target_ids = {program.program_id for program in targets}
+            launched_improvements = tuple(
+                item for item in improvement_requests if _improvement_program_id(item) in target_ids
+            )
             self._persist_status(
                 AlwaysOnResearchState.LAUNCHING_JOBS,
                 run_id=run_id,
@@ -739,16 +753,19 @@ class AlwaysOnAutonomousResearchOrchestrator:
                 jobs_in_flight=len(targets),
                 last_jobs_launched=0,
                 last_error=None,
-                totals=self._totals_from_priorities(rows, programs, priorities),
+                totals=self._totals_from_priorities(rows, programs, priorities, improvement_requests),
             )
             jobs_launched = len(targets)
             candidates_generated = sum(int(program.candidate_count) for program in targets)
+            self._mark_improvements(launched_improvements, "RESEARCH_RUNNING", run_id=run_id, checked_at=started)
             self.research_runner(tuple(targets))
+            self._mark_improvements(launched_improvements, "RESEARCHED", run_id=run_id, checked_at=_utc_now())
             _matrix, _rows, _programs, assets_after_rows, rejected_after_rows = self._snapshot()
             assets_after = len(assets_after_rows)
             rejected_after = len(rejected_after_rows)
             finished = _utc_now()
             finished_priorities = self.score_programs(_rows, _programs, assets_after_rows, rejected_after_rows, checked_at=finished)
+            remaining_improvements = self._requested_improvements()
             record = AlwaysOnRunRecord(
                 run_id=run_id,
                 started_at=started.isoformat(),
@@ -773,7 +790,7 @@ class AlwaysOnAutonomousResearchOrchestrator:
                 jobs_in_flight=0,
                 last_jobs_launched=jobs_launched,
                 last_error=None,
-                totals=self._totals_from_priorities(_rows, _programs, finished_priorities),
+                totals=self._totals_from_priorities(_rows, _programs, finished_priorities, remaining_improvements),
             )
             return record
         except Exception as exc:
@@ -985,13 +1002,21 @@ class AlwaysOnAutonomousResearchOrchestrator:
         self,
         programs: tuple[Any, ...],
         priorities: tuple[ResearchProgramPriority, ...],
+        *,
+        improvement_requests: tuple[dict[str, Any], ...] = (),
     ) -> tuple[Any, ...]:
         program_by_id = {program.program_id: program for program in programs}
-        target_ids = [
+        improvement_target_ids = [
+            program_id
+            for program_id in (_improvement_program_id(item) for item in improvement_requests)
+            if program_id in program_by_id
+        ]
+        threshold_target_ids = [
             priority.program_id
             for priority in priorities
             if priority.priority > 0 and (priority.weak or priority.stale)
         ]
+        target_ids = list(dict.fromkeys(improvement_target_ids + threshold_target_ids))
         return tuple(program_by_id[program_id] for program_id in target_ids[: self.thresholds.max_jobs_per_pass])
 
     def _idle_reason_if_no_work(
@@ -1000,6 +1025,7 @@ class AlwaysOnAutonomousResearchOrchestrator:
         programs: tuple[Any, ...],
         targets: tuple[Any, ...],
         checked_at: datetime,
+        improvement_requests: tuple[dict[str, Any], ...] = (),
     ) -> IdleReason | None:
         usable = sum(row.usable_for_research for row in rows)
         weak = sum(row.usable_for_research and row.approved_asset_count < self.thresholds.min_assets_per_program for row in rows)
@@ -1011,6 +1037,7 @@ class AlwaysOnAutonomousResearchOrchestrator:
             "weak_programs": weak,
             "stale_programs": 0,
             "blocked_programs": blocked,
+            "history_validation_improvement_requests": len(improvement_requests),
         }
         if not rows or usable == 0:
             return IdleReason(
@@ -1081,8 +1108,11 @@ class AlwaysOnAutonomousResearchOrchestrator:
         rejected: tuple[Any, ...],
         checked_at: datetime,
         previous_status: dict[str, Any],
+        *,
+        improvement_requests: tuple[dict[str, Any], ...] = (),
     ) -> tuple[GuardrailDecision, ...]:
         row_by_key = {(row.pair, row.timeframe): row for row in rows}
+        improvement_program_ids = {_improvement_program_id(item) for item in improvement_requests}
         decisions: list[GuardrailDecision] = []
         jobs_in_flight = int(previous_status.get("jobs_in_flight", 0) or 0)
         for program in targets:
@@ -1108,10 +1138,16 @@ class AlwaysOnAutonomousResearchOrchestrator:
                 blocked, reason_code, message = True, "NO_USABLE_DATASETS", "Dataset is not usable for research."
             elif jobs_in_flight >= self.thresholds.max_jobs_in_flight:
                 blocked, reason_code, message = True, "MAX_JOBS_IN_FLIGHT", "Maximum in-flight research jobs reached."
-            elif last_run_at and checked_at - last_run_at < timedelta(hours=self.thresholds.stale_after_hours):
+            elif (
+                program.program_id not in improvement_program_ids
+                and last_run_at
+                and checked_at - last_run_at < timedelta(hours=self.thresholds.stale_after_hours)
+            ):
                 blocked = True
                 reason_code = "INPUTS_UNCHANGED"
                 message = "Skipped because dataset and model inputs have not changed since last successful run."
+            elif program.program_id in improvement_program_ids:
+                message = "Historical validation requested new research for this pair/timeframe."
             decisions.append(
                 GuardrailDecision(
                     program_id=program.program_id,
@@ -1146,7 +1182,7 @@ class AlwaysOnAutonomousResearchOrchestrator:
         MultiMarketAutonomousResearchFanOut().run(
             programs=programs,
             base_report=base_report,
-            source_workflow_id="Milestone 24 always-on orchestrator",
+            source_workflow_id=f"Milestone 24 always-on orchestrator {_utc_now().isoformat()}",
         )
 
     def _persist_status(
@@ -1205,6 +1241,48 @@ class AlwaysOnAutonomousResearchOrchestrator:
         guardrails.extend(_payload(decision) for decision in decisions)
         self._write_json(self.paths.guardrails_file, {"version": 1, "guardrails": guardrails[-1000:]})
 
+    def _requested_improvements(self) -> tuple[dict[str, Any], ...]:
+        path = self.paths.history_validation_improvements_file
+        if path is None:
+            return ()
+        improvements = _load_json_file(path).get("improvements", [])
+        return tuple(
+            item
+            for item in improvements
+            if str(item.get("status", "")).upper() == "REQUESTED"
+            and item.get("pair")
+            and item.get("timeframe")
+        )
+
+    def _mark_improvements(
+        self,
+        improvements: tuple[dict[str, Any], ...],
+        status: str,
+        *,
+        run_id: str,
+        checked_at: datetime,
+    ) -> None:
+        path = self.paths.history_validation_improvements_file
+        if path is None or not improvements:
+            return
+        payload = _load_json_file(path)
+        requested_ids = {str(item.get("improvement_id")) for item in improvements}
+        rows = []
+        for item in payload.get("improvements", []):
+            if str(item.get("improvement_id")) not in requested_ids:
+                rows.append(item)
+                continue
+            rows.append(
+                {
+                    **item,
+                    "status": status,
+                    "research_run_id": run_id,
+                    "research_program_id": _improvement_program_id(item),
+                    "research_updated_at": checked_at.isoformat(),
+                }
+            )
+        self._write_json(path, {"version": 1, "improvements": rows})
+
     def _enabled(self, payload: dict[str, Any] | None = None) -> bool:
         if payload is not None and "enabled" in payload:
             return bool(payload["enabled"])
@@ -1228,6 +1306,7 @@ class AlwaysOnAutonomousResearchOrchestrator:
         rows: tuple[Any, ...],
         programs: tuple[Any, ...],
         priorities: tuple[ResearchProgramPriority, ...],
+        improvement_requests: tuple[dict[str, Any], ...] = (),
     ) -> dict[str, Any]:
         usable = sum(row.usable_for_research for row in rows)
         return {
@@ -1239,6 +1318,8 @@ class AlwaysOnAutonomousResearchOrchestrator:
             "stale_programs": sum(item.stale for item in priorities),
             "approved_assets": sum(row.approved_asset_count for row in rows),
             "blocked_programs": sum(not row.usable_for_research for row in rows),
+            "history_validation_improvement_requests": len(improvement_requests),
+            "improvement_target_programs": len({_improvement_program_id(item) for item in improvement_requests}),
             "top_priority_programs": [_payload(item) for item in priorities[:10]],
         }
 
@@ -1249,6 +1330,7 @@ def default_always_on_orchestrator_paths(repo_root: Path) -> AlwaysOnOrchestrato
         runs_file=repo_root / "var" / "research_orchestrator_runs.json",
         idle_reasons_file=repo_root / "var" / "research_orchestrator_idle_reasons.json",
         guardrails_file=repo_root / "var" / "research_orchestrator_guardrails.json",
+        history_validation_improvements_file=repo_root / "var" / "history_validation_improvements.json",
     )
 
 
@@ -1295,6 +1377,10 @@ def _latest_timestamp(values: tuple[str, ...]) -> datetime | None:
             continue
         parsed.append(timestamp if timestamp.tzinfo else timestamp.replace(tzinfo=UTC))
     return max(parsed) if parsed else None
+
+
+def _improvement_program_id(item: dict[str, Any]) -> str:
+    return str(item.get("research_program_id") or f"RP-{item.get('pair')}-{item.get('timeframe')}")
 
 
 def _payload(value: Any) -> Any:

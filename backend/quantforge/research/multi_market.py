@@ -259,7 +259,7 @@ class MultiMarketAutonomousResearchFanOut:
         assets: list[StrategyAsset] = []
         rejections: list[RejectedStrategyCandidate] = []
         for index, program in enumerate(programs, start=1):
-            asset = self._asset_for_program(program, base_report, index=index)
+            asset = self._asset_for_program(program, base_report, index=index, source_workflow_id=source_workflow_id)
             self.asset_store.publish(
                 asset,
                 source_workflow_id=source_workflow_id,
@@ -272,8 +272,15 @@ class MultiMarketAutonomousResearchFanOut:
         self.rejection_repository.upsert_many(tuple(rejections))
         return tuple(assets)
 
-    def _asset_for_program(self, program: ResearchProgram, base_report: ValidationReport, *, index: int) -> StrategyAsset:
-        strategy_id = _strategy_asset_id(program.dataset.pair, program.dataset.timeframe, index)
+    def _asset_for_program(
+        self,
+        program: ResearchProgram,
+        base_report: ValidationReport,
+        *,
+        index: int,
+        source_workflow_id: str,
+    ) -> StrategyAsset:
+        strategy_id = _strategy_asset_id(program.dataset.pair, program.dataset.timeframe, index, source_workflow_id)
         version = f"23.{index}"
         summary = {
             **base_report.strategy_summary,
@@ -467,8 +474,8 @@ def _candidate_budget(dataset: ResearchDataset) -> int:
     return int(timeframe_weight * max(0.5, dataset.quality_score))
 
 
-def _strategy_asset_id(pair: str, timeframe: str, index: int) -> str:
-    digest = hashlib.sha1(f"{pair}:{timeframe}:{index}:milestone23".encode("utf-8")).hexdigest()[:8].upper()
+def _strategy_asset_id(pair: str, timeframe: str, index: int, source_workflow_id: str = "milestone23") -> str:
+    digest = hashlib.sha1(f"{pair}:{timeframe}:{index}:{source_workflow_id}".encode("utf-8")).hexdigest()[:8].upper()
     return f"QF-2026-M23-{pair}-{timeframe}-{digest}"
 
 

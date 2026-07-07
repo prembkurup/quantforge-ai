@@ -36,7 +36,7 @@ def main() -> None:
         status = engine.run_next_batch()
         progress = status["progress"]
         print(f"{status['state']} {progress['completed']}/{progress['total']} queue={status['queue_length']}", flush=True)
-        sleep_seconds = 30 if status["queue_length"] else max(args.sleep_seconds, 300)
+        sleep_seconds = max(args.sleep_seconds, 30)
         time.sleep(sleep_seconds)
 
 

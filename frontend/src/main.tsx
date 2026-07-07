@@ -806,6 +806,10 @@ function HistoryValidation() {
   const spreads = useApi<Row[]>("/api/history-validation/spreads", []);
   if (!status || !balance || !queue || !running || !results || !improvements || !spreads) return <Loading />;
   const sheet = Object.keys(balance).length ? balance : status.balance_sheet ?? {};
+  const completedWork = Number(status.progress?.completed ?? status.completed_validations ?? 0);
+  const totalWork = Number(status.progress?.total ?? queue.length + results.length);
+  const progressPct = totalWork ? Math.round((completedWork / totalWork) * 100) : 0;
+  const remainingWork = Math.max(0, totalWork - completedWork);
   return (
     <Page title="Historical Validation">
       <div className="kpi-grid">
@@ -826,6 +830,20 @@ function HistoryValidation() {
         <KpiCard title="Improvements" value={status.improvement_requests ?? 0} tone={status.improvement_requests ? "warn" : "good"} />
         <KpiCard title="ETA" value={`${status.estimated_remaining_minutes ?? 0}m`} />
       </div>
+      <section className="card panel dashboard-card">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Historical Validation Progress</div>
+        <ProgressBar value={progressPct} />
+        <div className="pipeline-detail-grid mt-3">
+          <MiniFact label="Current Work" value={status.current_pair ? `${status.current_pair} ${status.current_timeframe}` : status.state} />
+          <MiniFact label="Completed" value={number(completedWork)} />
+          <MiniFact label="Total Work" value={number(totalWork)} />
+          <MiniFact label="Remaining" value={number(remainingWork)} />
+          <MiniFact label="Running" value={status.running_validations ?? 0} />
+          <MiniFact label="Queued" value={status.queued_validations ?? 0} />
+          <MiniFact label="Needs Research" value={status.needs_research_validations ?? 0} />
+          <MiniFact label="ETA" value={`${status.estimated_remaining_minutes ?? 0}m`} />
+        </div>
+      </section>
       <DataTable title="Historical Validation Balance Sheet" rows={[sheet as Row]} />
       <section className="card panel dashboard-card">
         <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Current Batch</div>

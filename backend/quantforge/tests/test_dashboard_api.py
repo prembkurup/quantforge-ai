@@ -1,10 +1,15 @@
 import os
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 os.environ["QUANTFORGE_DEMO_MODE"] = "1"
 
+from quantforge.dashboard import service as dashboard_service
 from quantforge.dashboard.api import create_app
+from quantforge.dashboard.service import DashboardService
+from quantforge.research.strategy_assets import ApprovedStrategyAssetStatus, ApprovedStrategyAssetStore, StrategyAssetRepository
+from quantforge.strategies.production import ProductionStrategyManagementPlatform
 
 
 client = TestClient(create_app())
@@ -360,6 +365,62 @@ def test_paper_position_chart_uses_source_candle_time_as_utc_trade_time() -> Non
     trade = response.json()["trade"]
     assert trade["opened_at"] == "2026-07-07T03:30:00+00:00"
     assert trade["source_candle_time"] == "2026-07-07T03:30:00+00:00"
+
+
+def test_paper_summary_uses_real_position_store_and_rows_include_strategy(monkeypatch, tmp_path: Path) -> None:
+    positions_file = tmp_path / "paper_positions.json"
+    assets_file = tmp_path / "approved_strategy_assets.json"
+    repository = StrategyAssetRepository(assets_file)
+    record = ApprovedStrategyAssetStore(repository).publish(
+        ProductionStrategyManagementPlatform()._demo_asset(),
+        status=ApprovedStrategyAssetStatus.APPROVED,
+    )
+    positions_file.write_text(
+        f"""
+        {{
+          "positions": [
+            {{
+              "position_id": "closed",
+              "status": "CLOSED",
+              "pair": "EUR_USD",
+              "timeframe": "H1",
+              "strategy_asset_id": "{record.strategy_asset_id}",
+              "direction": "BUY",
+              "units": 10000,
+              "entry_price": 1.1000,
+              "close_price": 1.1020,
+              "p_l": 20.0
+            }},
+            {{
+              "position_id": "open",
+              "status": "OPEN",
+              "pair": "EUR_USD",
+              "timeframe": "H1",
+              "strategy_asset_id": "{record.strategy_asset_id}",
+              "direction": "BUY",
+              "units": 10000,
+              "entry_price": 1.1000,
+              "close_price": 1.1010,
+              "floating_pl": 10.0
+            }}
+          ]
+        }}
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_service, "default_paper_positions_file", lambda: positions_file)
+    monkeypatch.setattr(dashboard_service, "_approved_strategy_assets_file", lambda: assets_file)
+
+    service = DashboardService()
+    summary = service.paper_summary()
+    rows = service._paper_position_rows("OPEN")
+
+    assert summary["paper_balance"] == 100_020.0
+    assert summary["paper_equity"] == 100_030.0
+    assert summary["realized_pl"] == 20.0
+    assert summary["floating_pl"] == 10.0
+    assert rows[0]["strategy"] == record.strategy_name
+    assert rows[0]["strategy_asset_id"] == record.strategy_asset_id
 
 
 def test_performance_learning_endpoint_exposes_milestone_26_layers() -> None:

@@ -201,6 +201,7 @@ def _open_position_rows(positions: Any) -> list[dict[str, Any]]:
             {
                 "pair": _field(position, "pair", _field(position, "instrument", "")),
                 "timeframe": _field(position, "timeframe", ""),
+                "strategy_asset_id": _field(position, "strategy_asset_id", _field(position, "strategy_id", "")),
                 "direction": _field(position, "direction", ""),
                 "units": _field(position, "units", 0),
                 "open_price": _display_price(entry_price),
@@ -226,6 +227,7 @@ def _closed_position_rows(positions: Any) -> list[dict[str, Any]]:
             {
                 "pair": _field(position, "pair", _field(position, "instrument", "")),
                 "timeframe": _field(position, "timeframe", ""),
+                "strategy_asset_id": _field(position, "strategy_asset_id", _field(position, "strategy_id", "")),
                 "direction": _field(position, "direction", ""),
                 "units": _field(position, "units", 0),
                 "open_price": _display_price(entry_price),

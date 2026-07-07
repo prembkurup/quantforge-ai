@@ -89,6 +89,7 @@ from quantforge.live import (
     intraday_profile_from_strategy_definition,
     ReplayProgressStore,
 )
+from quantforge.live.paper_scanner import PaperPositionStore, default_paper_positions_file
 
 
 class DashboardService:
@@ -1262,15 +1263,25 @@ class DashboardService:
         }
 
     def paper_summary(self) -> dict[str, Any]:
-        portfolio = self._paper.paper_portfolio
+        starting_balance = 100_000.0
+        positions = _paper_position_records()
+        open_positions = [position for position in positions if position.get("status") == "OPEN"]
+        closed_positions = [position for position in positions if position.get("status") == "CLOSED"]
+        realized_pl = round(sum(_position_pl_value(position) for position in closed_positions), 2)
+        floating_pl = round(sum(_position_pl_value(position) for position in open_positions), 2)
+        balance = round(starting_balance + realized_pl, 2)
+        equity = round(balance + floating_pl, 2)
+        total_pl = round(realized_pl + floating_pl, 2)
         return {
-            "paper_balance": portfolio.balance,
-            "paper_equity": portfolio.equity,
-            "open_trades": len(self._paper.paper_orders),
-            "closed_trades": 0,
-            "daily_pl": round(portfolio.equity - portfolio.balance, 2),
-            "total_pl": round(portfolio.equity - portfolio.balance, 2),
-            "paper_drawdown": 0.0,
+            "paper_balance": balance,
+            "paper_equity": equity,
+            "open_trades": len(open_positions),
+            "closed_trades": len(closed_positions),
+            "daily_pl": total_pl,
+            "total_pl": total_pl,
+            "realized_pl": realized_pl,
+            "floating_pl": floating_pl,
+            "paper_drawdown": round(abs(min(total_pl, 0.0)) / starting_balance, 4),
             "expected_vs_actual_deviation": self._paper.prediction_analysis.deviation,
             "promotion_readiness": self._paper.monthly_review.decision.value,
             "timestamp": self._timestamp,
@@ -1376,12 +1387,20 @@ class DashboardService:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["open_paper_positions"] = self._paper_position_rows("OPEN")
+        payload["closed_paper_positions"] = self._paper_position_rows("CLOSED")
         return {
             "status": "RUNNING",
             **payload,
             "source": str(path.relative_to(_repo_root())),
             "timestamp": datetime.now(UTC).isoformat(),
         }
+
+    def _paper_position_rows(self, status: str) -> list[dict[str, Any]]:
+        store = PaperPositionStore(default_paper_positions_file())
+        rows = store.list_open() if status == "OPEN" else store.list_closed(limit=200)
+        strategy_names = _strategy_name_lookup(self._strategy_asset_repository)
+        return [_paper_position_table_row(position, strategy_names, closed=status == "CLOSED") for position in rows]
 
     def paper_practice_history(self) -> list[dict[str, Any]]:
         path = _paper_practice_history_file()
@@ -1683,6 +1702,86 @@ def _paper_practice_result_file() -> Path:
 
 def _paper_practice_history_file() -> Path:
     return _repo_root() / "var" / "paper_practice_trading_history.jsonl"
+
+
+def _paper_position_records() -> list[dict[str, Any]]:
+    path = default_paper_positions_file()
+    if not path.exists():
+        return []
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return [position for position in payload.get("positions", []) if isinstance(position, dict)]
+
+
+def _position_pl_value(position: dict[str, Any]) -> float:
+    value = _safe_float(position.get("p_l"))
+    if value is not None:
+        return value
+    value = _safe_float(position.get("floating_pl"))
+    return value if value is not None else 0.0
+
+
+def _strategy_name_lookup(repository: StrategyAssetRepository) -> dict[str, str]:
+    names: dict[str, str] = {}
+    for asset in repository.list():
+        for key in (asset.strategy_asset_id, asset.strategy_id):
+            if key:
+                names[key] = asset.strategy_name
+    return names
+
+
+def _paper_position_table_row(
+    position: dict[str, Any],
+    strategy_names: dict[str, str],
+    *,
+    closed: bool,
+) -> dict[str, Any]:
+    strategy_asset_id = str(position.get("strategy_asset_id") or position.get("strategy_id") or "")
+    row = {
+        "pair": position.get("pair") or position.get("instrument") or "",
+        "timeframe": position.get("timeframe", ""),
+        "strategy": strategy_names.get(strategy_asset_id, strategy_asset_id),
+        "strategy_asset_id": strategy_asset_id,
+        "direction": position.get("direction", ""),
+        "units": position.get("units", 0),
+        "open_price": _display_price(position.get("entry_price") or position.get("open_price")),
+        "close_price": _display_price(position.get("close_price") or position.get("current_price")),
+        "take_profit": _display_price(position.get("take_profit")),
+        "stop_loss": _display_price(position.get("stop_loss")),
+        "p_l": _display_money(_position_pl_value(position)),
+    }
+    if closed:
+        row.update(
+            {
+                "close_reason": position.get("close_reason", ""),
+                "opened_at": position.get("entry_time") or position.get("opened_at") or "",
+                "closed_at": position.get("closed_at", ""),
+                "source_candle_time": position.get("source_candle_time", ""),
+            }
+        )
+    else:
+        row.update(
+            {
+                "status": position.get("status", ""),
+                "opened_at": position.get("entry_time") or position.get("opened_at") or "",
+                "entry_time": position.get("entry_time", ""),
+                "source_candle_time": position.get("source_candle_time", ""),
+            }
+        )
+    return row
+
+
+def _display_price(value: Any) -> str:
+    number = _safe_float(value)
+    if number is None:
+        return ""
+    return f"{number:.5f}"
+
+
+def _display_money(value: Any) -> str:
+    number = _safe_float(value)
+    if number is None:
+        return "0.00"
+    return f"{number:.2f}"
 
 
 def _full_history_research_cache_file() -> Path:

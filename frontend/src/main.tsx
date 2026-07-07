@@ -1858,7 +1858,7 @@ function OpenPaperPositionsTable({
               return (
                 <tr key={index} className={`border-t border-slate-800 ${isSelected ? "selected-table-row" : ""}`}>
                   <td className="px-3 py-2">
-                    <button className="icon-action-button" title="Open trade chart" type="button" onClick={() => onSelect(row)}>
+                    <button className="icon-action-button" title="Pop out trade chart" type="button" onClick={() => onSelect(row)}>
                       <CandlestickChart size={16} />
                     </button>
                   </td>
@@ -1877,6 +1877,17 @@ function OpenPaperPositionsTable({
 }
 
 function PaperPositionChart({ position, onClose }: { position: Row; onClose: () => void }) {
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.body.classList.add("modal-open");
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.classList.remove("modal-open");
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
   const query = React.useMemo(() => {
     const params = new URLSearchParams({
       pair: String(position.pair ?? ""),
@@ -1893,34 +1904,57 @@ function PaperPositionChart({ position, onClose }: { position: Row; onClose: () 
   const data = useApi<PaperPositionChartPayload>(`/api/paper/positions/chart?${query}`);
   const candles = data?.candles ?? [];
   return (
-    <section className="card panel dashboard-card trade-chart-panel">
-      <div className="trade-chart-header">
-        <div>
-          <div className="card-header border-0 bg-transparent p-0 font-medium">
-            {data ? `${data.display_pair} ${data.timeframe} Open Position Chart` : "Open Position Chart"}
+    <div className="trade-chart-modal-backdrop" role="presentation" onClick={onClose}>
+      <section className="card panel dashboard-card trade-chart-modal" role="dialog" aria-modal="true" aria-label="Open paper position chart" onClick={(event) => event.stopPropagation()}>
+        <div className="trade-chart-header">
+          <div>
+            <div className="card-header border-0 bg-transparent p-0 font-medium">
+              {data ? `${data.display_pair} ${data.timeframe} Open Position Chart` : "Open Position Chart"}
+            </div>
+            <div className="trade-chart-subtitle">
+              {candles.length.toLocaleString()} / 3000 candles
+              {data?.trade.opened_at ? ` | Opened ${formatDate(data.trade.opened_at)}` : ""}
+            </div>
           </div>
-          <div className="trade-chart-subtitle">
-            {candles.length.toLocaleString()} / 3000 candles
-            {data?.trade.open_price ? ` | Open ${formatNumber(data.trade.open_price, 5)}` : ""}
-            {data?.trade.stop_loss ? ` | SL ${formatNumber(data.trade.stop_loss, 5)}` : ""}
-            {data?.trade.take_profit ? ` | TP ${formatNumber(data.trade.take_profit, 5)}` : ""}
-          </div>
+          <button className="icon-action-button" title="Close chart" type="button" onClick={onClose}>
+            <X size={16} />
+          </button>
         </div>
-        <button className="icon-action-button" title="Close chart" type="button" onClick={onClose}>
-          <X size={16} />
-        </button>
+        {data && <TradePriceList data={data} />}
+        {!data && <div className="chart-loading">Loading historical candles...</div>}
+        {data && data.database_status !== "available" && (
+          <div className="callout callout-warning rounded border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-100">
+            Historical candle database unavailable: {data.error || "no detail returned"}
+          </div>
+        )}
+        {data && data.database_status === "available" && candles.length === 0 && (
+          <div className="chart-loading">No historical candles returned for this position.</div>
+        )}
+        {data && candles.length > 0 && <LightweightTradeChart data={data} />}
+      </section>
+    </div>
+  );
+}
+
+function TradePriceList({ data }: { data: PaperPositionChartPayload }) {
+  const prices = [
+    { label: "Open", value: data.trade.open_price, className: "open" },
+    { label: "Stop Loss", value: data.trade.stop_loss, className: "sl" },
+    { label: "Take Profit", value: data.trade.take_profit, className: "tp" }
+  ].filter((item) => item.value !== null);
+  return (
+    <div className="trade-price-list">
+      <div className="trade-price-item direction">
+        <span>Direction</span>
+        <strong>{data.trade.direction || "N/A"}</strong>
       </div>
-      {!data && <div className="chart-loading">Loading historical candles...</div>}
-      {data && data.database_status !== "available" && (
-        <div className="callout callout-warning rounded border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-100">
-          Historical candle database unavailable: {data.error || "no detail returned"}
+      {prices.map((item) => (
+        <div key={item.label} className={`trade-price-item ${item.className}`}>
+          <span>{item.label}</span>
+          <strong>{formatNumber(item.value ?? 0, 5)}</strong>
         </div>
-      )}
-      {data && data.database_status === "available" && candles.length === 0 && (
-        <div className="chart-loading">No historical candles returned for this position.</div>
-      )}
-      {data && candles.length > 0 && <LightweightTradeChart data={data} />}
-    </section>
+      ))}
+    </div>
   );
 }
 
@@ -1942,7 +1976,10 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
       },
       rightPriceScale: { borderColor: "#334155" },
       timeScale: { borderColor: "#334155", timeVisible: true, secondsVisible: false },
-      crosshair: { mode: 1 }
+      crosshair: { mode: 1 },
+      localization: {
+        priceFormatter: (price: number) => formatNumber(price, 5)
+      }
     });
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: "#22c55e",
@@ -1962,7 +1999,7 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
       }))
       .filter((item): item is CandlestickData<UTCTimestamp> => item.time !== null);
     candleSeries.setData(candleData);
-    addTradePriceLine(candleSeries, data.trade.open_price, "Open", "#38bdf8", LineStyle.Solid);
+    addTradePriceLine(candleSeries, data.trade.open_price, "OPEN", "#38bdf8", LineStyle.Solid);
     addTradePriceLine(candleSeries, data.trade.stop_loss, "SL", "#f43f5e", LineStyle.Dashed);
     addTradePriceLine(candleSeries, data.trade.take_profit, "TP", "#22c55e", LineStyle.Dashed);
     const openTime = toChartTime(data.trade.opened_at);
@@ -1976,7 +2013,7 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
         text: `Open ${data.trade.direction || ""}`.trim()
       }]);
     }
-    chart.timeScale().fitContent();
+    zoomToTradeSession(chart, candleData, openTime);
     const resizeObserver = new ResizeObserver(() => {
       chart.applyOptions({ width: container.clientWidth });
     });
@@ -1987,6 +2024,24 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
     };
   }, [data]);
   return <div ref={containerRef} className="trade-chart-canvas" />;
+}
+
+function zoomToTradeSession(
+  chart: ReturnType<typeof createChart>,
+  candleData: CandlestickData<UTCTimestamp>[],
+  openTime: UTCTimestamp | null
+) {
+  if (!candleData.length) return;
+  if (!openTime) {
+    chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, candleData.length - 220), to: candleData.length - 1 });
+    return;
+  }
+  const openIndex = candleData.findIndex((item) => Number(item.time) >= Number(openTime));
+  const centerIndex = openIndex >= 0 ? openIndex : candleData.length - 1;
+  chart.timeScale().setVisibleLogicalRange({
+    from: Math.max(0, centerIndex - 90),
+    to: Math.min(candleData.length - 1, centerIndex + 150)
+  });
 }
 
 function addTradePriceLine(
@@ -2003,7 +2058,7 @@ function addTradePriceLine(
     lineWidth: 2,
     lineStyle,
     axisLabelVisible: true,
-    title
+    title: `${title} ${formatNumber(price, 5)}`
   });
 }
 

@@ -14,6 +14,10 @@ body {
   overflow-x: hidden;
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 .app-wrapper {
   --lte-sidebar-width: 16rem;
   --cui-body-bg: #020617;
@@ -241,9 +245,25 @@ body {
   background: rgba(14, 165, 233, 0.12);
 }
 
-.trade-chart-panel {
+.trade-chart-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 23, 0.76);
+  padding: 18px;
+}
+
+.trade-chart-modal {
   display: grid;
+  width: min(96vw, 1360px);
+  max-height: min(92vh, 900px);
   gap: 12px;
+  overflow: auto;
+  border-color: rgba(56, 189, 248, 0.38);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
 }
 
 .trade-chart-header {
@@ -259,9 +279,52 @@ body {
   font-size: 0.82rem;
 }
 
+.trade-price-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.trade-price-item {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.42);
+  padding: 10px 12px;
+}
+
+.trade-price-item span {
+  color: #94a3b8;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.trade-price-item strong {
+  color: #f8fafc;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.trade-price-item.open {
+  border-color: rgba(56, 189, 248, 0.44);
+}
+
+.trade-price-item.sl {
+  border-color: rgba(244, 63, 94, 0.48);
+}
+
+.trade-price-item.tp {
+  border-color: rgba(34, 197, 94, 0.48);
+}
+
+.trade-price-item.direction {
+  border-color: rgba(148, 163, 184, 0.32);
+}
+
 .trade-chart-canvas {
   width: 100%;
-  height: 430px;
+  height: min(62vh, 600px);
   min-width: 0;
 }
 
@@ -274,6 +337,26 @@ body {
   border-radius: 8px;
   color: #94a3b8;
   background: rgba(2, 6, 23, 0.34);
+}
+
+@media (max-width: 900px) {
+  .trade-chart-modal-backdrop {
+    align-items: stretch;
+    padding: 10px;
+  }
+
+  .trade-chart-modal {
+    width: 100%;
+    max-height: 96vh;
+  }
+
+  .trade-price-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trade-chart-canvas {
+    height: 460px;
+  }
 }
 
 .admin-save-button {

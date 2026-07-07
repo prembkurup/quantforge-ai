@@ -92,6 +92,10 @@ def _write_result(result: Any) -> None:
         "candles_loaded": getattr(result, "candles_loaded", 0),
         "new_candles": getattr(result, "new_candles", 0),
         "pair_results": _to_jsonable(getattr(result, "pair_results", ())),
+        "paper_scanner_run": _to_jsonable(getattr(result, "paper_scanner_run", {})),
+        "paper_signals": _to_jsonable(getattr(result, "paper_signals", ())),
+        "paper_orders": _to_jsonable(getattr(result, "paper_orders", ())),
+        "paper_positions": _to_jsonable(getattr(result, "paper_positions", ())),
         "safety": {
             "practice_safe": True,
             "broker_order_execution": "paper_only",

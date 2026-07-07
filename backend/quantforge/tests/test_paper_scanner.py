@@ -10,6 +10,7 @@ from quantforge.live.paper_scanner import (
     PaperPositionStore,
     PaperScannerConfig,
     ProcessedCandleStore,
+    ProcessedSignalStore,
 )
 from quantforge.research.strategy_assets import (
     ApprovedStrategyAssetStatus,
@@ -33,6 +34,18 @@ class FakeLatestCandleRepository:
     ) -> list[dict]:
         self.calls.append((pair_name, granularity))
         return [
+            {
+                "time": datetime(2026, 7, 7, 2, 30, tzinfo=UTC),
+                "pair_name": pair_name,
+                "granularity": granularity,
+                "volume": 100,
+                "open_price": 1.09,
+                "high_price": 1.10,
+                "low_price": 1.08,
+                "close_price": 1.1,
+                "is_complete": True,
+                "source": "test",
+            },
             {
                 "time": datetime(2026, 7, 7, 3, 30, tzinfo=UTC),
                 "pair_name": pair_name,
@@ -61,6 +74,7 @@ def test_multi_pair_paper_scanner_reads_latest_candles_and_blocks_duplicate_runs
         ),
         strategy_repository=repository,
         processed_store=ProcessedCandleStore(tmp_path / "processed.json"),
+        signal_store=ProcessedSignalStore(tmp_path / "signals.json"),
         position_store=PaperPositionStore(tmp_path / "positions.json"),
         decision_store=DecisionTraceStore(tmp_path / "decisions.jsonl"),
     )
@@ -76,6 +90,13 @@ def test_multi_pair_paper_scanner_reads_latest_candles_and_blocks_duplicate_runs
     assert result.orders_executed == 1
     assert result.open_positions == 1
     assert result.pair_results[0].strategy_asset_id == "QF-2026-00431"
+    assert result.pair_results[0].feature_vector is not None
+    assert result.pair_results[0].feature_vector.candle_time == "2026-07-07T03:30:00+00:00"
+    assert result.pair_results[0].regime_result is not None
+    assert result.pair_results[0].strategy_selection is not None
+    assert result.paper_signals[0].feature_vector_id == result.pair_results[0].feature_vector.feature_vector_id
+    assert result.paper_orders[0].execution_path == "OANDA_PAPER"
+    assert result.paper_positions[0]["source_candle_time"] == "2026-07-07T03:30:00+00:00"
     assert result.pair_results[1].reason == "no_compatible_approved_strategy"
 
     second = scanner.run()
@@ -84,7 +105,35 @@ def test_multi_pair_paper_scanner_reads_latest_candles_and_blocks_duplicate_runs
     assert second.signals_generated == 0
     assert second.orders_executed == 0
     assert second.open_positions == 1
-    assert {item.reason for item in second.pair_results} == {"candle_already_processed"}
+    assert {item.reason for item in second.pair_results} == {"CANDLE_ALREADY_PROCESSED"}
+
+
+def test_scanner_rejects_major_recent_candle_gap(tmp_path: Path) -> None:
+    class GapRepository(FakeLatestCandleRepository):
+        def load_latest(self, *args, **kwargs) -> list[dict]:
+            rows = super().load_latest(*args, **kwargs)
+            rows[0]["time"] = datetime(2026, 7, 7, 0, 0, tzinfo=UTC)
+            return rows
+
+    scanner = MultiPairPaperScanner(
+        GapRepository(),
+        config=PaperScannerConfig(
+            enabled=True,
+            pairs=("EUR_USD",),
+            timeframes=("H1",),
+            max_pairs_per_scan=30,
+        ),
+        strategy_repository=_strategy_repository(tmp_path),
+        processed_store=ProcessedCandleStore(tmp_path / "processed.json"),
+        signal_store=ProcessedSignalStore(tmp_path / "signals.json"),
+        position_store=PaperPositionStore(tmp_path / "positions.json"),
+        decision_store=DecisionTraceStore(tmp_path / "decisions.jsonl"),
+    )
+
+    result = scanner.run()
+
+    assert result.signals_generated == 0
+    assert result.pair_results[0].reason == "RECENT_LOOKBACK_GAP"
 
 
 def _strategy_repository(tmp_path: Path) -> StrategyAssetRepository:

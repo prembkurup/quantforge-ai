@@ -148,6 +148,40 @@ def test_existing_paper_position_blocks_duplicate_order(tmp_path: Path) -> None:
     assert result.open_positions == 1
 
 
+def test_paper_position_store_enriches_legacy_open_positions(tmp_path: Path) -> None:
+    position_store = PaperPositionStore(tmp_path / "positions.json")
+    position_store._save(
+        {
+            "positions": [
+                {
+                    "position_id": "legacy",
+                    "instrument": "EUR_USD",
+                    "timeframe": "H1",
+                    "status": "OPEN",
+                    "units": 10000,
+                    "close_price": 1.105,
+                    "floating_pl": 50.0,
+                    "strategy_id": "QF-LIVE-0001",
+                    "signal_id": "SIG-REPLAY-EUR_USD-H1-000001",
+                    "opened_at": "2026-07-07T03:46:55+00:00",
+                }
+            ]
+        }
+    )
+
+    positions = position_store.list_open()
+
+    assert positions[0]["pair"] == "EUR_USD"
+    assert positions[0]["direction"] == "BUY"
+    assert positions[0]["entry_price"] == 1.1
+    assert positions[0]["open_price"] == 1.1
+    assert positions[0]["stop_loss"] == 1.0989
+    assert positions[0]["take_profit"] == 1.1022
+    assert positions[0]["strategy_asset_id"] == "QF-LIVE-0001"
+    assert positions[0]["source_signal_id"] == "SIG-REPLAY-EUR_USD-H1-000001"
+    assert positions[0]["entry_time"] == "2026-07-07T03:46:55+00:00"
+
+
 def test_risk_rejection_prevents_order(tmp_path: Path) -> None:
     scanner = MultiPairPaperScanner(
         FakeLatestCandleRepository(),

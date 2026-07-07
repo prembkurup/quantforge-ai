@@ -190,6 +190,9 @@ class PaperPositionStore:
 
     def list_open(self) -> tuple[dict[str, Any], ...]:
         payload = self._load()
+        changed = self._enrich_open_positions(payload)
+        if changed:
+            self._save(payload)
         return tuple(position for position in payload.get("positions", []) if position.get("status") == "OPEN")
 
     def has_open(self, pair: str, timeframe: str) -> bool:
@@ -254,7 +257,7 @@ class PaperPositionStore:
     def mark_to_market(self, price_by_pair_timeframe: dict[str, float]) -> None:
         payload = self._load()
         now = datetime.now(UTC).isoformat(timespec="seconds")
-        changed = False
+        changed = self._enrich_open_positions(payload)
         for position in payload.get("positions", []):
             if position.get("status") != "OPEN":
                 continue
@@ -281,6 +284,15 @@ class PaperPositionStore:
             changed = True
         if changed:
             self._save(payload)
+
+    def _enrich_open_positions(self, payload: dict[str, Any]) -> bool:
+        changed = False
+        now = datetime.now(UTC).isoformat(timespec="seconds")
+        for position in payload.get("positions", []):
+            if position.get("status") != "OPEN":
+                continue
+            changed = _enrich_open_position(position, now) or changed
+        return changed
 
     def _load(self) -> dict[str, Any]:
         if not self.path.exists():
@@ -873,6 +885,92 @@ def _float_or_zero(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _enrich_open_position(position: dict[str, Any], updated_at: str) -> bool:
+    changed = False
+    pair = str(position.get("pair") or position.get("instrument") or "")
+    if pair and not position.get("pair"):
+        position["pair"] = pair
+        changed = True
+    if pair and not position.get("instrument"):
+        position["instrument"] = pair
+        changed = True
+
+    for target, fallback in (
+        ("strategy_asset_id", "strategy_id"),
+        ("source_signal_id", "signal_id"),
+        ("entry_time", "opened_at"),
+        ("created_at", "opened_at"),
+    ):
+        if not position.get(target) and position.get(fallback):
+            position[target] = position[fallback]
+            changed = True
+
+    direction = _infer_position_direction(position)
+    if direction and position.get("direction") != direction:
+        position["direction"] = direction
+        changed = True
+
+    close_price = _first_positive_price(position, "close_price", "current_price", "entry_price", "open_price")
+    if close_price > 0:
+        for target in ("close_price", "current_price"):
+            if _float_or_zero(position.get(target)) <= 0:
+                position[target] = close_price
+                changed = True
+
+    entry_price = _first_positive_price(position, "entry_price", "open_price")
+    if entry_price <= 0:
+        entry_price = _reconstruct_entry_price(position, close_price, direction)
+    if entry_price > 0:
+        for target in ("entry_price", "open_price"):
+            if _float_or_zero(position.get(target)) <= 0:
+                position[target] = entry_price
+                changed = True
+
+    if entry_price > 0:
+        take_profit, stop_loss = _default_exit_prices(entry_price, direction)
+        for target, value in (("take_profit", take_profit), ("stop_loss", stop_loss)):
+            if value is not None and _float_or_zero(position.get(target)) <= 0:
+                position[target] = value
+                changed = True
+
+    if changed:
+        position["updated_at"] = updated_at
+    return changed
+
+
+def _infer_position_direction(position: dict[str, Any]) -> str:
+    direction = str(position.get("direction") or "").upper()
+    if direction in {"BUY", "SELL"}:
+        return direction
+    units = _float_or_zero(position.get("units"))
+    if units > 0:
+        return "BUY"
+    if units < 0:
+        return "SELL"
+    return ""
+
+
+def _first_positive_price(position: dict[str, Any], *keys: str) -> float:
+    for key in keys:
+        value = _float_or_zero(position.get(key))
+        if value > 0:
+            return value
+    return 0.0
+
+
+def _reconstruct_entry_price(position: dict[str, Any], close_price: float, direction: str) -> float:
+    if close_price <= 0:
+        return 0.0
+    units = abs(_float_or_zero(position.get("units")))
+    floating_pl = _float_or_zero(position.get("p_l") or position.get("floating_pl"))
+    if units <= 0 or floating_pl == 0 or direction not in {"BUY", "SELL"}:
+        return close_price
+    price_delta = floating_pl / units
+    if direction == "SELL":
+        return round(close_price + price_delta, 8)
+    return round(close_price - price_delta, 8)
 
 
 def _default_exit_prices(entry_price: float, direction: str) -> tuple[float | None, float | None]:

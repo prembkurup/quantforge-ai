@@ -82,7 +82,7 @@ def test_multi_pair_paper_scanner_reads_latest_candles_and_blocks_duplicate_runs
 
     result = scanner.run()
 
-    assert candles.calls == [("EUR_USD", "H1"), ("GBP_USD", "H1")]
+    assert candles.calls == [("EUR_USD", "H1"), ("GBP_USD", "H1"), ("EUR_USD", "M1")]
     assert result.mode == "paper-scanner"
     assert result.pairs_loaded == 2
     assert result.pair_timeframes_scanned == 2
@@ -295,6 +295,54 @@ def test_mark_to_market_closes_open_position_when_stop_loss_touched(tmp_path: Pa
     assert positions[0]["close_reason"] == "STOP_LOSS"
     assert positions[0]["close_price"] == 1.099
     assert positions[0]["p_l"] == -10.0
+
+
+def test_mark_to_market_uses_m1_monitor_candle_for_h1_position_exit(tmp_path: Path) -> None:
+    position_store = PaperPositionStore(tmp_path / "positions.json")
+    position_store._save(
+        {
+            "positions": [
+                {
+                    "position_id": "h1-tracked-by-m1",
+                    "pair": "EUR_USD",
+                    "instrument": "EUR_USD",
+                    "timeframe": "H1",
+                    "direction": "BUY",
+                    "status": "OPEN",
+                    "units": 10000,
+                    "entry_price": 1.1,
+                    "open_price": 1.1,
+                    "stop_loss": 1.099,
+                    "take_profit": 1.102,
+                    "source_candle_time": "2026-07-07T03:00:00+00:00",
+                    "opened_at": "2026-07-07T03:00:00+00:00",
+                }
+            ]
+        }
+    )
+
+    position_store.mark_to_market(
+        {"EUR_USD:H1": 1.1005, "EUR_USD:M1": 1.1018},
+        {
+            "EUR_USD:H1": {
+                "time": datetime(2026, 7, 7, 4, 0, tzinfo=UTC),
+                "high_price": 1.1008,
+                "low_price": 1.1002,
+            },
+            "EUR_USD:M1": {
+                "time": datetime(2026, 7, 7, 3, 41, tzinfo=UTC),
+                "high_price": 1.1021,
+                "low_price": 1.101,
+            },
+        },
+    )
+
+    positions = position_store._load()["positions"]
+    assert positions[0]["status"] == "CLOSED"
+    assert positions[0]["close_reason"] == "TAKE_PROFIT"
+    assert positions[0]["close_price"] == 1.102
+    assert positions[0]["close_timeframe"] == "M1"
+    assert positions[0]["closed_at"] == "2026-07-07T03:41:00+00:00"
 
 
 def test_mark_to_market_converts_jpy_quote_pl_to_usd_account_currency(tmp_path: Path) -> None:

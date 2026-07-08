@@ -282,7 +282,9 @@ class PaperPositionStore:
                 continue
             pair = str(position.get("pair") or position.get("instrument") or "")
             timeframe = str(position.get("timeframe") or "")
-            key = _pair_timeframe_key(pair, timeframe)
+            monitor_timeframe = _paper_position_monitor_timeframe(position)
+            monitor_key = _pair_timeframe_key(pair, monitor_timeframe)
+            key = monitor_key if monitor_key in price_by_pair_timeframe else _pair_timeframe_key(pair, timeframe)
             close_price = price_by_pair_timeframe.get(key)
             if close_price is None:
                 continue
@@ -308,6 +310,7 @@ class PaperPositionStore:
                 position["p_l_currency"] = "USD"
                 position["status"] = "CLOSED"
                 position["close_reason"] = exit_reason
+                position["close_timeframe"] = monitor_timeframe if key == monitor_key else timeframe
                 position["closed_at"] = _iso(candle.get("time")) if candle.get("time") else now
                 position["updated_at"] = now
                 changed = True
@@ -323,6 +326,7 @@ class PaperPositionStore:
             )
             position["close_price"] = close_price
             position["current_price"] = close_price
+            position["price_timeframe"] = monitor_timeframe if key == monitor_key else timeframe
             position["floating_pl"] = floating_pl
             position["p_l"] = floating_pl
             position["p_l_account_currency"] = floating_pl
@@ -722,6 +726,11 @@ class MultiPairPaperScanner:
 
         signal_by_pair = {signal.pair: signal for signal in paper_signals}
         self.positions.add_many(tuple(new_positions), signal_by_pair, price_by_pair_timeframe, conversion_prices)
+        candles_loaded += self._load_position_monitor_candles(
+            price_by_pair_timeframe,
+            candle_by_pair_timeframe,
+            conversion_prices,
+        )
         self.positions.mark_to_market(price_by_pair_timeframe, candle_by_pair_timeframe, conversion_prices)
         open_position_records = self.positions.list_open()
         closed_position_records = self.positions.list_closed()
@@ -788,6 +797,36 @@ class MultiPairPaperScanner:
         if _has_major_gap(rows, timeframe):
             return GateResult("NOT_ELIGIBLE", ("RECENT_LOOKBACK_GAP",))
         return GateResult("ELIGIBLE")
+
+    def _load_position_monitor_candles(
+        self,
+        price_by_pair_timeframe: dict[str, float],
+        candle_by_pair_timeframe: dict[str, dict[str, Any]],
+        conversion_prices: dict[str, float],
+    ) -> int:
+        candles_loaded = 0
+        open_pairs = sorted(
+            {
+                str(position.get("pair") or position.get("instrument") or "")
+                for position in self.positions.list_open()
+                if position.get("pair") or position.get("instrument")
+            }
+        )
+        for pair in open_pairs:
+            rows = self.candles.load_latest(
+                pair,
+                "M1",
+                complete_only=True,
+                limit=3,
+            )
+            candles_loaded += len(rows)
+            if not rows:
+                continue
+            key = _pair_timeframe_key(pair, "M1")
+            price_by_pair_timeframe[key] = _candle_close(rows[-1])
+            conversion_prices[pair] = _candle_close(rows[-1])
+            candle_by_pair_timeframe[key] = rows[-1]
+        return candles_loaded
 
     def _trade_eligibility(
         self,
@@ -1134,6 +1173,10 @@ def _effective_pl_units(pair: str, units: float) -> float:
 
 def _normalized_pair(pair: str) -> str:
     return pair.replace("/", "_").upper()
+
+
+def _paper_position_monitor_timeframe(position: dict[str, Any]) -> str:
+    return "M1"
 
 
 def _split_pair(pair: str) -> tuple[str, str]:

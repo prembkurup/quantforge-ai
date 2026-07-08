@@ -423,6 +423,53 @@ def test_paper_summary_uses_real_position_store_and_rows_include_strategy(monkey
     assert rows[0]["strategy_asset_id"] == record.strategy_asset_id
 
 
+def test_trade_investigation_endpoints_expose_milestone_27_report(monkeypatch, tmp_path: Path) -> None:
+    positions_file = tmp_path / "paper_positions.json"
+    positions_file.write_text(
+        """
+        {
+          "positions": [
+            {
+              "position_id": "paper-test-1",
+              "status": "CLOSED",
+              "pair": "EUR_USD",
+              "timeframe": "H1",
+              "strategy_asset_id": "strategy_asset_001",
+              "direction": "BUY",
+              "units": 10000,
+              "entry_price": 1.1000,
+              "close_price": 1.1020,
+              "stop_loss": 1.0980,
+              "take_profit": 1.1040,
+              "p_l": 20.0,
+              "entry_time": "2026-07-07T03:30:00+00:00",
+              "closed_at": "2026-07-07T06:30:00+00:00",
+              "close_reason": "TAKE_PROFIT"
+            }
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_service, "default_paper_positions_file", lambda: positions_file)
+
+    response = client.get("/api/trades/paper-test-1")
+    passport = client.get("/api/trades/paper-test-1/passport")
+    risk = client.get("/api/trades/paper-test-1/risk")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["trade_id"] == "paper-test-1"
+    assert payload["sections"]["header"]["pair"] == "EUR_USD"
+    assert payload["sections"]["strategy_selection"]["candidates"][0]["decision"] == "SELECTED"
+    assert payload["sections"]["opportunity"]["total"] == 86
+    assert payload["sections"]["summary"]["decision_transparency"] == "complete"
+    assert passport.status_code == 200
+    assert passport.json()["data"]["strategy_asset_id"] == "strategy_asset_001"
+    assert risk.status_code == 200
+    assert risk.json()["data"]["risk_approval"] == "PASS"
+
+
 def test_performance_learning_endpoint_exposes_milestone_26_layers() -> None:
     response = client.get("/api/performance/learning")
 

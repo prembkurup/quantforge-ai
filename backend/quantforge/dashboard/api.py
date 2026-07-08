@@ -378,6 +378,54 @@ def create_app() -> FastAPI:
             limit=limit,
         )
 
+    @app.get("/api/trades/{trade_id}")
+    def trade_investigation(trade_id: str) -> dict[str, Any]:
+        return service.paper_trade_investigation(trade_id)
+
+    @app.get("/api/trades/{trade_id}/passport")
+    def trade_passport(trade_id: str) -> dict[str, Any]:
+        return service.paper_trade_investigation(trade_id, "passport")
+
+    @app.get("/api/trades/{trade_id}/market")
+    def trade_market(trade_id: str) -> dict[str, Any]:
+        return service.paper_trade_investigation(trade_id, "market")
+
+    @app.get("/api/trades/{trade_id}/features")
+    def trade_features(trade_id: str) -> dict[str, Any]:
+        return service.paper_trade_investigation(trade_id, "features")
+
+    @app.get("/api/trades/{trade_id}/portfolio")
+    def trade_portfolio(trade_id: str) -> dict[str, Any]:
+        return service.paper_trade_investigation(trade_id, "portfolio")
+
+    @app.get("/api/trades/{trade_id}/risk")
+    def trade_risk(trade_id: str) -> dict[str, Any]:
+        return service.paper_trade_investigation(trade_id, "risk")
+
+    @app.get("/api/trades/{trade_id}/execution")
+    def trade_execution(trade_id: str) -> dict[str, Any]:
+        return service.paper_trade_investigation(trade_id, "execution")
+
+    @app.get("/api/trades/{trade_id}/timeline")
+    def trade_timeline(trade_id: str) -> dict[str, Any]:
+        return service.paper_trade_investigation(trade_id, "timeline")
+
+    @app.get("/api/trades/{trade_id}/replay")
+    def trade_replay(trade_id: str) -> dict[str, Any]:
+        return service.paper_trade_investigation(trade_id, "replay")
+
+    @app.get("/api/trades/{trade_id}/knowledge")
+    def trade_knowledge(trade_id: str) -> dict[str, Any]:
+        return service.paper_trade_investigation(trade_id, "knowledge")
+
+    @app.get("/api/trades/{trade_id}/research")
+    def trade_research(trade_id: str) -> dict[str, Any]:
+        return service.paper_trade_investigation(trade_id, "research")
+
+    @app.get("/api/trades/{trade_id}/summary")
+    def trade_summary(trade_id: str) -> dict[str, Any]:
+        return service.paper_trade_investigation(trade_id, "summary")
+
     @app.get("/api/ops/health")
     def ops_health() -> dict[str, Any]:
         return service.ops_health()

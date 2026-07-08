@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from quantforge.config.settings import get_settings
+from quantforge.live.paper_scanner import _exit_price_for_candles
 from quantforge.market_data.coreui_repository import CoreUiCandleRepository, get_coreui_history_engine
 
 
@@ -14,6 +15,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Reconcile open paper positions against real UTC candle data.")
     parser.add_argument("--positions-file", default="var/paper_positions.json")
     parser.add_argument("--audit-file", default="var/paper_positions_reconciliation.json")
+    parser.add_argument("--backup-file", default="")
+    parser.add_argument("--closed-m1-backfill", action="store_true", help="Backfill closed trade times from M1 TP/SL hits.")
     parser.add_argument("--write", action="store_true", help="Persist corrected positions.")
     args = parser.parse_args()
 
@@ -25,9 +28,14 @@ def main() -> int:
     with get_coreui_history_engine().connect() as connection:
         repository = CoreUiCandleRepository(connection, get_settings().coreui_candle_table)
         for position in payload.get("positions", []):
-            if position.get("status") != "OPEN":
-                continue
-            result = _reconcile_position(repository, position)
+            if args.closed_m1_backfill:
+                if position.get("status") != "CLOSED":
+                    continue
+                result = _backfill_closed_position_m1_time(repository, position)
+            else:
+                if position.get("status") != "OPEN":
+                    continue
+                result = _reconcile_position(repository, position)
             audit.append(result)
             changed = result["changed"] or changed
 
@@ -43,10 +51,66 @@ def main() -> int:
     audit_path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
 
     if args.write and changed:
+        backup_file = args.backup_file or f"{positions_path}.bak"
+        backup_path = Path(backup_file)
+        backup_path.parent.mkdir(parents=True, exist_ok=True)
+        backup_path.write_text(positions_path.read_text(encoding="utf-8"), encoding="utf-8")
         positions_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
     print(json.dumps({k: summary[k] for k in ("positions_checked", "positions_changed", "positions_unmatched")}, indent=2))
     return 1 if summary["positions_unmatched"] else 0
+
+
+def _backfill_closed_position_m1_time(repository: CoreUiCandleRepository, position: dict[str, Any]) -> dict[str, Any]:
+    original = {
+        "closed_at": position.get("closed_at"),
+        "close_timeframe": position.get("close_timeframe"),
+        "close_price": position.get("close_price"),
+        "take_profit": position.get("take_profit"),
+        "stop_loss": position.get("stop_loss"),
+    }
+    if position.get("close_timeframe") == "M1":
+        return _audit(position, original, "ALREADY_M1", False)
+
+    pair = str(position.get("pair") or position.get("instrument") or "")
+    opened_at = _position_candle_time(position)
+    closed_at = _parse_optional_utc(position.get("closed_at"))
+    if not pair or opened_at is None or closed_at is None:
+        return _audit(position, original, "MISSING_TIME_RANGE", False)
+
+    rows = repository.load_window(
+        pair,
+        "M1",
+        opened_at,
+        closed_at + _timeframe_delta("M1"),
+        limit=10_000,
+    )
+    if not rows:
+        return _audit(position, original, "NO_M1_CANDLES", False)
+
+    exit_price, exit_reason, exit_candle = _exit_price_for_candles(position, rows)
+    if exit_price is None:
+        return _audit(position, original, "NO_M1_EXIT_HIT", False, m1_candles=len(rows))
+
+    corrected_closed_at = exit_candle["time"].isoformat()
+    updates = {
+        "closed_at": corrected_closed_at,
+        "close_timeframe": "M1",
+        "m1_close_time_backfilled_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "m1_close_time_previous_closed_at": original["closed_at"],
+    }
+    changed = any(position.get(key) != value for key, value in updates.items())
+    position.update(updates)
+    return _audit(
+        position,
+        original,
+        "MATCHED",
+        changed,
+        m1_candles=len(rows),
+        m1_exit_time=corrected_closed_at,
+        m1_exit_price=exit_price,
+        m1_exit_reason=exit_reason,
+    )
 
 
 def _reconcile_position(repository: CoreUiCandleRepository, position: dict[str, Any]) -> dict[str, Any]:
@@ -134,6 +198,12 @@ def _parse_utc(value: Any) -> datetime:
     if timestamp.tzinfo is None:
         timestamp = timestamp.replace(tzinfo=UTC)
     return timestamp.astimezone(UTC)
+
+
+def _parse_optional_utc(value: Any) -> datetime | None:
+    if not value:
+        return None
+    return _parse_utc(value)
 
 
 def _floor_to_timeframe(value: datetime, timeframe: str) -> datetime:

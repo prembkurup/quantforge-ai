@@ -318,6 +318,10 @@ def create_app() -> FastAPI:
     def portfolio_intelligence() -> dict[str, Any]:
         return service.portfolio_intelligence()
 
+    @app.get("/api/strategy-lifecycle")
+    def strategy_lifecycle() -> dict[str, Any]:
+        return service.strategy_lifecycle()
+
     @app.get("/api/performance/learning")
     def performance_learning() -> dict[str, Any]:
         return service.performance_learning()

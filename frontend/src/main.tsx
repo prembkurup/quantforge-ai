@@ -110,6 +110,7 @@ function App() {
               <Route path="/indicators" element={<Indicators />} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/portfolio-intelligence" element={<PortfolioIntelligence />} />
+              <Route path="/strategy-lifecycle" element={<StrategyLifecycle />} />
               <Route path="/performance-learning" element={<PerformanceLearning />} />
               <Route path="/intraday" element={<IntradayDaily />} />
               <Route path="/decision-intelligence" element={<DecisionIntelligence />} />
@@ -140,6 +141,7 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     ["/indicators", "Indicators", BookOpen],
     ["/portfolio", "Portfolio", ShieldCheck],
     ["/portfolio-intelligence", "Portfolio Intel", PieChart],
+    ["/strategy-lifecycle", "Lifecycle", HeartPulse],
     ["/performance-learning", "Learning", Brain],
     ["/intraday", "Intraday", Activity],
     ["/decision-intelligence", "Decision Intel", Brain],
@@ -906,6 +908,199 @@ function PortfolioIntelligence() {
         { label: "Decision Trace", content: <JsonPanel title="Allocation Decision Trace" data={data.decision_trace ?? {}} /> },
         { label: "Stress Tests", content: <JsonPanel title="Stress Tests" data={stress} /> },
         { label: "Acceptance", content: <JsonPanel title="Acceptance Criteria" data={acceptance} /> },
+      ]} />
+    </Page>
+  );
+}
+
+function StrategyLifecycle() {
+  const data = useApi<any>("/api/strategy-lifecycle");
+  if (!data) return <Loading />;
+  const strategies = (data.strategies ?? []) as any[];
+  const statusCounts = data.status_counts ?? {};
+  const actionCounts = data.action_counts ?? {};
+  const reports = data.reports ?? {};
+  const lifecycleRows = strategies.map((item) => ({
+    strategy_asset_id: item.strategy_asset_id,
+    strategy_name: item.strategy_name,
+    version: item.version,
+    pair: item.pair,
+    timeframe: item.timeframe,
+    health_score: item.health_score,
+    status: item.status,
+    lifecycle_stage: item.lifecycle_stage,
+    profit_factor: item.profit_factor,
+    win_rate: `${Math.round(Number(item.win_rate ?? 0) * 100)}%`,
+    drawdown: `${Math.round(Number(item.drawdown ?? 0) * 1000) / 10}%`,
+    drift: item.drift,
+    root_cause: item.root_cause,
+    action: item.action,
+    recommendation: item.recommendation,
+  }));
+  const rootCauseRows = (data.root_causes ?? []).map((item: any) => ({
+    strategy_asset_id: item.strategy_asset_id,
+    strategy_name: item.strategy_name,
+    category: item.category,
+    reason: item.reason,
+    severity: item.severity,
+    evidence: item.evidence,
+  }));
+  const actionRows = (data.actions ?? []).map((item: any) => ({
+    strategy_asset_id: item.strategy_asset_id,
+    strategy_name: item.strategy_name,
+    action: item.action,
+    recommendation: item.recommendation,
+    current_allocation: `${Math.round(Number(item.current_allocation ?? 0) * 1000) / 10}%`,
+    target_allocation: `${Math.round(Number(item.target_allocation ?? 0) * 1000) / 10}%`,
+  }));
+  const researchRows = (data.research_goals ?? []).map((item: any) => ({
+    research_goal_id: item.research_goal_id,
+    strategy_asset_id: item.strategy_asset_id,
+    hypothesis: item.hypothesis,
+    campaign: item.campaign,
+    priority: item.priority,
+  }));
+  const replacementRows = (data.replacement_candidates ?? []).map((item: any) => ({
+    strategy_asset_id: item.strategy_asset_id,
+    strategy_name: item.strategy_name,
+    candidate_id: item.candidate_id,
+    candidate_version: item.candidate_version,
+    expected_health_score: item.expected_health_score,
+    status: item.status,
+  }));
+  const portfolioRows = (data.portfolio_impacts ?? []).map((item: any) => ({
+    strategy_asset_id: item.strategy_asset_id,
+    strategy_name: item.strategy_name,
+    decision: item.decision,
+    allocation_delta: item.allocation_delta,
+    expected_pf_delta: item.expected_pf_delta,
+    correlation_effect: item.correlation_effect,
+    risk_effect: item.risk_effect,
+    expected_return_effect: item.expected_return_effect,
+  }));
+  const timelineRows = strategies.flatMap((item) =>
+    (item.health_timeline ?? []).map((point: any) => ({
+      strategy_asset_id: item.strategy_asset_id,
+      strategy_name: item.strategy_name,
+      date: point.date,
+      health_score: point.health_score,
+      profit_factor: point.profit_factor,
+    }))
+  );
+  const allocationRows = strategies.flatMap((item) =>
+    (item.allocation_history ?? []).map((point: any) => ({
+      strategy_asset_id: item.strategy_asset_id,
+      strategy_name: item.strategy_name,
+      date: point.date,
+      allocation: `${Math.round(Number(point.allocation ?? 0) * 1000) / 10}%`,
+    }))
+  );
+  const versionRows = strategies.flatMap((item) =>
+    (item.version_history ?? []).map((point: any) => ({
+      strategy_asset_id: item.strategy_asset_id,
+      strategy_name: item.strategy_name,
+      version: point.version,
+      status: point.status,
+      stage: point.stage,
+      date: point.date,
+    }))
+  );
+  const researchLinkRows = strategies.flatMap((item) =>
+    (item.research_links ?? []).map((link: any) => ({
+      strategy_asset_id: item.strategy_asset_id,
+      strategy_name: item.strategy_name,
+      label: link.label,
+      target: link.target,
+      type: link.type,
+    }))
+  );
+  const retiredRows = strategies
+    .filter((item) => item.retirement_status === "EVIDENCE_READY" || item.action === "RETIRE")
+    .map((item) => ({
+      strategy_asset_id: item.strategy_asset_id,
+      strategy_name: item.strategy_name,
+      retirement_status: item.retirement_status,
+      evidence: (item.retirement_evidence ?? []).join("; ") || "Monitoring",
+      replacement: item.replacement_candidate?.candidate_id ?? "None",
+    }));
+  const acceptance = data.acceptance_criteria ?? {};
+  return (
+    <Page title="Strategy Lifecycle">
+      <ReadinessBanner value="STRATEGY LIFECYCLE INTELLIGENCE" source={String(data.source ?? "StrategyLifecycleEngine")} />
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Avg Health" value={`${data.average_health_score ?? 0}/100`} tone={Number(data.average_health_score ?? 0) >= 75 ? "good" : "warn"} />
+              <KpiCard title="Strategies" value={data.strategy_count ?? strategies.length} />
+              <KpiCard title="Excellent" value={statusCounts.EXCELLENT ?? 0} tone="good" />
+              <KpiCard title="Healthy" value={statusCounts.HEALTHY ?? 0} tone="good" />
+              <KpiCard title="Watch" value={statusCounts.WATCH ?? 0} tone="warn" />
+              <KpiCard title="Degraded" value={statusCounts.DEGRADED ?? 0} tone="warn" />
+              <KpiCard title="Critical" value={statusCounts.CRITICAL ?? 0} tone="warn" />
+              <KpiCard title="Retire" value={statusCounts.RETIRE ?? 0} tone={statusCounts.RETIRE ? "warn" : "good"} />
+              <KpiCard title="Research Goals" value={(data.research_goals ?? []).length} tone={(data.research_goals ?? []).length ? "warn" : "good"} />
+              <KpiCard title="Replacements" value={(data.replacement_candidates ?? []).length} />
+              <KpiCard title="Reduce Allocation" value={actionCounts.REDUCE_ALLOCATION ?? 0} />
+              <KpiCard title="Policy Coverage" value={Object.values(acceptance).every(Boolean) ? "PASS" : "CHECK"} tone={Object.values(acceptance).every(Boolean) ? "good" : "warn"} />
+            </div>
+          ),
+        },
+        { label: "Strategies", content: <PaginatedDataTable title={`Strategy Health (${lifecycleRows.length})`} rows={lifecycleRows as Row[]} pageSize={30} /> },
+        {
+          label: "History",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-3">
+              <PaginatedDataTable title="Health Timeline" rows={timelineRows as Row[]} pageSize={30} />
+              <PaginatedDataTable title="Allocation History" rows={allocationRows as Row[]} pageSize={30} />
+              <PaginatedDataTable title="Version History" rows={versionRows as Row[]} pageSize={30} />
+            </div>
+          ),
+        },
+        {
+          label: "Root Causes",
+          content: <PaginatedDataTable title={`Root Cause Analysis (${rootCauseRows.length})`} rows={rootCauseRows as Row[]} pageSize={30} />,
+        },
+        {
+          label: "Actions",
+          content: <PaginatedDataTable title={`Policy Actions (${actionRows.length})`} rows={actionRows as Row[]} pageSize={30} />,
+        },
+        {
+          label: "Research",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <PaginatedDataTable title={`Research Recommendations (${researchRows.length})`} rows={researchRows as Row[]} pageSize={30} />
+              <PaginatedDataTable title={`Research Links (${researchLinkRows.length})`} rows={researchLinkRows as Row[]} pageSize={30} />
+            </div>
+          ),
+        },
+        {
+          label: "Replacement",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <PaginatedDataTable title={`Replacement Candidates (${replacementRows.length})`} rows={replacementRows as Row[]} pageSize={30} />
+              <PaginatedDataTable title={`Retirement Status (${retiredRows.length})`} rows={retiredRows as Row[]} pageSize={30} />
+            </div>
+          ),
+        },
+        {
+          label: "Portfolio Impact",
+          content: <PaginatedDataTable title={`Portfolio Impact Analysis (${portfolioRows.length})`} rows={portfolioRows as Row[]} pageSize={30} />,
+        },
+        {
+          label: "Reports",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <JsonPanel title="Daily Strategy Health Report" data={reports.daily_strategy_health ?? {}} />
+              <JsonPanel title="Weekly Lifecycle Report" data={reports.weekly_lifecycle ?? {}} />
+              <JsonPanel title="Monthly Strategy Evolution Report" data={reports.monthly_strategy_evolution ?? {}} />
+              <JsonPanel title="Research Recommendation Report" data={reports.research_recommendation ?? {}} />
+              <JsonPanel title="Portfolio Impact Report" data={reports.portfolio_impact ?? {}} />
+              <JsonPanel title="Acceptance Criteria" data={acceptance} />
+            </div>
+          ),
+        },
       ]} />
     </Page>
   );

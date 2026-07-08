@@ -139,6 +139,25 @@ def test_intraday_decision_intelligence_endpoint_exposes_milestone_24_layers() -
     assert payload["decision_quality_metrics"]["trades_avoided"] >= 0
 
 
+def test_strategy_lifecycle_endpoint_exposes_milestone_28_payload() -> None:
+    response = client.get("/api/strategy-lifecycle")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"] == "StrategyLifecycleEngine"
+    assert payload["strategy_count"] >= 1
+    assert payload["strategies"]
+    assert all("health_score" in strategy for strategy in payload["strategies"])
+    assert payload["root_causes"]
+    assert payload["reports"]["daily_strategy_health"]["report_id"].startswith("DAILY-STRATEGY-HEALTH-")
+    assert payload["reports"]["weekly_lifecycle"]["report_id"].startswith("WEEKLY-LIFECYCLE-")
+    assert payload["reports"]["monthly_strategy_evolution"]["report_id"].startswith("MONTHLY-STRATEGY-EVOLUTION-")
+    assert payload["reports"]["research_recommendation"]["goals"]
+    assert payload["reports"]["portfolio_impact"]["portfolio_impacts"]
+    assert payload["acceptance_criteria"]["every_strategy_has_health_score"] is True
+    assert payload["acceptance_criteria"]["degradations_have_root_cause"] is True
+
+
 def test_pipeline_snapshot_combines_page_payload_for_fast_loading() -> None:
     snapshot = client.get("/api/pipeline/snapshot").json()
 

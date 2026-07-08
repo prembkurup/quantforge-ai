@@ -1451,7 +1451,8 @@ function Paper() {
         {
           label: "Daily Trades",
           content: (
-            <PaperDailyTradesPanel
+            <PaperPeriodTradesPanel
+              period="day"
               rows={periodTradeRows}
               selected={selectedPosition}
               onSelect={setSelectedPosition}
@@ -1461,10 +1462,9 @@ function Paper() {
         {
           label: "Weekly Trades",
           content: (
-            <PaperTradePeriodPanel
-              title="Weekly Paper Trades"
-              rows={filterPaperTradesByPeriod(periodTradeRows, "week")}
-              emptyText="No paper trades found for this week."
+            <PaperPeriodTradesPanel
+              period="week"
+              rows={periodTradeRows}
               selected={selectedPosition}
               onSelect={setSelectedPosition}
             />
@@ -1473,10 +1473,9 @@ function Paper() {
         {
           label: "Monthly Trades",
           content: (
-            <PaperTradePeriodPanel
-              title="Monthly Paper Trades"
-              rows={filterPaperTradesByPeriod(periodTradeRows, "month")}
-              emptyText="No paper trades found for this month."
+            <PaperPeriodTradesPanel
+              period="month"
+              rows={periodTradeRows}
               selected={selectedPosition}
               onSelect={setSelectedPosition}
             />
@@ -1951,6 +1950,20 @@ function formatDayKey(value: string) {
   const [year, month, day] = value.split("-");
   if (!year || !month || !day) return value;
   return `${day}-${month}-${year}`;
+}
+
+function formatWeekKey(value: string) {
+  const start = new Date(normalizeUtcDateString(value));
+  if (Number.isNaN(start.getTime())) return value;
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return `${formatDayKey(localDateKey(start))} to ${formatDayKey(localDateKey(end))}`;
+}
+
+function formatMonthKey(value: string) {
+  const [year, month] = value.split("-");
+  if (!year || !month) return value;
+  return `${month}-${year}`;
 }
 
 function tradingQualityScore({
@@ -2902,32 +2915,35 @@ function PaperTradePeriodPanel({
   );
 }
 
-function PaperDailyTradesPanel({
+function PaperPeriodTradesPanel({
+  period,
   rows,
   selected,
   onSelect
 }: {
+  period: "day" | "week" | "month";
   rows: Row[];
   selected: Row | null;
   onSelect: (row: Row) => void;
 }) {
-  const [selectedDay, setSelectedDay] = React.useState("");
-  const dayRows = React.useMemo(() => buildDailyTradeSummaryRows(rows), [rows]);
+  const [selectedPeriod, setSelectedPeriod] = React.useState("");
+  const labels = paperTradePeriodLabels(period);
+  const periodRows = React.useMemo(() => buildTradePeriodSummaryRows(rows, period), [rows, period]);
   const selectedRows = React.useMemo(
-    () => rows.filter((row) => paperTradeDateKey(row) === selectedDay),
-    [rows, selectedDay]
+    () => rows.filter((row) => paperTradePeriodKey(row, period) === selectedPeriod),
+    [rows, period, selectedPeriod]
   );
-  const selectedDisplayDay = dayRows.find((row) => row.day_key === selectedDay)?.Day ?? selectedDay;
-  if (selectedDay) {
+  const selectedDisplay = periodRows.find((row) => row.period_key === selectedPeriod)?.[labels.column] ?? selectedPeriod;
+  if (selectedPeriod) {
     return (
       <div className="paper-period-trades-panel">
         <div>
-          <button className="pagination-button" type="button" onClick={() => setSelectedDay("")}>Back to Days</button>
+          <button className="pagination-button" type="button" onClick={() => setSelectedPeriod("")}>{`Back to ${labels.plural}`}</button>
         </div>
         <PaperTradePeriodPanel
-          title={`${selectedDisplayDay} Daily Paper Trades`}
+          title={`${selectedDisplay} ${labels.detailTitle}`}
           rows={selectedRows}
-          emptyText="No paper trades found for this day."
+          emptyText={`No paper trades found for this ${labels.emptyNoun}.`}
           selected={selected}
           onSelect={onSelect}
         />
@@ -2935,24 +2951,30 @@ function PaperDailyTradesPanel({
     );
   }
   return (
-    <PaperDailySummaryTable
-      title={`Daily Paper Trades (${dayRows.length})`}
-      rows={dayRows}
-      onSelectDay={setSelectedDay}
+    <PaperPeriodSummaryTable
+      title={`${labels.summaryTitle} (${periodRows.length})`}
+      rows={periodRows}
+      periodColumn={labels.column}
+      emptyText={`No paper trade ${labels.plural.toLowerCase()} found.`}
+      onSelectPeriod={setSelectedPeriod}
     />
   );
 }
 
-function PaperDailySummaryTable({
+function PaperPeriodSummaryTable({
   title,
   rows,
-  onSelectDay
+  periodColumn,
+  emptyText,
+  onSelectPeriod
 }: {
   title: string;
   rows: Row[];
-  onSelectDay: (day: string) => void;
+  periodColumn: string;
+  emptyText: string;
+  onSelectPeriod: (period: string) => void;
 }) {
-  const columns = ["Day", "Total Profit", "Trades", "Open Trades", "Closed Trades", "Winning Trades", "Losing Trades", "Win Rate", "Profit Factor", "Average P/L", "Best Trade", "Worst Trade"];
+  const columns = [periodColumn, "Total Profit", "Trades", "Open Trades", "Closed Trades", "Winning Trades", "Losing Trades", "Win Rate", "Profit Factor", "Average P/L", "Best Trade", "Worst Trade"];
   const [query, setQuery] = React.useState("");
   const [page, setPage] = React.useState(1);
   const pageSize = 30;
@@ -2977,7 +2999,7 @@ function PaperDailySummaryTable({
       <div className="pb-3">
         <input
           className="input"
-          placeholder="Filter by day, profit, trade count, win rate, or any visible field..."
+          placeholder={`Filter by ${periodColumn.toLowerCase()}, profit, trade count, win rate, or any visible field...`}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -2990,13 +3012,13 @@ function PaperDailySummaryTable({
           <tbody>
             {pageRows.map((row) => (
               <tr
-                key={String(row.day_key)}
+                key={String(row.period_key)}
                 className="cursor-pointer border-t border-slate-800"
                 role="button"
                 tabIndex={0}
-                title="Open day trades"
-                onClick={() => onSelectDay(String(row.day_key))}
-                onKeyDown={(event) => openPaperDailyRowFromKeyboard(event, String(row.day_key), onSelectDay)}
+                title={`Open ${periodColumn.toLowerCase()} trades`}
+                onClick={() => onSelectPeriod(String(row.period_key))}
+                onKeyDown={(event) => openPaperPeriodRowFromKeyboard(event, String(row.period_key), onSelectPeriod)}
               >
                 {columns.map((column) => (
                   <td key={column} className={`px-3 py-2 ${paperDailySummaryCellClass(column, row[column])}`}>{String(row[column])}</td>
@@ -3006,7 +3028,7 @@ function PaperDailySummaryTable({
           </tbody>
         </table>
       </div>
-      {filteredRows.length === 0 && <div className="pt-3 text-sm text-slate-400">{rows.length === 0 ? "No paper trade days found." : "No paper trade days match the current filter."}</div>}
+      {filteredRows.length === 0 && <div className="pt-3 text-sm text-slate-400">{rows.length === 0 ? emptyText : "No paper trade periods match the current filter."}</div>}
       <PaginationControls
         page={page}
         totalPages={totalPages}
@@ -3023,20 +3045,21 @@ function buildPaperTradePeriodRows(openRows: Row[], closedRows: Row[]) {
     .sort((left, right) => paperTradeTimeValue(right) - paperTradeTimeValue(left));
 }
 
-function buildDailyTradeSummaryRows(rows: Row[]) {
-  const byDay = new Map<string, Row[]>();
+function buildTradePeriodSummaryRows(rows: Row[], period: "day" | "week" | "month") {
+  const byPeriod = new Map<string, Row[]>();
+  const labels = paperTradePeriodLabels(period);
   for (const row of rows) {
-    const day = paperTradeDateKey(row);
-    if (!day) continue;
-    byDay.set(day, [...(byDay.get(day) ?? []), row]);
+    const periodKey = paperTradePeriodKey(row, period);
+    if (!periodKey) continue;
+    byPeriod.set(periodKey, [...(byPeriod.get(periodKey) ?? []), row]);
   }
-  return Array.from(byDay.entries())
+  return Array.from(byPeriod.entries())
     .sort(([left], [right]) => right.localeCompare(left))
-    .map(([day, dayTrades]) => {
-      const summary = summarizePaperTrades(dayTrades);
+    .map(([periodKey, periodTrades]) => {
+      const summary = summarizePaperTrades(periodTrades);
       return {
-        day_key: day,
-        Day: formatDayKey(day),
+        period_key: periodKey,
+        [labels.column]: formatPaperTradePeriodKey(periodKey, period),
         "Total Profit": summary.totalProfit,
         Trades: summary.trades,
         "Open Trades": summary.openTrades,
@@ -3050,6 +3073,48 @@ function buildDailyTradeSummaryRows(rows: Row[]) {
         "Worst Trade": summary.worstTrade,
       };
     });
+}
+
+function paperTradePeriodKey(row: Row, period: "day" | "week" | "month") {
+  const date = paperTradeDate(row);
+  if (!date) return "";
+  if (period === "day") return localDateKey(date);
+  if (period === "week") return weekKey(date);
+  return monthKey(date);
+}
+
+function formatPaperTradePeriodKey(value: string, period: "day" | "week" | "month") {
+  if (period === "day") return formatDayKey(value);
+  if (period === "week") return formatWeekKey(value);
+  return formatMonthKey(value);
+}
+
+function paperTradePeriodLabels(period: "day" | "week" | "month") {
+  if (period === "week") {
+    return {
+      column: "Week",
+      plural: "Weeks",
+      summaryTitle: "Weekly Paper Trades",
+      detailTitle: "Weekly Paper Trades",
+      emptyNoun: "week",
+    };
+  }
+  if (period === "month") {
+    return {
+      column: "Month",
+      plural: "Months",
+      summaryTitle: "Monthly Paper Trades",
+      detailTitle: "Monthly Paper Trades",
+      emptyNoun: "month",
+    };
+  }
+  return {
+    column: "Day",
+    plural: "Days",
+    summaryTitle: "Daily Paper Trades",
+    detailTitle: "Daily Paper Trades",
+    emptyNoun: "day",
+  };
 }
 
 function filterPaperTradesByPeriod(rows: Row[], period: "day" | "week" | "month") {
@@ -3100,10 +3165,10 @@ function openPaperPositionRowFromKeyboard(event: React.KeyboardEvent<HTMLTableRo
   onSelect(row);
 }
 
-function openPaperDailyRowFromKeyboard(event: React.KeyboardEvent<HTMLTableRowElement>, day: string, onSelectDay: (day: string) => void) {
+function openPaperPeriodRowFromKeyboard(event: React.KeyboardEvent<HTMLTableRowElement>, period: string, onSelectPeriod: (period: string) => void) {
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();
-  onSelectDay(day);
+  onSelectPeriod(period);
 }
 
 function paperDailySummaryCellClass(column: string, value: Row[string]) {

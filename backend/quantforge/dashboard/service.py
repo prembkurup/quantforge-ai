@@ -1259,6 +1259,7 @@ class DashboardService:
         snapshot = StrategyLifecycleEngine().analyze(self._strategy_lifecycle_inputs())
         return {
             **snapshot.to_payload(),
+            "runtime_status": _strategy_lifecycle_runtime_status(),
             "source": "StrategyLifecycleEngine",
             "demo_mode": self._demo_mode,
         }
@@ -1710,6 +1711,95 @@ class DashboardService:
             return self._strategy_asset_repository.get(strategy_id)
         except KeyError:
             return None
+
+
+def _strategy_lifecycle_runtime_status() -> dict[str, Any]:
+    repo = _repo_root()
+    supervisor_status = _read_json_file(repo / "var" / "quantforge_247_status.json")
+    snapshot = _read_json_file(repo / "var" / "strategy_lifecycle_snapshot.json")
+    improvements = _read_json_file(repo / "var" / "history_validation_improvements.json")
+    lifecycle_job = next(
+        (
+            job
+            for job in supervisor_status.get("recurring_jobs", [])
+            if str(job.get("name")) == "strategy-lifecycle"
+        ),
+        {},
+    )
+    lifecycle_requests = [
+        item
+        for item in improvements.get("improvements", [])
+        if str(item.get("source")) == "strategy_lifecycle"
+    ]
+    request_status_counts: dict[str, int] = {}
+    for item in lifecycle_requests:
+        status = str(item.get("status") or "UNKNOWN").upper()
+        request_status_counts[status] = request_status_counts.get(status, 0) + 1
+    recent_requests = sorted(
+        lifecycle_requests,
+        key=lambda item: str(item.get("updated_at") or item.get("research_updated_at") or item.get("created_at") or ""),
+        reverse=True,
+    )[:10]
+    return {
+        "supervisor_running": supervisor_status.get("status") == "RUNNING",
+        "supervisor_pid": supervisor_status.get("supervisor_pid"),
+        "supervisor_updated_at": supervisor_status.get("updated_at", ""),
+        "job_registered": bool(lifecycle_job),
+        "job_name": lifecycle_job.get("name", "strategy-lifecycle"),
+        "job_interval_seconds": lifecycle_job.get("interval_seconds"),
+        "job_next_run_at": lifecycle_job.get("next_run_at", ""),
+        "job_log_file": lifecycle_job.get("log_file", "var/log/strategy-lifecycle.log"),
+        "snapshot_available": bool(snapshot),
+        "snapshot_generated_at": snapshot.get("generated_at", ""),
+        "snapshot_strategy_count": snapshot.get("strategy_count", 0),
+        "snapshot_average_health": snapshot.get("average_health_score", 0),
+        "snapshot_acceptance_gaps": sum(
+            1 for value in snapshot.get("acceptance_criteria", {}).values() if not value
+        )
+        if snapshot
+        else 0,
+        "research_requests_total": len(lifecycle_requests),
+        "research_request_status_counts": request_status_counts,
+        "research_requests_requested": request_status_counts.get("REQUESTED", 0),
+        "research_requests_running": request_status_counts.get("RESEARCH_RUNNING", 0),
+        "research_requests_researched": request_status_counts.get("RESEARCHED", 0),
+        "recent_research_requests": [
+            {
+                "improvement_id": item.get("improvement_id", ""),
+                "strategy_asset_id": item.get("strategy_asset_id", ""),
+                "strategy_name": item.get("strategy_name", ""),
+                "pair": item.get("pair", ""),
+                "timeframe": item.get("timeframe", ""),
+                "reason_code": item.get("reason_code", ""),
+                "priority": item.get("priority", ""),
+                "status": item.get("status", ""),
+                "research_program_id": item.get("research_program_id", ""),
+                "research_run_id": item.get("research_run_id", ""),
+                "updated_at": item.get("updated_at") or item.get("research_updated_at") or item.get("created_at", ""),
+            }
+            for item in recent_requests
+        ],
+        "recent_log_lines": _tail_text_file(repo / "var" / "log" / "strategy-lifecycle.log", limit=12),
+    }
+
+
+def _read_json_file(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _tail_text_file(path: Path, *, limit: int) -> list[str]:
+    if not path.exists():
+        return []
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").splitlines()[-limit:]
+    except OSError:
+        return []
 
 
 def _full_history_state_file() -> Path:

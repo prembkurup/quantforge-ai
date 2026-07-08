@@ -156,6 +156,9 @@ def test_strategy_lifecycle_endpoint_exposes_milestone_28_payload() -> None:
     assert payload["reports"]["portfolio_impact"]["portfolio_impacts"]
     assert payload["acceptance_criteria"]["every_strategy_has_health_score"] is True
     assert payload["acceptance_criteria"]["degradations_have_root_cause"] is True
+    assert "runtime_status" in payload
+    assert "job_registered" in payload["runtime_status"]
+    assert "research_requests_total" in payload["runtime_status"]
 
 
 def test_pipeline_snapshot_combines_page_payload_for_fast_loading() -> None:

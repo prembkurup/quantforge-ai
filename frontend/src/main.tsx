@@ -920,6 +920,7 @@ function StrategyLifecycle() {
   const statusCounts = data.status_counts ?? {};
   const actionCounts = data.action_counts ?? {};
   const reports = data.reports ?? {};
+  const runtime = data.runtime_status ?? {};
   const lifecycleRows = strategies.map((item) => ({
     strategy_asset_id: item.strategy_asset_id,
     strategy_name: item.strategy_name,
@@ -1023,6 +1024,52 @@ function StrategyLifecycle() {
       evidence: (item.retirement_evidence ?? []).join("; ") || "Monitoring",
       replacement: item.replacement_candidate?.candidate_id ?? "None",
     }));
+  const runtimeRows = [
+    {
+      process: "Supervisor",
+      status: runtime.supervisor_running ? "RUNNING" : "UNKNOWN",
+      current: runtime.supervisor_updated_at ?? "",
+      next: runtime.job_next_run_at ?? "",
+      detail: `PID ${runtime.supervisor_pid ?? "unknown"}`,
+    },
+    {
+      process: "Strategy Lifecycle Job",
+      status: runtime.job_registered ? "REGISTERED" : "MISSING",
+      current: runtime.snapshot_generated_at ?? "",
+      next: runtime.job_next_run_at ?? "",
+      detail: `${runtime.job_interval_seconds ?? 0}s interval`,
+    },
+    {
+      process: "Lifecycle Snapshot",
+      status: runtime.snapshot_available ? "AVAILABLE" : "MISSING",
+      current: `${runtime.snapshot_strategy_count ?? 0} strategies`,
+      next: `${runtime.snapshot_acceptance_gaps ?? 0} acceptance gaps`,
+      detail: `Avg health ${runtime.snapshot_average_health ?? 0}`,
+    },
+    {
+      process: "Research Feedback Queue",
+      status: Number(runtime.research_requests_total ?? 0) > 0 ? "ACTIVE" : "EMPTY",
+      current: `${runtime.research_requests_requested ?? 0} requested`,
+      next: `${runtime.research_requests_running ?? 0} running`,
+      detail: `${runtime.research_requests_researched ?? 0} researched / ${runtime.research_requests_total ?? 0} total`,
+    },
+  ];
+  const runtimeRequestRows = (runtime.recent_research_requests ?? []).map((item: any) => ({
+    improvement_id: item.improvement_id,
+    strategy_name: item.strategy_name,
+    pair: item.pair,
+    timeframe: item.timeframe,
+    reason_code: item.reason_code,
+    priority: item.priority,
+    status: item.status,
+    research_program_id: item.research_program_id,
+    research_run_id: item.research_run_id,
+    updated_at: item.updated_at,
+  }));
+  const runtimeLogRows = (runtime.recent_log_lines ?? []).map((line: string, index: number) => ({
+    line: index + 1,
+    message: line,
+  }));
   const acceptance = data.acceptance_criteria ?? {};
   return (
     <Page title="Strategy Lifecycle">
@@ -1044,6 +1091,21 @@ function StrategyLifecycle() {
               <KpiCard title="Replacements" value={(data.replacement_candidates ?? []).length} />
               <KpiCard title="Reduce Allocation" value={actionCounts.REDUCE_ALLOCATION ?? 0} />
               <KpiCard title="Policy Coverage" value={Object.values(acceptance).every(Boolean) ? "PASS" : "CHECK"} tone={Object.values(acceptance).every(Boolean) ? "good" : "warn"} />
+              <KpiCard title="Supervisor" value={runtime.supervisor_running ? "RUNNING" : "UNKNOWN"} tone={runtime.supervisor_running ? "good" : "warn"} />
+              <KpiCard title="Lifecycle Job" value={runtime.job_registered ? "REGISTERED" : "MISSING"} tone={runtime.job_registered ? "good" : "warn"} />
+              <KpiCard title="Next Run" value={runtime.job_next_run_at ? String(runtime.job_next_run_at).slice(11, 19) : "UNKNOWN"} />
+              <KpiCard title="Queued Research" value={runtime.research_requests_requested ?? 0} tone={Number(runtime.research_requests_requested ?? 0) ? "warn" : "good"} />
+            </div>
+          ),
+        },
+        {
+          label: "Runtime",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <DataTable title="Autonomous Process Status" rows={runtimeRows as Row[]} />
+              <DataTable title="Lifecycle Research Queue" rows={runtimeRequestRows as Row[]} />
+              <DataTable title="Recent Lifecycle Log" rows={runtimeLogRows as Row[]} />
+              <JsonPanel title="Runtime Status Payload" data={runtime} />
             </div>
           ),
         },

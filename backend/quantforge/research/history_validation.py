@@ -171,17 +171,28 @@ class HistoricalValidationEngine:
         running = [item for item in queue if item["status"] in {"Loading Data", "Running", "Calculating Metrics"}]
         queued = [item for item in queue if item["status"] in {"Queued", "Waiting"}]
         needs_research = [item for item in queue if item["status"] == HistoricalValidationStatus.NEEDS_RESEARCH.value]
+        completed_queue = [item for item in queue if item["status"] == HistoricalValidationStatus.COMPLETED.value]
+        failed_queue = [item for item in queue if item["status"] in {HistoricalValidationStatus.NEEDS_RESEARCH.value, HistoricalValidationStatus.FAILED.value}]
+        terminal_queue = [
+            item
+            for item in queue
+            if item["status"]
+            in {
+                HistoricalValidationStatus.COMPLETED.value,
+                HistoricalValidationStatus.NEEDS_RESEARCH.value,
+                HistoricalValidationStatus.FAILED.value,
+                HistoricalValidationStatus.CANCELLED.value,
+            }
+        ]
         researched_improvements = [
             item
             for item in self.improvements()
             if str(item.get("status", "")).upper() in {"RESEARCHED", "VALIDATION_QUEUED"}
         ]
-        failed = [item for item in results if item["result"] == "FAIL"]
-        passed = [item for item in results if item["result"] == "PASS"]
         current = running[0] if running else queued[0] if queued else None
         next_item = queued[1] if len(queued) > 1 else None
         total = len(queue)
-        completed = len(results)
+        completed = len(terminal_queue)
         status = {
             "enabled": self.config.enabled,
             "state": self._state(queue, running),
@@ -198,9 +209,10 @@ class HistoricalValidationEngine:
             "needs_research_validations": len(needs_research),
             "researched_improvements_waiting_validation": len(researched_improvements),
             "completed_validations": completed,
-            "passed_validations": len(passed),
-            "failed_validations": len(failed),
+            "passed_validations": len(completed_queue),
+            "failed_validations": len(failed_queue),
             "improvement_requests": len(self.improvements()),
+            "result_records_available": len(results),
             "average_validation_duration_seconds": self._average_duration_seconds(queue),
             "queue_length": len(queued),
             "recent_results": results[-10:][::-1],
@@ -258,6 +270,7 @@ class HistoricalValidationEngine:
             "execution_cost_per_trade": round(((weighted_spread + self.config.slippage_pips) * self.config.pip_value), 2),
             "promotion_readiness": promotion_readiness,
             "expected_vs_actual_deviation": round(abs(100.0 - pass_rate) / 100.0, 4) if completed else 0.0,
+            "result_records_available": completed,
         }
 
     def queue(self) -> list[dict[str, Any]]:
@@ -373,10 +386,10 @@ class HistoricalValidationEngine:
                 improvements.append(_payload(self._improvement_for(result)))
 
         self._write_json(self.paths.queue_file, {"version": 1, "queue": updated})
-        self._write_json(self.paths.results_file, {"version": 1, "results": _dedupe(results, "validation_id")[-1000:]})
+        self._write_json(self.paths.results_file, {"version": 1, "results": _dedupe(results, "validation_id")})
         self._write_json(
             self.paths.improvements_file,
-            {"version": 1, "improvements": _dedupe(improvements, "improvement_id")[-1000:]},
+            {"version": 1, "improvements": _dedupe(improvements, "improvement_id")},
         )
         return self.status()
 

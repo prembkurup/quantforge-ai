@@ -100,6 +100,8 @@ def test_history_validation_status_reports_dashboard_summary(tmp_path) -> None:
 
     assert status["progress"]["total"] == 3
     assert status["completed_validations"] == 1
+    assert status["passed_validations"] + status["failed_validations"] == 1
+    assert status["result_records_available"] == 1
     assert "estimated_remaining_minutes" in status
     assert "recent_results" in status
     assert status["balance_sheet"]["paper_balance"] == 100_000.0
@@ -121,6 +123,7 @@ def test_history_validation_balance_sheet_matches_paper_summary_shape(tmp_path) 
     assert sheet["promotion_readiness"] in {"PROMOTE", "HOLD", "NEEDS_RESEARCH"}
     assert "drawdown" in sheet
     assert "expected_vs_actual_deviation" in sheet
+    assert sheet["result_records_available"] == 1
 
 
 def test_history_validation_uses_pair_specific_spread(tmp_path) -> None:

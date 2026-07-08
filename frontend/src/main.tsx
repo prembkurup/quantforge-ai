@@ -1423,7 +1423,7 @@ function Paper() {
           label: "Trades",
           content: (
             <>
-      <DashboardTabs tabs={[
+      <DashboardTabs className="paper-trades-tabs" tabs={[
         {
           label: "Open Positions",
           content: (
@@ -2641,7 +2641,7 @@ function PaginationControls({
   );
 }
 
-function DashboardTabs({ tabs }: { tabs: DashboardTab[] }) {
+function DashboardTabs({ tabs, className = "" }: { tabs: DashboardTab[]; className?: string }) {
   const availableTabs = tabs.filter((tab) => tab.content !== null && tab.content !== undefined);
   const [active, setActive] = React.useState(availableTabs[0]?.label ?? "");
   React.useEffect(() => {
@@ -2652,7 +2652,7 @@ function DashboardTabs({ tabs }: { tabs: DashboardTab[] }) {
   const selected = availableTabs.find((tab) => tab.label === active) ?? availableTabs[0];
   if (!selected) return null;
   return (
-    <section className="dashboard-tabs-shell">
+    <section className={`dashboard-tabs-shell ${className}`.trim()}>
       <div className="dashboard-tabs" role="tablist">
         {availableTabs.map((tab) => (
           <button
@@ -2870,8 +2870,8 @@ function PaperTradePeriodPanel({
 }) {
   const summary = summarizePaperTrades(rows);
   return (
-    <div className="space-y-4">
-      <section className="card panel dashboard-card">
+    <div className="paper-period-trades-panel">
+      <section className="card panel dashboard-card paper-period-summary">
         <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{title} Summary</div>
         <div className="pipeline-detail-grid">
           <MiniFact label="Total Profit" value={summary.totalProfit} />

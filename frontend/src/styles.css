@@ -234,6 +234,34 @@ body.modal-open {
   min-width: 0;
 }
 
+.paper-trades-tabs > .dashboard-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-items: stretch;
+}
+
+.paper-trades-tabs > .dashboard-tabs .dashboard-tab {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+
+.paper-period-trades-panel {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 16px;
+}
+
+.paper-period-summary {
+  width: 100%;
+  min-height: auto;
+}
+
+.paper-period-summary .pipeline-detail-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
 .callout {
   border-left-width: 4px;
 }

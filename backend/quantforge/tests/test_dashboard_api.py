@@ -403,6 +403,13 @@ def test_paper_replay_campaign_discovers_pair_timeframe_strategy_candidates() ->
     }
     assert 0 <= first_job["comfort_score"] <= 100
     assert first_job["failure_reason"] in {"", *payload["failure_reasons"], "LOW_COMFORT_SCORE"}
+    assert first_job["daily_results"]
+    assert first_job["trade_results"]
+    first_trade = first_job["trade_results"][0]
+    assert first_trade["pair"] == first_job["pair"]
+    assert first_trade["timeframe"] == first_job["timeframe"]
+    assert first_trade["job_id"] == first_job["job_id"]
+    assert first_trade["trade_id"].startswith(first_job["job_id"])
 
 
 def test_paper_replay_control_endpoints_update_progress_store(monkeypatch, tmp_path: Path) -> None:

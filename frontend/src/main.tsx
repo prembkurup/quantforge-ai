@@ -1842,6 +1842,7 @@ function PaperReplayControlPanel({ campaign, replay }: { campaign: any; replay: 
     campaign,
     replay,
     selectedGroup,
+    selectedGroupJobs,
     groupQueueRows,
     jobRows,
     rejectedRows,
@@ -2106,6 +2107,7 @@ function buildReplayCampaignTabs({
   campaign,
   replay,
   selectedGroup,
+  selectedGroupJobs,
   groupQueueRows,
   jobRows,
   rejectedRows,
@@ -2117,6 +2119,7 @@ function buildReplayCampaignTabs({
   campaign: any;
   replay: any;
   selectedGroup: any;
+  selectedGroupJobs: any[];
   groupQueueRows: Row[];
   jobRows: Row[];
   rejectedRows: Row[];
@@ -2129,29 +2132,7 @@ function buildReplayCampaignTabs({
   const selectedTimeframe = String(selectedGroup.timeframe ?? "n/a");
   const openRows = jobRows.filter((row) => String(row.status) === "RUNNING");
   const closedRows = jobRows.filter((row) => String(row.status) !== "RUNNING");
-  const dailyRows = jobRows.map((row, index) => ({
-    day: `D${index + 1}`,
-    pair: selectedPair,
-    timeframe: selectedTimeframe,
-    strategy: row.strategy_asset_id,
-    trades: row.trades,
-    pf: row.profit_factor,
-    comfort: row.comfort_score,
-  }));
-  const weeklyRows = jobRows.map((row, index) => ({
-    week: `W${index + 1}`,
-    strategy: row.strategy_asset_id,
-    drawdown: row.drawdown,
-    expectancy: row.expectancy,
-    decision: row.decision,
-  }));
-  const monthlyRows = jobRows.map((row, index) => ({
-    month: `M${index + 1}`,
-    strategy: row.strategy_asset_id,
-    comfort: row.comfort_score,
-    failure_reason: row.failure_reason,
-    next_action: row.next_action,
-  }));
+  const replayTradeRows = buildReplayTradeRows(selectedGroupJobs);
   return [
     {
       label: "Summary",
@@ -2194,9 +2175,9 @@ function buildReplayCampaignTabs({
     },
     { label: "Open Positions", content: <DataTable title="Open Replay Positions" rows={openRows.length ? openRows : [{ status: "No open replay positions", pair: selectedPair, timeframe: selectedTimeframe }]} /> },
     { label: "Closed Positions", content: <DataTable title="Closed Replay Positions" rows={closedRows} /> },
-    { label: "Daily", content: <DataTable title="Daily Replay Results" rows={dailyRows} /> },
-    { label: "Weekly", content: <DataTable title="Weekly Replay Results" rows={weeklyRows} /> },
-    { label: "Monthly", content: <DataTable title="Monthly Replay Results" rows={monthlyRows} /> },
+    { label: "Daily", content: <ReplayPeriodTradesPanel period="day" rows={replayTradeRows} /> },
+    { label: "Weekly", content: <ReplayPeriodTradesPanel period="week" rows={replayTradeRows} /> },
+    { label: "Monthly", content: <ReplayPeriodTradesPanel period="month" rows={replayTradeRows} /> },
     {
       label: "Trade Details",
       content: (
@@ -2218,6 +2199,304 @@ function buildReplayCampaignTabs({
       ),
     },
   ];
+}
+
+function buildReplayTradeRows(jobs: any[]): Row[] {
+  return jobs.flatMap((job) => {
+    const trades = Array.isArray(job.trade_results) ? job.trade_results : [];
+    return trades.map((trade: Record<string, unknown>) => ({
+      trade_id: String(trade.trade_id ?? ""),
+      day: formatDayKey(String(trade.closed_at ?? trade.opened_at ?? "").slice(0, 10)),
+      pair: String(trade.pair ?? job.pair ?? ""),
+      timeframe: String(trade.timeframe ?? job.timeframe ?? ""),
+      strategy_asset_id: String(trade.strategy_asset_id ?? job.strategy_asset_id ?? ""),
+      strategy: String(trade.strategy ?? job.strategy ?? ""),
+      trade_status: String(trade.trade_status ?? "CLOSED"),
+      direction: String(trade.direction ?? ""),
+      opened_at: String(trade.opened_at ?? ""),
+      closed_at: String(trade.closed_at ?? ""),
+      source_candle_time: String(trade.source_candle_time ?? trade.opened_at ?? ""),
+      open_price: String(trade.open_price ?? ""),
+      close_price: String(trade.close_price ?? ""),
+      stop_loss: String(trade.stop_loss ?? ""),
+      take_profit: String(trade.take_profit ?? ""),
+      p_l: formatUsd(Number(trade.p_l ?? 0)),
+      result: String(trade.result ?? ""),
+      profit_factor: String(trade.profit_factor ?? job.profit_factor ?? ""),
+      expectancy: String(trade.expectancy ?? job.expectancy ?? ""),
+      comfort_score: String(trade.comfort_score ?? job.comfort_score ?? ""),
+      decision: String(trade.decision ?? job.decision ?? ""),
+      close_reason: String(trade.close_reason ?? job.failure_reason ?? ""),
+      replay_result: String(trade.replay_result ?? "Replay Paper Result"),
+      job_id: String(trade.job_id ?? job.job_id ?? ""),
+      group_id: String(trade.group_id ?? job.group_id ?? ""),
+    }));
+  }).sort((left, right) => paperTradeTimeValue(right) - paperTradeTimeValue(left));
+}
+
+function ReplayPeriodTradesPanel({ period, rows }: { period: "day" | "week" | "month"; rows: Row[] }) {
+  const [selectedBucket, setSelectedBucket] = React.useState("");
+  const [selectedTrade, setSelectedTrade] = React.useState<Row | null>(null);
+  const labels = replayTradePeriodLabels(period);
+  const periodRows = React.useMemo(() => buildReplayTradePeriodSummaryRows(rows, period), [rows, period]);
+  const selectedRows = React.useMemo(
+    () => rows.filter((row) => replayTradeBucketKey(row, period) === selectedBucket),
+    [rows, period, selectedBucket]
+  );
+  React.useEffect(() => {
+    setSelectedTrade(null);
+  }, [selectedBucket]);
+  React.useEffect(() => {
+    if (selectedBucket && !periodRows.some((row) => row.period_key === selectedBucket)) {
+      setSelectedBucket("");
+    }
+  }, [periodRows, selectedBucket]);
+  const selectedDisplay = periodRows.find((row) => row.period_key === selectedBucket)?.[labels.column] ?? selectedBucket;
+  if (selectedBucket) {
+    return (
+      <div className="paper-period-trades-panel">
+        <div>
+          <button className="pagination-button" type="button" onClick={() => setSelectedBucket("")}>{`Back to Replay ${labels.plural}`}</button>
+        </div>
+        <ReplayTradeListPanel
+          title={`${selectedDisplay} Replay Trades`}
+          rows={selectedRows}
+          selectedTrade={selectedTrade}
+          onSelectTrade={setSelectedTrade}
+        />
+        {selectedTrade && <ReplayTradeDetailsPanel trade={selectedTrade} />}
+      </div>
+    );
+  }
+  return (
+    <ReplayPeriodSummaryTable
+      title={`${labels.summaryTitle} (${periodRows.length})`}
+      rows={periodRows}
+      periodColumn={labels.column}
+      emptyText={`No replay ${labels.plural.toLowerCase()} found.`}
+      onSelectPeriod={setSelectedBucket}
+    />
+  );
+}
+
+function ReplayPeriodSummaryTable({
+  title,
+  rows,
+  periodColumn,
+  emptyText,
+  onSelectPeriod
+}: {
+  title: string;
+  rows: Row[];
+  periodColumn: string;
+  emptyText: string;
+  onSelectPeriod: (period: string) => void;
+}) {
+  const columns = [periodColumn, "Pair", "Timeframe", "Total Profit", "Trades", "Open Trades", "Closed Trades", "Winning Trades", "Losing Trades", "Win Rate", "Profit Factor", "Average P/L", "Best Trade", "Worst Trade"];
+  const [query, setQuery] = React.useState("");
+  const [page, setPage] = React.useState(1);
+  const pageSize = 30;
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredRows = normalizedQuery
+    ? rows.filter((row) => JSON.stringify(row).toLowerCase().includes(normalizedQuery))
+    : rows;
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  React.useEffect(() => {
+    setPage(1);
+  }, [query, rows]);
+  React.useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+  const pageRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
+  return (
+    <div className="card panel dashboard-card overflow-hidden">
+      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">
+        {title}
+        {filteredRows.length !== rows.length ? ` - ${filteredRows.length} matched` : ""}
+      </div>
+      <div className="pb-3">
+        <input
+          className="input"
+          placeholder={`Filter by ${periodColumn.toLowerCase()}, pair, profit, trade count, win rate, or any visible field...`}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </div>
+      <div className="overflow-auto">
+        <table className="table table-dark table-hover dashboard-table w-full min-w-[1260px] text-left text-sm">
+          <thead className="bg-slate-900 text-xs uppercase text-slate-400">
+            <tr>{columns.map((column) => <th key={column} className="px-3 py-2">{column}</th>)}</tr>
+          </thead>
+          <tbody>
+            {pageRows.map((row) => (
+              <tr
+                key={String(row.period_key)}
+                className="cursor-pointer border-t border-slate-800"
+                role="button"
+                tabIndex={0}
+                title={`Open ${periodColumn.toLowerCase()} replay trades`}
+                onClick={() => onSelectPeriod(String(row.period_key))}
+                onKeyDown={(event) => openPaperPeriodRowFromKeyboard(event, String(row.period_key), onSelectPeriod)}
+              >
+                {columns.map((column) => (
+                  <td key={column} className={`px-3 py-2 ${paperDailySummaryCellClass(column, row[column])}`}>{String(row[column])}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {filteredRows.length === 0 && <div className="pt-3 text-sm text-slate-400">{rows.length === 0 ? emptyText : "No replay trade periods match the current filter."}</div>}
+      <PaginationControls page={page} totalPages={totalPages} pageSize={pageSize} totalRows={filteredRows.length} onPageChange={setPage} />
+    </div>
+  );
+}
+
+function ReplayTradeListPanel({
+  title,
+  rows,
+  selectedTrade,
+  onSelectTrade
+}: {
+  title: string;
+  rows: Row[];
+  selectedTrade: Row | null;
+  onSelectTrade: (row: Row) => void;
+}) {
+  const columns = ["trade_id", "pair", "timeframe", "strategy", "direction", "opened_at", "closed_at", "p_l", "result", "comfort_score", "decision", "close_reason"];
+  const summary = summarizePaperTrades(rows);
+  return (
+    <div className="paper-period-trades-panel">
+      <section className="card panel dashboard-card paper-period-summary">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{title} Summary</div>
+        <div className="pipeline-detail-grid">
+          <MiniFact label="Total Profit" value={summary.totalProfit} />
+          <MiniFact label="Trades" value={summary.trades} />
+          <MiniFact label="Winning Trades" value={summary.winningTrades} />
+          <MiniFact label="Losing Trades" value={summary.losingTrades} />
+          <MiniFact label="Win Rate" value={summary.winRate} />
+          <MiniFact label="Profit Factor" value={summary.profitFactor} />
+          <MiniFact label="Average P/L" value={summary.averageProfit} />
+          <MiniFact label="Best Trade" value={summary.bestTrade} />
+          <MiniFact label="Worst Trade" value={summary.worstTrade} />
+        </div>
+      </section>
+      <div className="card panel dashboard-card overflow-hidden">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{`${title} (${rows.length})`}</div>
+        <div className="overflow-auto">
+          <table className="table table-dark table-hover dashboard-table w-full min-w-[1180px] text-left text-sm">
+            <thead className="bg-slate-900 text-xs uppercase text-slate-400">
+              <tr>{columns.map((column) => <th key={column} className="px-3 py-2">{column.replace(/_/g, " ")}</th>)}</tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={String(row.trade_id)}
+                  className={`cursor-pointer border-t border-slate-800 ${selectedTrade?.trade_id === row.trade_id ? "selected-table-row" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  title="Open replay trade details"
+                  onClick={() => onSelectTrade(row)}
+                  onKeyDown={(event) => openPaperPositionRowFromKeyboard(event, row, onSelectTrade)}
+                >
+                  {columns.map((column) => (
+                    <td key={column} className={`px-3 py-2 ${paperPositionCellClass(column, row[column])}`}>{String(row[column])}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {rows.length === 0 && <div className="pt-3 text-sm text-slate-400">No replay trades found for this selection.</div>}
+      </div>
+    </div>
+  );
+}
+
+function ReplayTradeDetailsPanel({ trade }: { trade: Row }) {
+  const detailRows = [
+    { field: "Trade ID", value: trade.trade_id },
+    { field: "Replay Result", value: trade.replay_result },
+    { field: "Group / Job", value: `${trade.group_id} / ${trade.job_id}` },
+    { field: "Pair / Timeframe", value: `${trade.pair} ${trade.timeframe}` },
+    { field: "Strategy", value: `${trade.strategy} (${trade.strategy_asset_id})` },
+    { field: "Direction", value: trade.direction },
+    { field: "Opened", value: formatDate(trade.opened_at) },
+    { field: "Closed", value: formatDate(trade.closed_at) },
+    { field: "Source Candle", value: formatDate(trade.source_candle_time) },
+    { field: "Open Price", value: trade.open_price },
+    { field: "Close Price", value: trade.close_price },
+    { field: "Stop Loss", value: trade.stop_loss },
+    { field: "Take Profit", value: trade.take_profit },
+    { field: "Profit / Loss", value: trade.p_l },
+    { field: "Result", value: trade.result },
+    { field: "Profit Factor", value: trade.profit_factor },
+    { field: "Expectancy", value: trade.expectancy },
+    { field: "Comfort Score", value: trade.comfort_score },
+    { field: "Decision", value: trade.decision },
+    { field: "Close Reason", value: trade.close_reason },
+  ] as Row[];
+  return (
+    <section className="card panel dashboard-card replay-trade-detail">
+      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Single Replay Trade Full Details</div>
+      <div className="replay-trade-detail-grid">
+        {detailRows.map((row) => (
+          <div className="replay-trade-detail-item" key={String(row.field)}>
+            <div className="replay-trade-detail-label">{String(row.field)}</div>
+            <div className={`replay-trade-detail-value ${paperPositionCellClass(String(row.field), row.value)}`}>{String(row.value)}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function buildReplayTradePeriodSummaryRows(rows: Row[], period: "day" | "week" | "month") {
+  const byPeriod = new Map<string, Row[]>();
+  const labels = replayTradePeriodLabels(period);
+  for (const row of rows) {
+    const periodKey = replayTradeBucketKey(row, period);
+    if (!periodKey) continue;
+    byPeriod.set(periodKey, [...(byPeriod.get(periodKey) ?? []), row]);
+  }
+  return Array.from(byPeriod.entries())
+    .sort(([left], [right]) => right.localeCompare(left))
+    .map(([periodKey, periodTrades]) => {
+      const summary = summarizePaperTrades(periodTrades);
+      const first = periodTrades[0] ?? {};
+      return {
+        period_key: periodKey,
+        [labels.column]: formatPaperTradePeriodKey(String(periodKey).split("|")[0], period),
+        Pair: first.pair ?? "n/a",
+        Timeframe: first.timeframe ?? "n/a",
+        "Total Profit": summary.totalProfit,
+        Trades: summary.trades,
+        "Open Trades": summary.openTrades,
+        "Closed Trades": summary.closedTrades,
+        "Winning Trades": summary.winningTrades,
+        "Losing Trades": summary.losingTrades,
+        "Win Rate": summary.winRate,
+        "Profit Factor": summary.profitFactor,
+        "Average P/L": summary.averageProfit,
+        "Best Trade": summary.bestTrade,
+        "Worst Trade": summary.worstTrade,
+      };
+    });
+}
+
+function replayTradeBucketKey(row: Row, period: "day" | "week" | "month") {
+  const periodKey = paperTradePeriodKey(row, period);
+  if (!periodKey) return "";
+  return `${periodKey}|${row.pair ?? "n/a"}|${row.timeframe ?? "n/a"}`;
+}
+
+function replayTradePeriodLabels(period: "day" | "week" | "month") {
+  const labels = paperTradePeriodLabels(period);
+  return {
+    ...labels,
+    summaryTitle: labels.summaryTitle.replace("Paper", "Replay"),
+    detailTitle: labels.detailTitle.replace("Paper", "Replay"),
+  };
 }
 
 function Operations() {

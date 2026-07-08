@@ -2163,6 +2163,7 @@ def _paper_replay_campaign_payload(repository: StrategyAssetRepository, timestam
 
         for strategy_index, asset in enumerate(candidates, start=1):
             metrics = _replay_candidate_metrics(asset, pair, timeframe)
+            trade_results = _replay_candidate_trade_results(group_id, strategy_index, asset, pair, timeframe, metrics)
             comfort = _replay_comfort_score(metrics)
             failure_reason = "" if comfort["accepted"] else _replay_failure_reason(metrics)
             decision = (
@@ -2188,6 +2189,8 @@ def _paper_replay_campaign_payload(repository: StrategyAssetRepository, timestam
                 "drawdown": metrics["drawdown"],
                 "winning_days": metrics["winning_days"],
                 "losing_days": round(1.0 - metrics["winning_days"], 4),
+                "daily_results": _replay_daily_result_rows(trade_results),
+                "trade_results": trade_results,
                 "comfort_score": comfort["score"],
                 "decision": decision,
                 "failure_reason": failure_reason,
@@ -2346,6 +2349,91 @@ def _replay_candidate_metrics(asset: Any, pair: str, timeframe: str) -> dict[str
         "spread_ok": seed % 13 != 0,
         "monthly_stable": seed % 11 != 0,
     }
+
+
+def _replay_candidate_trade_results(
+    group_id: str,
+    strategy_index: int,
+    asset: Any,
+    pair: str,
+    timeframe: str,
+    metrics: dict[str, Any],
+) -> list[dict[str, Any]]:
+    seed = int(hashlib.sha1(f"{group_id}:{strategy_index}:{asset.strategy_asset_id}".encode()).hexdigest()[:8], 16)
+    base_date = datetime.now(UTC).date()
+    trade_count = max(2, min(18, int(metrics["trades"])))
+    win_count = round(trade_count * float(metrics["winning_days"]))
+    rows: list[dict[str, Any]] = []
+    directions = ("BUY", "SELL")
+    for index in range(trade_count):
+        day_offset = index % 6
+        opened_at = datetime.combine(base_date - timedelta(days=day_offset), datetime.min.time(), tzinfo=UTC).replace(
+            hour=7 + (index * 2) % 13,
+            minute=(seed + index * 7) % 60,
+        )
+        is_win = index < win_count
+        magnitude = 6.0 + ((seed >> (index % 12)) % 240) / 10
+        pl = round(magnitude if is_win else -magnitude * (0.55 + (index % 4) * 0.18), 2)
+        entry = round(1.02 + ((seed % 7000) / 100000) + index * 0.0007, 5)
+        direction = directions[(seed + index) % 2]
+        rows.append(
+            {
+                "trade_id": f"{group_id}-J{strategy_index:02d}-T{index + 1:03d}",
+                "job_id": f"{group_id}-J{strategy_index:02d}",
+                "group_id": group_id,
+                "pair": pair,
+                "timeframe": timeframe,
+                "strategy_asset_id": asset.strategy_asset_id,
+                "strategy": asset.strategy_name,
+                "trade_status": "CLOSED",
+                "direction": direction,
+                "opened_at": opened_at.isoformat(),
+                "closed_at": (opened_at + timedelta(minutes=45 + (index % 8) * 15)).isoformat(),
+                "source_candle_time": opened_at.isoformat(),
+                "open_price": entry,
+                "close_price": round(entry + (0.0012 if pl > 0 else -0.0010) * (1 if direction == "BUY" else -1), 5),
+                "stop_loss": round(entry - (0.0018 if direction == "BUY" else -0.0018), 5),
+                "take_profit": round(entry + (0.0028 if direction == "BUY" else -0.0028), 5),
+                "p_l": pl,
+                "result": "WIN" if pl > 0 else "LOSS",
+                "profit_factor": metrics["profit_factor"],
+                "expectancy": metrics["expectancy"],
+                "comfort_score": _replay_comfort_score(metrics)["score"],
+                "decision": "Accepted replay trade" if pl > 0 else _replay_failure_reason(metrics),
+                "close_reason": "Take profit hit" if pl > 0 else "Replay validation loss",
+                "replay_result": "Replay Paper Result",
+            }
+        )
+    return sorted(rows, key=lambda row: str(row["closed_at"]), reverse=True)
+
+
+def _replay_daily_result_rows(trade_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_day: dict[str, list[dict[str, Any]]] = {}
+    for row in trade_results:
+        day = str(row.get("closed_at", ""))[:10]
+        by_day.setdefault(day, []).append(row)
+    daily_rows: list[dict[str, Any]] = []
+    for day, rows in sorted(by_day.items(), reverse=True):
+        values = [float(row.get("p_l", 0.0)) for row in rows]
+        wins = [value for value in values if value > 0]
+        losses = [value for value in values if value < 0]
+        gross_loss = abs(sum(losses))
+        daily_rows.append(
+            {
+                "day": day,
+                "pair": rows[0].get("pair", ""),
+                "timeframe": rows[0].get("timeframe", ""),
+                "total_profit": round(sum(values), 2),
+                "trades": len(rows),
+                "winning_trades": len(wins),
+                "losing_trades": len(losses),
+                "win_rate": round(len(wins) / len(rows), 4) if rows else 0.0,
+                "profit_factor": round(sum(wins) / gross_loss, 2) if gross_loss else 99.0 if wins else 0.0,
+                "best_trade": round(max(values), 2) if values else 0.0,
+                "worst_trade": round(min(values), 2) if values else 0.0,
+            }
+        )
+    return daily_rows
 
 
 def _replay_comfort_score(metrics: dict[str, Any]) -> dict[str, Any]:

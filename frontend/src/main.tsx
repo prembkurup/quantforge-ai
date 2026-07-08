@@ -115,6 +115,7 @@ function App() {
               <Route path="/intraday" element={<IntradayDaily />} />
               <Route path="/decision-intelligence" element={<DecisionIntelligence />} />
               <Route path="/paper" element={<Paper />} />
+              <Route path="/replay-paper-trading" element={<ReplayPaperTrading />} />
               <Route path="/history-validation" element={<HistoryValidation />} />
               <Route path="/operations" element={<Operations />} />
               <Route path="/logs" element={<Logs />} />
@@ -146,6 +147,7 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     ["/intraday", "Intraday", Activity],
     ["/decision-intelligence", "Decision Intel", Brain],
     ["/paper", "Paper", CandlestickChart],
+    ["/replay-paper-trading", "Replay Paper", CandlestickChart],
     ["/history-validation", "History Validation", Database],
     ["/operations", "Operations", HeartPulse],
     ["/logs", "Logs", ScrollText],
@@ -1513,12 +1515,9 @@ function Paper() {
   const summary = useApi<Row>("/api/paper/summary");
   const trades = useApi<Row[]>("/api/paper/trades/open");
   const drift = useApi<any>("/api/paper/drift");
-  const replay = useApi<any>("/api/paper/replay");
   const practice = useApi<any>("/api/paper/practice/latest");
   const practiceHistory = useApi<Row[]>("/api/paper/practice/history", []);
-  const [replayOverride, setReplayOverride] = React.useState<any | null>(null);
-  if (!summary || !trades || !drift || !replay || !practice || !practiceHistory) return <Loading />;
-  const replayData = replayOverride ?? replay;
+  if (!summary || !trades || !drift || !practice || !practiceHistory) return <Loading />;
   const openPositions = practice.open_paper_positions ?? [];
   const closedPositions = practice.closed_paper_positions ?? [];
   const periodTradeRows = buildPaperTradePeriodRows(openPositions, closedPositions);
@@ -1526,7 +1525,6 @@ function Paper() {
   const dashboard = buildPaperDashboardV2(practice, summary, openPositions, closedPositions, paperMetrics);
   return (
     <Page title="Paper Trading Dashboard v2.0">
-      <PaperReplayControlPanel replay={replayData} onReplayUpdated={setReplayOverride} />
       <DashboardTabs tabs={[
         {
           label: "Summary",
@@ -1666,13 +1664,8 @@ function Paper() {
           <MiniFact label="Candles" value={practice.candles_checked ?? practice.candles_loaded ?? 0} />
           <MiniFact label="Execution Path" value={practice.execution_path ?? "UNKNOWN"} />
           <MiniFact label="24/7 Ready" value={practice.run_24_7_ready ? "YES" : "NO"} />
-          <MiniFact label="Replay Status" value={replayData.status} />
-          <MiniFact label="Replay Events" value={number(replayData.processed_events)} />
-          <MiniFact label="Replay Signals" value={number(replayData.generated_signals)} />
-          <MiniFact label="Replay Orders" value={number(replayData.paper_orders)} />
         </div>
       </section>
-      <JsonPanel title="Real Candle Replay Cursor" data={replayData} />
       <PaginatedDataTable title={`Recent 24/7 Paper-Practice Runs (${practiceHistory.length})`} rows={practiceHistory} pageSize={30} />
       <PaginatedDataTable title={`Legacy Open Paper Trades (${trades.length})`} rows={trades} pageSize={30} />
       <JsonPanel title="Drift" data={drift} />
@@ -1747,6 +1740,18 @@ function Paper() {
           ),
         },
       ]} />
+    </Page>
+  );
+}
+
+function ReplayPaperTrading() {
+  const replay = useApi<any>("/api/paper/replay");
+  const [replayOverride, setReplayOverride] = React.useState<any | null>(null);
+  if (!replay) return <Loading />;
+  const replayData = replayOverride ?? replay;
+  return (
+    <Page title="Replay Paper Trading">
+      <PaperReplayControlPanel replay={replayData} onReplayUpdated={setReplayOverride} />
     </Page>
   );
 }

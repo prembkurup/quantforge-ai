@@ -1262,6 +1262,7 @@ function Paper() {
   if (!summary || !trades || !drift || !replay || !practice || !practiceHistory) return <Loading />;
   const openPositions = practice.open_paper_positions ?? [];
   const closedPositions = practice.closed_paper_positions ?? [];
+  const periodTradeRows = buildPaperTradePeriodRows(openPositions, closedPositions);
   const paperMetrics = calculatePaperMetrics(closedPositions, summary);
   const dashboard = buildPaperDashboardV2(practice, summary, openPositions, closedPositions, paperMetrics);
   return (
@@ -1442,6 +1443,42 @@ function Paper() {
               title={`Closed Paper Positions (${closedPositions.length})`}
               rows={closedPositions}
               emptyText="No closed paper positions."
+              selected={selectedPosition}
+              onSelect={setSelectedPosition}
+            />
+          ),
+        },
+        {
+          label: "Daily Trades",
+          content: (
+            <PaperTradePeriodPanel
+              title="Daily Paper Trades"
+              rows={filterPaperTradesByPeriod(periodTradeRows, "day")}
+              emptyText="No paper trades found for today."
+              selected={selectedPosition}
+              onSelect={setSelectedPosition}
+            />
+          ),
+        },
+        {
+          label: "Weekly Trades",
+          content: (
+            <PaperTradePeriodPanel
+              title="Weekly Paper Trades"
+              rows={filterPaperTradesByPeriod(periodTradeRows, "week")}
+              emptyText="No paper trades found for this week."
+              selected={selectedPosition}
+              onSelect={setSelectedPosition}
+            />
+          ),
+        },
+        {
+          label: "Monthly Trades",
+          content: (
+            <PaperTradePeriodPanel
+              title="Monthly Paper Trades"
+              rows={filterPaperTradesByPeriod(periodTradeRows, "month")}
+              emptyText="No paper trades found for this month."
               selected={selectedPosition}
               onSelect={setSelectedPosition}
             />
@@ -1863,11 +1900,28 @@ function isTodayPaperTrade(row: Row) {
 }
 
 function paperTradeDateKey(row: Row) {
-  const value = row.closed_at ?? row.opened_at ?? row.entry_time ?? "";
-  if (!value) return "";
-  const parsed = new Date(normalizeUtcDateString(String(value)));
-  if (Number.isNaN(parsed.getTime())) return String(value).slice(0, 10);
+  const parsed = paperTradeDate(row);
+  if (!parsed) {
+    const value = paperTradeDateValue(row);
+    return value ? String(value).slice(0, 10) : "";
+  }
   return localDateKey(parsed);
+}
+
+function paperTradeDate(row: Row) {
+  const value = paperTradeDateValue(row);
+  if (!value) return null;
+  const parsed = new Date(normalizeUtcDateString(String(value)));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function paperTradeDateValue(row: Row) {
+  return row.closed_at ?? row.opened_at ?? row.entry_time ?? row.source_candle_time ?? "";
+}
+
+function paperTradeTimeValue(row: Row) {
+  const parsed = paperTradeDate(row);
+  return parsed ? parsed.getTime() : 0;
 }
 
 function localDateKey(value: Date) {
@@ -1875,6 +1929,24 @@ function localDateKey(value: Date) {
   const month = String(value.getMonth() + 1).padStart(2, "0");
   const day = String(value.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function weekKey(value: Date) {
+  const start = startOfLocalWeek(value);
+  return localDateKey(start);
+}
+
+function startOfLocalWeek(value: Date) {
+  const start = new Date(value);
+  start.setHours(0, 0, 0, 0);
+  const day = start.getDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  start.setDate(start.getDate() + offset);
+  return start;
+}
+
+function monthKey(value: Date) {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function tradingQualityScore({
@@ -2781,6 +2853,87 @@ function PaperPositionsTable({
       />
     </div>
   );
+}
+
+function PaperTradePeriodPanel({
+  title,
+  rows,
+  emptyText,
+  selected,
+  onSelect
+}: {
+  title: string;
+  rows: Row[];
+  emptyText: string;
+  selected: Row | null;
+  onSelect: (row: Row) => void;
+}) {
+  const summary = summarizePaperTrades(rows);
+  return (
+    <div className="space-y-4">
+      <section className="card panel dashboard-card">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{title} Summary</div>
+        <div className="pipeline-detail-grid">
+          <MiniFact label="Total Profit" value={summary.totalProfit} />
+          <MiniFact label="Trades" value={summary.trades} />
+          <MiniFact label="Open Trades" value={summary.openTrades} />
+          <MiniFact label="Closed Trades" value={summary.closedTrades} />
+          <MiniFact label="Winning Trades" value={summary.winningTrades} />
+          <MiniFact label="Losing Trades" value={summary.losingTrades} />
+          <MiniFact label="Win Rate" value={summary.winRate} />
+          <MiniFact label="Profit Factor" value={summary.profitFactor} />
+          <MiniFact label="Average P/L" value={summary.averageProfit} />
+          <MiniFact label="Best Trade" value={summary.bestTrade} />
+          <MiniFact label="Worst Trade" value={summary.worstTrade} />
+        </div>
+      </section>
+      <PaperPositionsTable
+        title={`${title} (${rows.length})`}
+        rows={rows}
+        emptyText={emptyText}
+        selected={selected}
+        onSelect={onSelect}
+      />
+    </div>
+  );
+}
+
+function buildPaperTradePeriodRows(openRows: Row[], closedRows: Row[]) {
+  return [...openRows.map((row) => ({ trade_status: "OPEN", ...row })), ...closedRows.map((row) => ({ trade_status: "CLOSED", ...row }))]
+    .sort((left, right) => paperTradeTimeValue(right) - paperTradeTimeValue(left));
+}
+
+function filterPaperTradesByPeriod(rows: Row[], period: "day" | "week" | "month") {
+  const now = new Date();
+  return rows.filter((row) => {
+    const date = paperTradeDate(row);
+    if (!date) return false;
+    if (period === "day") return localDateKey(date) === localDateKey(now);
+    if (period === "week") return weekKey(date) === weekKey(now);
+    return monthKey(date) === monthKey(now);
+  });
+}
+
+function summarizePaperTrades(rows: Row[]) {
+  const values = rows.map((row) => moneyNumber(row.p_l)).filter((value): value is number => value !== null);
+  const wins = values.filter((value) => value > 0);
+  const losses = values.filter((value) => value < 0);
+  const total = values.reduce((sum, value) => sum + value, 0);
+  const best = values.length ? Math.max(...values) : 0;
+  const worst = values.length ? Math.min(...values) : 0;
+  return {
+    totalProfit: formatUsd(total),
+    trades: rows.length,
+    openTrades: rows.filter((row) => String(row.trade_status ?? row.status ?? "").toUpperCase() === "OPEN").length,
+    closedTrades: rows.filter((row) => String(row.trade_status ?? row.status ?? "").toUpperCase() === "CLOSED").length,
+    winningTrades: wins.length,
+    losingTrades: losses.length,
+    winRate: formatPercent(values.length ? wins.length / values.length : 0),
+    profitFactor: formatRatio(profitFactorValue(wins, losses)),
+    averageProfit: values.length ? formatUsd(average(values)) : "N/A",
+    bestTrade: values.length ? formatUsd(best) : "N/A",
+    worstTrade: values.length ? formatUsd(worst) : "N/A",
+  };
 }
 
 function paperTradeListingColumns(rows: Row[]) {

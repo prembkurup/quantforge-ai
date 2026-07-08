@@ -1865,17 +1865,202 @@ function PaperReplayControlPanel({ campaign, replay, onReplayUpdated }: { campai
     improvementRequests,
   });
 
+  const replayManagementTabs: DashboardTab[] = [
+    {
+      label: "Campaign",
+      content: (
+        <div className="space-y-4">
+          <div className="kpi-grid">
+            <KpiCard title="Total Groups" value={number(campaignSummary.total_groups ?? 0)} />
+            <KpiCard title="Groups Complete" value={number(campaignSummary.groups_complete ?? 0)} tone="good" />
+            <KpiCard title="Strategy Found" value={number(campaignSummary.strategy_found ?? 0)} tone="good" />
+            <KpiCard title="Needs Research" value={number(campaignSummary.needs_research ?? 0)} tone={campaignSummary.needs_research ? "warn" : "good"} />
+            <KpiCard title="Running" value={number(campaignSummary.running ?? 0)} />
+            <KpiCard title="Failed" value={number(campaignSummary.failed ?? 0)} tone={campaignSummary.failed ? "warn" : "good"} />
+            <KpiCard title="Pending" value={number(campaignSummary.pending ?? 0)} />
+            <KpiCard title="Max Strategies" value={number(campaign.max_strategies_per_group ?? 0)} />
+          </div>
+          <section className="card panel dashboard-card">
+            <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Strategy Discovery Campaign</div>
+            <div className="pipeline-detail-grid">
+              <MiniFact label="Campaign" value={String(campaign.campaign_id ?? "RPC")} />
+              <MiniFact label="Enabled Pairs" value={number((campaign.enabled_pairs ?? []).length)} />
+              <MiniFact label="Enabled Timeframes" value={number((campaign.enabled_timeframes ?? []).length)} />
+              <MiniFact label="Filtered Groups" value={number(filteredGroups.length)} />
+              <MiniFact label="Shared Trading Path" value={campaign.shared_trading_path ?? "Paper Trading path"} />
+              <MiniFact label="Candle Source" value="Historical candle event" />
+            </div>
+          </section>
+        </div>
+      ),
+    },
+    {
+      label: "Groups",
+      content: (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <ReplayGroupQueue rows={groupQueueRows as Row[]} selectedGroupId={selectedGroupId} onSelect={setSelectedGroupId} />
+          <section className="card panel dashboard-card">
+            <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{selectedGroup.pair ?? "Group"} {selectedGroup.timeframe ?? ""}</div>
+            <div className="pipeline-detail-grid">
+              <MiniFact label="Strategies Tested" value={number(selectedGroup.strategies_tested ?? 0)} />
+              <MiniFact label="Best Strategy" value={selectedGroup.best_strategy ?? "n/a"} />
+              <MiniFact label="Comfort Score" value={selectedGroup.comfort_score ?? 0} />
+              <MiniFact label="Profit Factor" value={selectedGroup.profit_factor ?? "n/a"} />
+              <MiniFact label="Max Drawdown" value={formatPercent(Number(selectedGroup.max_drawdown ?? 0))} />
+              <MiniFact label="Winning Days" value={formatPercent(Number(selectedGroup.winning_days ?? 0))} />
+              <MiniFact label="Decision" value={selectedGroup.decision ?? "n/a"} />
+              <MiniFact label="Status" value={selectedGroup.status ?? "n/a"} />
+            </div>
+            <DataTable title="Rejected Strategies" rows={rejectedRows as Row[]} />
+          </section>
+        </div>
+      ),
+    },
+    {
+      label: "Runtime",
+      content: (
+        <div className="space-y-4">
+          <div className="kpi-grid">
+            <KpiCard title="Replay Status" value={replay.status ?? "NOT_STARTED"} tone={replay.status === "FAILED" ? "warn" : replay.status === "RUNNING" ? "good" : "neutral"} />
+            <KpiCard title="Replay Mode" value={replay.replay_mode || "HISTORICAL_REPLAY"} />
+            <KpiCard title="Speed" value={replay.replay_speed || speed} />
+            <KpiCard title="Progress" value={`${replay.progress_percent ?? 0}%`} />
+            <KpiCard title="Events" value={number(replay.processed_events ?? 0)} />
+            <KpiCard title="Signals" value={number(replay.generated_signals ?? 0)} />
+            <KpiCard title="Paper Orders" value={number(replay.paper_orders ?? 0)} />
+            <KpiCard title="Control" value={replay.control ?? "IDLE"} />
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <section className="card panel dashboard-card">
+              <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Progress</div>
+              <ProgressBar value={Number(replay.progress_percent ?? 0)} />
+              <div className="pipeline-detail-grid mt-3">
+                <MiniFact label="Replay ID" value={replay.replay_id || "n/a"} />
+                <MiniFact label="Current Candle" value={formatDate(replay.current_candle_time)} />
+                <MiniFact label="Start" value={formatDate(replay.start_time)} />
+                <MiniFact label="End" value={formatDate(replay.end_time)} />
+              </div>
+            </section>
+            <section className="card panel dashboard-card">
+              <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Statistics</div>
+              <div className="pipeline-detail-grid">
+                <MiniFact label="Processed Events" value={number(replay.statistics?.processed_events ?? replay.processed_events ?? 0)} />
+                <MiniFact label="Generated Signals" value={number(replay.statistics?.generated_signals ?? replay.generated_signals ?? 0)} />
+                <MiniFact label="Paper Orders" value={number(replay.statistics?.paper_orders ?? replay.paper_orders ?? 0)} />
+                <MiniFact label="Updated" value={formatDate(replay.updated_at || replay.timestamp)} />
+              </div>
+            </section>
+          </div>
+        </div>
+      ),
+    },
+    {
+      label: "Controls",
+      content: (
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Controls</div>
+          <div className="grid gap-3 md:grid-cols-5">
+            <label className="text-xs uppercase text-slate-400">
+              From
+              <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+            </label>
+            <label className="text-xs uppercase text-slate-400">
+              To
+              <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+            </label>
+            <label className="text-xs uppercase text-slate-400">
+              Pair
+              <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={pairs} onChange={(event) => setPairs(event.target.value)} />
+            </label>
+            <label className="text-xs uppercase text-slate-400">
+              Timeframe
+              <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={timeframes} onChange={(event) => setTimeframes(event.target.value)} />
+            </label>
+            <label className="text-xs uppercase text-slate-400">
+              Speed
+              <select className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={speed} onChange={(event) => setSpeed(event.target.value)}>
+                {(replay.controls?.speeds ?? ["REAL_TIME", "2X", "5X", "10X", "100X", "MAXIMUM"]).map((item: string) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("start")}>{busyAction === "start" ? "Starting" : "Replay Start"}</button>
+            <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("pause")}>{busyAction === "pause" ? "Pausing" : "Pause"}</button>
+            <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("resume")}>{busyAction === "resume" ? "Resuming" : "Resume"}</button>
+            <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("stop")}>{busyAction === "stop" ? "Stopping" : "Stop"}</button>
+          </div>
+          {error && <div className="mt-3 text-sm text-amber-300">{error}</div>}
+        </section>
+      ),
+    },
+    {
+      label: "Reports",
+      content: (
+        <div className="space-y-4">
+          <section className="card panel dashboard-card">
+            <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Summary</div>
+            <div className="pipeline-detail-grid">
+              <MiniFact label="Replay Period" value={summary.replay_period || "n/a"} />
+              <MiniFact label="Pairs" value={(summary.pairs ?? []).join(", ") || replay.pair || "n/a"} />
+              <MiniFact label="Timeframes" value={(summary.timeframes ?? []).join(", ") || replay.timeframe || "n/a"} />
+              <MiniFact label="Candles Replayed" value={number(summary.candles_replayed ?? replay.processed_events ?? 0)} />
+              <MiniFact label="Trades" value={number(summary.trades ?? replay.paper_orders ?? 0)} />
+              <MiniFact label="Profit Factor" value={summary.profit_factor ?? "n/a"} />
+              <MiniFact label="Win Rate" value={formatPercent(Number(summary.win_rate ?? 0))} />
+              <MiniFact label="Drawdown" value={formatPercent(Number(summary.drawdown ?? 0))} />
+              <MiniFact label="Strategy Health" value={summary.strategy_health ?? "n/a"} />
+              <MiniFact label="Portfolio Health" value={summary.portfolio_health ?? "n/a"} />
+              <MiniFact label="Research Requests Generated" value={number(summary.research_requests_generated ?? 0)} />
+              <MiniFact label="Knowledge Updates" value={number(summary.knowledge_updates ?? 0)} />
+            </div>
+          </section>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <DataTable title="Backtest vs Replay vs Paper" rows={comparisonRows} />
+            <DataTable title="Milestone 29 Acceptance" rows={acceptanceRows as Row[]} />
+          </div>
+        </div>
+      ),
+    },
+    {
+      label: "Investigation",
+      content: (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <section className="card panel dashboard-card">
+            <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Investigation</div>
+            <div className="pipeline-detail-grid">
+              <MiniFact label="Required" value={investigation.required ? "YES" : "NO"} />
+              <MiniFact label="Decision Quality" value={investigation.decision_quality ?? "n/a"} />
+              <MiniFact label="Recommendation" value={investigation.recommendation ?? "n/a"} />
+              <MiniFact label="Root Causes" value={(investigation.root_causes ?? []).join(", ") || "None"} />
+            </div>
+            <DataTable title="Investigation Questions" rows={investigationRows as Row[]} />
+          </section>
+          <section className="card panel dashboard-card">
+            <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Learning Feedback</div>
+            <div className="pipeline-detail-grid">
+              <MiniFact label="Knowledge Base Updated" value={replay.knowledge_feedback?.knowledge_base_updated ? "YES" : "NO"} />
+              <MiniFact label="Learning Sources" value={(replay.knowledge_feedback?.learning_sources ?? []).join(", ")} />
+              <MiniFact label="Policy" value={replay.strategy_improvement_report?.policy ?? "Research requests only."} />
+            </div>
+            <DataTable title={`Research Improvement Requests (${improvementRequests.length})`} rows={improvementRequests} />
+          </section>
+        </div>
+      ),
+    },
+    { label: "Pipeline", content: <DataTable title="Shared Paper Trading Pipeline" rows={pipelineRows} /> },
+  ];
+  const replayPageTabs = [...replayManagementTabs, ...replayTabs];
+
   return (
-    <section className="card panel dashboard-card">
-      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Historical Replay Paper Trading</div>
-      <div className="mb-3 rounded border border-sky-500/30 bg-sky-500/10 p-3 text-sm text-slate-200">
-        {replay.mode_banner ?? "Replay Mode is idle. Paper Trading is using the live paper-practice data source."}
+    <div className="replay-paper-layout space-y-4">
+      <div className="rounded border border-sky-500/30 bg-sky-500/10 p-3 text-sm text-slate-200">
+        {replay.mode_banner ?? "Historical Replay only. Replay Paper Trading changes only the candle source and keeps the paper trading path."}
       </div>
-      <section className="card panel dashboard-card mb-4">
-        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Strategy Discovery Campaign</div>
-        <div className="grid gap-3 md:grid-cols-6">
+      <section className="card panel dashboard-card replay-filter-panel">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Filters</div>
+        <div className="grid gap-3 md:grid-cols-5">
           <label className="text-xs uppercase text-slate-400">
-            Replay Campaign
+            Campaign
             <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" readOnly value={String(campaign.campaign_id ?? "RPC")} />
           </label>
           <label className="text-xs uppercase text-slate-400">
@@ -1903,175 +2088,9 @@ function PaperReplayControlPanel({ campaign, replay, onReplayUpdated }: { campai
             </select>
           </label>
         </div>
-        <div className="mt-3 text-xs text-slate-400">Path: {campaign.shared_trading_path}</div>
       </section>
-      <div className="kpi-grid mb-4">
-        <KpiCard title="Total Groups" value={number(campaignSummary.total_groups ?? 0)} />
-        <KpiCard title="Groups Complete" value={number(campaignSummary.groups_complete ?? 0)} tone="good" />
-        <KpiCard title="Strategy Found" value={number(campaignSummary.strategy_found ?? 0)} tone="good" />
-        <KpiCard title="Needs Research" value={number(campaignSummary.needs_research ?? 0)} tone={campaignSummary.needs_research ? "warn" : "good"} />
-        <KpiCard title="Running" value={number(campaignSummary.running ?? 0)} />
-        <KpiCard title="Failed" value={number(campaignSummary.failed ?? 0)} tone={campaignSummary.failed ? "warn" : "good"} />
-        <KpiCard title="Pending" value={number(campaignSummary.pending ?? 0)} />
-        <KpiCard title="Max Strategies" value={number(campaign.max_strategies_per_group ?? 0)} />
-      </div>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <ReplayGroupQueue rows={groupQueueRows as Row[]} selectedGroupId={selectedGroupId} onSelect={setSelectedGroupId} />
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{selectedGroup.pair ?? "Group"} {selectedGroup.timeframe ?? ""}</div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Strategies Tested" value={number(selectedGroup.strategies_tested ?? 0)} />
-            <MiniFact label="Best Strategy" value={selectedGroup.best_strategy ?? "n/a"} />
-            <MiniFact label="Comfort Score" value={selectedGroup.comfort_score ?? 0} />
-            <MiniFact label="Profit Factor" value={selectedGroup.profit_factor ?? "n/a"} />
-            <MiniFact label="Max Drawdown" value={formatPercent(Number(selectedGroup.max_drawdown ?? 0))} />
-            <MiniFact label="Winning Days" value={formatPercent(Number(selectedGroup.winning_days ?? 0))} />
-            <MiniFact label="Decision" value={selectedGroup.decision ?? "n/a"} />
-            <MiniFact label="Status" value={selectedGroup.status ?? "n/a"} />
-          </div>
-          <DataTable title="Rejected Strategies" rows={rejectedRows as Row[]} />
-        </section>
-      </div>
-      <div className="mt-4">
-        <DashboardTabs tabs={replayTabs} />
-      </div>
-      <div className="mt-4">
-        <DashboardTabs tabs={[
-          {
-            label: "Runtime",
-            content: (
-              <div className="space-y-4">
-                <div className="kpi-grid">
-                  <KpiCard title="Replay Status" value={replay.status ?? "NOT_STARTED"} tone={replay.status === "FAILED" ? "warn" : replay.status === "RUNNING" ? "good" : "neutral"} />
-                  <KpiCard title="Replay Mode" value={replay.replay_mode || "HISTORICAL_REPLAY"} />
-                  <KpiCard title="Speed" value={replay.replay_speed || speed} />
-                  <KpiCard title="Progress" value={`${replay.progress_percent ?? 0}%`} />
-                  <KpiCard title="Events" value={number(replay.processed_events ?? 0)} />
-                  <KpiCard title="Signals" value={number(replay.generated_signals ?? 0)} />
-                  <KpiCard title="Paper Orders" value={number(replay.paper_orders ?? 0)} />
-                  <KpiCard title="Control" value={replay.control ?? "IDLE"} />
-                </div>
-                <div className="grid gap-4 xl:grid-cols-2">
-                  <section className="card panel dashboard-card">
-                    <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Progress</div>
-                    <ProgressBar value={Number(replay.progress_percent ?? 0)} />
-                    <div className="pipeline-detail-grid mt-3">
-                      <MiniFact label="Replay ID" value={replay.replay_id || "n/a"} />
-                      <MiniFact label="Current Candle" value={formatDate(replay.current_candle_time)} />
-                      <MiniFact label="Start" value={formatDate(replay.start_time)} />
-                      <MiniFact label="End" value={formatDate(replay.end_time)} />
-                    </div>
-                  </section>
-                  <section className="card panel dashboard-card">
-                    <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Statistics</div>
-                    <div className="pipeline-detail-grid">
-                      <MiniFact label="Processed Events" value={number(replay.statistics?.processed_events ?? replay.processed_events ?? 0)} />
-                      <MiniFact label="Generated Signals" value={number(replay.statistics?.generated_signals ?? replay.generated_signals ?? 0)} />
-                      <MiniFact label="Paper Orders" value={number(replay.statistics?.paper_orders ?? replay.paper_orders ?? 0)} />
-                      <MiniFact label="Updated" value={formatDate(replay.updated_at || replay.timestamp)} />
-                    </div>
-                  </section>
-                </div>
-              </div>
-            ),
-          },
-          {
-            label: "Controls",
-            content: (
-              <section className="card panel dashboard-card">
-                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Controls</div>
-                <div className="grid gap-3 md:grid-cols-5">
-                  <label className="text-xs uppercase text-slate-400">
-                    From
-                    <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-                  </label>
-                  <label className="text-xs uppercase text-slate-400">
-                    To
-                    <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={toDate} onChange={(event) => setToDate(event.target.value)} />
-                  </label>
-                  <label className="text-xs uppercase text-slate-400">
-                    Pair
-                    <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={pairs} onChange={(event) => setPairs(event.target.value)} />
-                  </label>
-                  <label className="text-xs uppercase text-slate-400">
-                    Timeframe
-                    <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={timeframes} onChange={(event) => setTimeframes(event.target.value)} />
-                  </label>
-                  <label className="text-xs uppercase text-slate-400">
-                    Speed
-                    <select className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={speed} onChange={(event) => setSpeed(event.target.value)}>
-                      {(replay.controls?.speeds ?? ["REAL_TIME", "2X", "5X", "10X", "100X", "MAXIMUM"]).map((item: string) => <option key={item} value={item}>{item}</option>)}
-                    </select>
-                  </label>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("start")}>{busyAction === "start" ? "Starting" : "Replay Start"}</button>
-                  <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("pause")}>{busyAction === "pause" ? "Pausing" : "Pause"}</button>
-                  <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("resume")}>{busyAction === "resume" ? "Resuming" : "Resume"}</button>
-                  <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("stop")}>{busyAction === "stop" ? "Stopping" : "Stop"}</button>
-                </div>
-                {error && <div className="mt-3 text-sm text-amber-300">{error}</div>}
-              </section>
-            ),
-          },
-          {
-            label: "Reports",
-            content: (
-              <div className="space-y-4">
-                <section className="card panel dashboard-card">
-                  <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Summary</div>
-                  <div className="pipeline-detail-grid">
-                    <MiniFact label="Replay Period" value={summary.replay_period || "n/a"} />
-                    <MiniFact label="Pairs" value={(summary.pairs ?? []).join(", ") || replay.pair || "n/a"} />
-                    <MiniFact label="Timeframes" value={(summary.timeframes ?? []).join(", ") || replay.timeframe || "n/a"} />
-                    <MiniFact label="Candles Replayed" value={number(summary.candles_replayed ?? replay.processed_events ?? 0)} />
-                    <MiniFact label="Trades" value={number(summary.trades ?? replay.paper_orders ?? 0)} />
-                    <MiniFact label="Profit Factor" value={summary.profit_factor ?? "n/a"} />
-                    <MiniFact label="Win Rate" value={formatPercent(Number(summary.win_rate ?? 0))} />
-                    <MiniFact label="Drawdown" value={formatPercent(Number(summary.drawdown ?? 0))} />
-                    <MiniFact label="Strategy Health" value={summary.strategy_health ?? "n/a"} />
-                    <MiniFact label="Portfolio Health" value={summary.portfolio_health ?? "n/a"} />
-                    <MiniFact label="Research Requests Generated" value={number(summary.research_requests_generated ?? 0)} />
-                    <MiniFact label="Knowledge Updates" value={number(summary.knowledge_updates ?? 0)} />
-                  </div>
-                </section>
-                <div className="grid gap-4 xl:grid-cols-2">
-                  <DataTable title="Backtest vs Replay vs Paper" rows={comparisonRows} />
-                  <DataTable title="Milestone 29 Acceptance" rows={acceptanceRows as Row[]} />
-                </div>
-              </div>
-            ),
-          },
-          {
-            label: "Investigation",
-            content: (
-              <div className="grid gap-4 xl:grid-cols-2">
-                <section className="card panel dashboard-card">
-                  <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Investigation</div>
-                  <div className="pipeline-detail-grid">
-                    <MiniFact label="Required" value={investigation.required ? "YES" : "NO"} />
-                    <MiniFact label="Decision Quality" value={investigation.decision_quality ?? "n/a"} />
-                    <MiniFact label="Recommendation" value={investigation.recommendation ?? "n/a"} />
-                    <MiniFact label="Root Causes" value={(investigation.root_causes ?? []).join(", ") || "None"} />
-                  </div>
-                  <DataTable title="Investigation Questions" rows={investigationRows as Row[]} />
-                </section>
-                <section className="card panel dashboard-card">
-                  <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Learning Feedback</div>
-                  <div className="pipeline-detail-grid">
-                    <MiniFact label="Knowledge Base Updated" value={replay.knowledge_feedback?.knowledge_base_updated ? "YES" : "NO"} />
-                    <MiniFact label="Learning Sources" value={(replay.knowledge_feedback?.learning_sources ?? []).join(", ")} />
-                    <MiniFact label="Policy" value={replay.strategy_improvement_report?.policy ?? "Research requests only."} />
-                  </div>
-                  <DataTable title={`Research Improvement Requests (${improvementRequests.length})`} rows={improvementRequests} />
-                </section>
-              </div>
-            ),
-          },
-          { label: "Pipeline", content: <DataTable title="Shared Paper Trading Pipeline" rows={pipelineRows} /> },
-        ]} />
-      </div>
-    </section>
+      <DashboardTabs className="replay-paper-tabs" tabs={replayPageTabs} />
+    </div>
   );
 }
 

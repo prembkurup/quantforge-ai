@@ -246,6 +246,30 @@ body.modal-open {
   text-align: center;
 }
 
+.replay-paper-layout,
+.replay-paper-layout .dashboard-card,
+.replay-paper-layout .dashboard-tab-panel {
+  min-width: 0;
+}
+
+.replay-paper-tabs > .dashboard-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  align-items: stretch;
+  gap: 8px;
+}
+
+.replay-paper-tabs > .dashboard-tabs .dashboard-tab {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+
+.replay-filter-panel select,
+.replay-filter-panel input {
+  min-width: 0;
+}
+
 .paper-period-trades-panel {
   display: grid;
   width: 100%;

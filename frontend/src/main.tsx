@@ -2694,7 +2694,7 @@ function PaperPositionsTable({
   selected: Row | null;
   onSelect: (row: Row) => void;
 }) {
-  const columns = rows[0] ? Object.keys(rows[0]) : [];
+  const columns = paperTradeListingColumns(rows);
   return (
     <div className="card panel dashboard-card overflow-hidden">
       <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{title}</div>
@@ -2741,7 +2741,7 @@ function OpenPaperPositionsTable({
   selected: Row | null;
   onSelect: (row: Row) => void;
 }) {
-  const columns = rows[0] ? Object.keys(rows[0]) : [];
+  const columns = paperTradeListingColumns(rows);
   return (
     <div className="card panel dashboard-card overflow-hidden">
       <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Open Paper Positions</div>
@@ -2777,6 +2777,15 @@ function OpenPaperPositionsTable({
       {rows.length === 0 && <div className="pt-3 text-sm text-slate-400">No open paper positions.</div>}
     </div>
   );
+}
+
+function paperTradeListingColumns(rows: Row[]) {
+  const columns = rows[0] ? Object.keys(rows[0]) : [];
+  const strategyColumns = new Set(["strategy", "strategy_asset", "strategy_asset_id"]);
+  return [
+    ...columns.filter((column) => !strategyColumns.has(column)),
+    ...columns.filter((column) => strategyColumns.has(column)),
+  ];
 }
 
 function openPaperPositionRowFromKeyboard(event: React.KeyboardEvent<HTMLTableRowElement>, row: Row, onSelect: (row: Row) => void) {

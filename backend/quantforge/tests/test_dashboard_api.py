@@ -380,6 +380,31 @@ def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:
     assert client.post("/api/portfolio/intelligence").status_code == 405
 
 
+def test_paper_replay_campaign_discovers_pair_timeframe_strategy_candidates() -> None:
+    response = client.get("/api/paper/replay/campaign")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["mode"] == "Historical Replay"
+    assert payload["max_strategies_per_group"] == 10
+    assert payload["summary"]["total_groups"] == len(payload["groups"])
+    assert payload["summary"]["groups_complete"] >= payload["summary"]["strategy_found"]
+    assert payload["groups"]
+    assert payload["jobs"]
+    first_group = payload["groups"][0]
+    assert first_group["status"] in payload["statuses"]
+    assert first_group["group_id"].startswith("G")
+    first_job = payload["jobs"][0]
+    assert first_job["group_id"] == first_group["group_id"]
+    assert first_job["decision"] in {
+        "ACCEPT_FOR_PAIR_TIMEFRAME",
+        "TRY_NEXT_STRATEGY",
+        "SEND_BACK_TO_RESEARCH",
+    }
+    assert 0 <= first_job["comfort_score"] <= 100
+    assert first_job["failure_reason"] in {"", *payload["failure_reasons"], "LOW_COMFORT_SCORE"}
+
+
 def test_paper_replay_control_endpoints_update_progress_store(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(dashboard_service, "_paper_replay_progress_file", lambda: tmp_path / "paper_replay_progress.json")
     replay_client = TestClient(create_app())

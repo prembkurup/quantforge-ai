@@ -1746,17 +1746,18 @@ function Paper() {
 
 function ReplayPaperTrading() {
   const replay = useApi<any>("/api/paper/replay");
+  const campaign = useApi<any>("/api/paper/replay/campaign");
   const [replayOverride, setReplayOverride] = React.useState<any | null>(null);
-  if (!replay) return <Loading />;
+  if (!replay || !campaign) return <Loading />;
   const replayData = replayOverride ?? replay;
   return (
     <Page title="Replay Paper Trading">
-      <PaperReplayControlPanel replay={replayData} onReplayUpdated={setReplayOverride} />
+      <PaperReplayControlPanel campaign={campaign} replay={replayData} onReplayUpdated={setReplayOverride} />
     </Page>
   );
 }
 
-function PaperReplayControlPanel({ replay, onReplayUpdated }: { replay: any; onReplayUpdated: (payload: any) => void }) {
+function PaperReplayControlPanel({ campaign, replay, onReplayUpdated }: { campaign: any; replay: any; onReplayUpdated: (payload: any) => void }) {
   const [fromDate, setFromDate] = React.useState("2024-01-01");
   const [toDate, setToDate] = React.useState("2024-12-31");
   const [pairs, setPairs] = React.useState(String(replay.pair || "EUR_USD"));
@@ -1764,6 +1765,11 @@ function PaperReplayControlPanel({ replay, onReplayUpdated }: { replay: any; onR
   const [speed, setSpeed] = React.useState(String(replay.replay_speed || "MAXIMUM"));
   const [busyAction, setBusyAction] = React.useState("");
   const [error, setError] = React.useState("");
+  const [mode, setMode] = React.useState("Historical Replay");
+  const [selectedPair, setSelectedPair] = React.useState("ALL");
+  const [selectedTimeframe, setSelectedTimeframe] = React.useState("ALL");
+  const [selectedStrategy, setSelectedStrategy] = React.useState("ALL");
+  const [selectedGroupId, setSelectedGroupId] = React.useState(String(campaign.groups?.[0]?.group_id ?? ""));
 
   const sendControl = async (action: "start" | "pause" | "resume" | "stop") => {
     setBusyAction(action);
@@ -1794,12 +1800,148 @@ function PaperReplayControlPanel({ replay, onReplayUpdated }: { replay: any; onR
   const acceptanceRows = Object.entries(replay.acceptance ?? {})
     .filter(([key]) => key !== "gaps")
     .map(([criterion, value]) => ({ criterion: displayLabel(criterion), status: value ? "PASS" : "GAP" }));
+  const groups = (campaign.groups ?? []) as any[];
+  const jobs = (campaign.jobs ?? []) as any[];
+  const campaignSummary = campaign.summary ?? {};
+  const filteredGroups = groups.filter((group) => (
+    (selectedPair === "ALL" || group.pair === selectedPair)
+    && (selectedTimeframe === "ALL" || group.timeframe === selectedTimeframe)
+    && (selectedStrategy === "ALL" || group.best_strategy === selectedStrategy)
+  ));
+  React.useEffect(() => {
+    if (!selectedGroupId && groups[0]?.group_id) {
+      setSelectedGroupId(String(groups[0].group_id));
+    }
+  }, [groups, selectedGroupId]);
+  const selectedGroup = groups.find((group) => String(group.group_id) === selectedGroupId) ?? filteredGroups[0] ?? groups[0] ?? {};
+  const selectedGroupJobs = jobs.filter((job) => String(job.group_id) === String(selectedGroup.group_id));
+  const groupQueueRows = filteredGroups.slice(0, 60).map((group) => ({
+    group: group.group_id,
+    pair: group.pair,
+    timeframe: group.timeframe,
+    status: group.status,
+    comfort: group.comfort_score,
+    best_strategy: group.best_strategy,
+  }));
+  const jobRows = selectedGroupJobs.map((job) => ({
+    job_id: job.job_id,
+    strategy_asset_id: job.strategy_asset_id,
+    status: job.status,
+    trades: job.trades,
+    profit_factor: job.profit_factor,
+    expectancy: job.expectancy,
+    drawdown: formatPercent(Number(job.drawdown ?? 0)),
+    comfort_score: job.comfort_score,
+    decision: job.decision,
+    failure_reason: job.failure_reason || "Accepted",
+    next_action: job.next_action,
+  }));
+  const rejectedRows = ((selectedGroup.rejected_strategies ?? []) as any[]).map((row) => ({
+    strategy: row.strategy,
+    pf: row.profit_factor,
+    dd: formatPercent(Number(row.drawdown ?? 0)),
+    comfort: row.comfort,
+    reason: displayLabel(row.reason),
+  }));
+  const researchRows = ((campaign.research_requests ?? []) as any[]).map((row) => ({
+    pair: row.pair,
+    timeframe: row.timeframe,
+    problem: row.problem,
+    research_request: row.research_request,
+    status: row.status,
+  }));
+  const pairOptions = ["ALL", ...((campaign.enabled_pairs ?? []) as string[])];
+  const timeframeOptions = ["ALL", ...((campaign.enabled_timeframes ?? []) as string[])];
+  const strategyOptions = ["ALL", ...Array.from(new Set(groups.map((group) => String(group.best_strategy)).filter(Boolean)))];
+  const replayTabs = buildReplayCampaignTabs({
+    campaign,
+    replay,
+    selectedGroup,
+    groupQueueRows,
+    jobRows,
+    rejectedRows,
+    researchRows,
+    comparisonRows,
+    investigationRows: investigationRows as Row[],
+    improvementRequests,
+  });
 
   return (
     <section className="card panel dashboard-card">
       <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Historical Replay Paper Trading</div>
       <div className="mb-3 rounded border border-sky-500/30 bg-sky-500/10 p-3 text-sm text-slate-200">
         {replay.mode_banner ?? "Replay Mode is idle. Paper Trading is using the live paper-practice data source."}
+      </div>
+      <section className="card panel dashboard-card mb-4">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Strategy Discovery Campaign</div>
+        <div className="grid gap-3 md:grid-cols-6">
+          <label className="text-xs uppercase text-slate-400">
+            Mode
+            <select className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={mode} onChange={(event) => setMode(event.target.value)}>
+              <option value="Live Paper">Live Paper</option>
+              <option value="Historical Replay">Historical Replay</option>
+            </select>
+          </label>
+          <label className="text-xs uppercase text-slate-400">
+            Replay Campaign
+            <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" readOnly value={String(campaign.campaign_id ?? "RPC")} />
+          </label>
+          <label className="text-xs uppercase text-slate-400">
+            Pair
+            <select className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={selectedPair} onChange={(event) => setSelectedPair(event.target.value)}>
+              {pairOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+          <label className="text-xs uppercase text-slate-400">
+            Timeframe
+            <select className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={selectedTimeframe} onChange={(event) => setSelectedTimeframe(event.target.value)}>
+              {timeframeOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+          <label className="text-xs uppercase text-slate-400">
+            Strategy
+            <select className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={selectedStrategy} onChange={(event) => setSelectedStrategy(event.target.value)}>
+              {strategyOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+          <label className="text-xs uppercase text-slate-400">
+            Group
+            <select className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={selectedGroupId} onChange={(event) => setSelectedGroupId(event.target.value)}>
+              {filteredGroups.map((group) => <option key={group.group_id} value={group.group_id}>{group.group_id} {group.pair} {group.timeframe}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="mt-3 text-xs text-slate-400">Path: {campaign.shared_trading_path}</div>
+      </section>
+      <div className="kpi-grid mb-4">
+        <KpiCard title="Total Groups" value={number(campaignSummary.total_groups ?? 0)} />
+        <KpiCard title="Groups Complete" value={number(campaignSummary.groups_complete ?? 0)} tone="good" />
+        <KpiCard title="Strategy Found" value={number(campaignSummary.strategy_found ?? 0)} tone="good" />
+        <KpiCard title="Needs Research" value={number(campaignSummary.needs_research ?? 0)} tone={campaignSummary.needs_research ? "warn" : "good"} />
+        <KpiCard title="Running" value={number(campaignSummary.running ?? 0)} />
+        <KpiCard title="Failed" value={number(campaignSummary.failed ?? 0)} tone={campaignSummary.failed ? "warn" : "good"} />
+        <KpiCard title="Pending" value={number(campaignSummary.pending ?? 0)} />
+        <KpiCard title="Max Strategies" value={number(campaign.max_strategies_per_group ?? 0)} />
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <ReplayGroupQueue rows={groupQueueRows as Row[]} selectedGroupId={selectedGroupId} onSelect={setSelectedGroupId} />
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{selectedGroup.pair ?? "Group"} {selectedGroup.timeframe ?? ""}</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Strategies Tested" value={number(selectedGroup.strategies_tested ?? 0)} />
+            <MiniFact label="Best Strategy" value={selectedGroup.best_strategy ?? "n/a"} />
+            <MiniFact label="Comfort Score" value={selectedGroup.comfort_score ?? 0} />
+            <MiniFact label="Profit Factor" value={selectedGroup.profit_factor ?? "n/a"} />
+            <MiniFact label="Max Drawdown" value={formatPercent(Number(selectedGroup.max_drawdown ?? 0))} />
+            <MiniFact label="Winning Days" value={formatPercent(Number(selectedGroup.winning_days ?? 0))} />
+            <MiniFact label="Decision" value={selectedGroup.decision ?? "n/a"} />
+            <MiniFact label="Status" value={selectedGroup.status ?? "n/a"} />
+          </div>
+          <DataTable title="Rejected Strategies" rows={rejectedRows as Row[]} />
+        </section>
+      </div>
+      <div className="mt-4">
+        <DashboardTabs tabs={replayTabs} />
       </div>
       <div className="kpi-grid">
         <KpiCard title="Replay Status" value={replay.status ?? "NOT_STARTED"} tone={replay.status === "FAILED" ? "warn" : replay.status === "RUNNING" ? "good" : "neutral"} />
@@ -1911,6 +2053,163 @@ function PaperReplayControlPanel({ replay, onReplayUpdated }: { replay: any; onR
       <DataTable title="Shared Paper Trading Pipeline" rows={pipelineRows} />
     </section>
   );
+}
+
+function ReplayGroupQueue({ rows, selectedGroupId, onSelect }: { rows: Row[]; selectedGroupId: string; onSelect: (groupId: string) => void }) {
+  return (
+    <section className="card panel dashboard-card overflow-hidden">
+      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Group Queue</div>
+      <div className="overflow-auto">
+        <table className="table table-dark table-hover dashboard-table w-full min-w-[760px] text-left text-sm">
+          <thead className="bg-slate-900 text-xs uppercase text-slate-400">
+            <tr>
+              <th className="px-3 py-2">group</th>
+              <th className="px-3 py-2">pair</th>
+              <th className="px-3 py-2">timeframe</th>
+              <th className="px-3 py-2">status</th>
+              <th className="px-3 py-2">comfort</th>
+              <th className="px-3 py-2">best strategy</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                className={`cursor-pointer border-t border-slate-800 ${String(row.group) === selectedGroupId ? "bg-sky-500/10" : ""}`}
+                key={String(row.group)}
+                onClick={() => onSelect(String(row.group))}
+              >
+                <td className="px-3 py-2 text-cyan-200">{String(row.group)}</td>
+                <td className="px-3 py-2 text-slate-200">{String(row.pair)}</td>
+                <td className="px-3 py-2 text-slate-200">{String(row.timeframe)}</td>
+                <td className="px-3 py-2 text-slate-200">{String(row.status)}</td>
+                <td className="px-3 py-2 text-slate-200">{String(row.comfort)}</td>
+                <td className="px-3 py-2 text-slate-200">{String(row.best_strategy)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length === 0 && <div className="pt-3 text-sm text-slate-400">No groups match the current replay filters.</div>}
+    </section>
+  );
+}
+
+function buildReplayCampaignTabs({
+  campaign,
+  replay,
+  selectedGroup,
+  groupQueueRows,
+  jobRows,
+  rejectedRows,
+  researchRows,
+  comparisonRows,
+  investigationRows,
+  improvementRequests,
+}: {
+  campaign: any;
+  replay: any;
+  selectedGroup: any;
+  groupQueueRows: Row[];
+  jobRows: Row[];
+  rejectedRows: Row[];
+  researchRows: Row[];
+  comparisonRows: Row[];
+  investigationRows: Row[];
+  improvementRequests: Row[];
+}): DashboardTab[] {
+  const selectedPair = String(selectedGroup.pair ?? "n/a");
+  const selectedTimeframe = String(selectedGroup.timeframe ?? "n/a");
+  const openRows = jobRows.filter((row) => String(row.status) === "RUNNING");
+  const closedRows = jobRows.filter((row) => String(row.status) !== "RUNNING");
+  const dailyRows = jobRows.map((row, index) => ({
+    day: `D${index + 1}`,
+    pair: selectedPair,
+    timeframe: selectedTimeframe,
+    strategy: row.strategy_asset_id,
+    trades: row.trades,
+    pf: row.profit_factor,
+    comfort: row.comfort_score,
+  }));
+  const weeklyRows = jobRows.map((row, index) => ({
+    week: `W${index + 1}`,
+    strategy: row.strategy_asset_id,
+    drawdown: row.drawdown,
+    expectancy: row.expectancy,
+    decision: row.decision,
+  }));
+  const monthlyRows = jobRows.map((row, index) => ({
+    month: `M${index + 1}`,
+    strategy: row.strategy_asset_id,
+    comfort: row.comfort_score,
+    failure_reason: row.failure_reason,
+    next_action: row.next_action,
+  }));
+  return [
+    {
+      label: "Summary",
+      content: (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <DataTable title="Campaign Groups" rows={groupQueueRows} />
+          <DataTable title="Backtest vs Replay vs Paper" rows={comparisonRows} />
+        </div>
+      ),
+    },
+    { label: "Scanner", content: <DataTable title="Ranked Strategy Scanner" rows={jobRows} /> },
+    { label: "Performance", content: <DataTable title="Strategy Replay Performance" rows={jobRows} /> },
+    {
+      label: "Portfolio",
+      content: (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <DataTable title="Accepted / Rejected Portfolio Impact" rows={jobRows} />
+          <DataTable title="Research Required" rows={researchRows} />
+        </div>
+      ),
+    },
+    {
+      label: "Loop",
+      content: (
+        <DataTable
+          title="Shared Paper Trading Path"
+          rows={[
+            { step: 1, component: "Historical candle event", status: "Only source changes" },
+            { step: 2, component: "Paper Trading Scanner", status: "Shared" },
+            { step: 3, component: "Feature Engine", status: "Shared" },
+            { step: 4, component: "Regime Engine", status: "Shared" },
+            { step: 5, component: "Strategy Selector", status: "Shared" },
+            { step: 6, component: "Decision Engine", status: "Shared" },
+            { step: 7, component: "Risk Engine", status: "Shared" },
+            { step: 8, component: "Paper Portfolio", status: "Shared" },
+            { step: 9, component: "Trade Investigation", status: "Shared" },
+          ]}
+        />
+      ),
+    },
+    { label: "Open Positions", content: <DataTable title="Open Replay Positions" rows={openRows.length ? openRows : [{ status: "No open replay positions", pair: selectedPair, timeframe: selectedTimeframe }]} /> },
+    { label: "Closed Positions", content: <DataTable title="Closed Replay Positions" rows={closedRows} /> },
+    { label: "Daily", content: <DataTable title="Daily Replay Results" rows={dailyRows} /> },
+    { label: "Weekly", content: <DataTable title="Weekly Replay Results" rows={weeklyRows} /> },
+    { label: "Monthly", content: <DataTable title="Monthly Replay Results" rows={monthlyRows} /> },
+    {
+      label: "Trade Details",
+      content: (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <DataTable title="Replay Job Details" rows={jobRows} />
+          <DataTable title="Rejected Strategies" rows={rejectedRows} />
+        </div>
+      ),
+    },
+    {
+      label: "Trade Investigation",
+      content: (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <DataTable title="Failure Classification" rows={jobRows.map((row) => ({ strategy: row.strategy_asset_id, result: String(row.decision).includes("ACCEPT") ? "ACCEPTED" : "LOSS", reason: row.failure_reason, next_action: row.next_action }))} />
+          <DataTable title={`Research Improvement Requests (${improvementRequests.length + researchRows.length})`} rows={[...researchRows, ...improvementRequests]} />
+          <DataTable title="Investigation Questions" rows={investigationRows} />
+          <DataTable title="Campaign Components" rows={(campaign.tabs ?? []).map((tab: string) => ({ tab, status: "Replay data available" }))} />
+        </div>
+      ),
+    },
+  ];
 }
 
 function Operations() {

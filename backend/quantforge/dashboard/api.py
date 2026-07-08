@@ -350,6 +350,10 @@ def create_app() -> FastAPI:
     def paper_replay_status() -> dict[str, Any]:
         return service.paper_replay_status()
 
+    @app.get("/api/paper/replay/campaign")
+    def paper_replay_campaign() -> dict[str, Any]:
+        return service.paper_replay_campaign()
+
     @app.post("/api/paper/replay/start")
     def paper_replay_start(payload: dict[str, Any]) -> dict[str, Any]:
         return service.start_paper_replay(payload)

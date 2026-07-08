@@ -414,6 +414,12 @@ def test_paper_replay_campaign_discovers_pair_timeframe_strategy_candidates() ->
 
 def test_paper_replay_control_endpoints_update_progress_store(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(dashboard_service, "_paper_replay_progress_file", lambda: tmp_path / "paper_replay_progress.json")
+    launched: list[tuple[object, str, str]] = []
+    monkeypatch.setattr(
+        dashboard_service,
+        "_launch_paper_replay_process",
+        lambda session, *, speed, strategy_asset_id="": launched.append((session, speed, strategy_asset_id)),
+    )
     replay_client = TestClient(create_app())
 
     started = replay_client.post(
@@ -434,6 +440,8 @@ def test_paper_replay_control_endpoints_update_progress_store(monkeypatch, tmp_p
     assert started.json()["status"] == "RUNNING"
     assert started.json()["replay_mode"] == "MULTI_PAIR_MULTI_TIMEFRAME"
     assert started.json()["replay_speed"] == "10X"
+    assert len(launched) == 1
+    assert launched[0][1] == "10X"
     assert paused.json()["status"] == "PAUSED"
     assert resumed.json()["status"] == "RUNNING"
     assert stopped.json()["status"] == "STOPPED"

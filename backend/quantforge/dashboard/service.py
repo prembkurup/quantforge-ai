@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
+import sys
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -1441,6 +1443,7 @@ class DashboardService:
         )
         cursor = _paper_replay_cursor_from_session(session, status=ReplayStatus.RUNNING, speed=speed, control="START_REQUESTED")
         ReplayProgressStore(_paper_replay_progress_file()).save(cursor)
+        _launch_paper_replay_process(session, speed=speed, strategy_asset_id=str(payload.get("strategy_asset_id") or ""))
         return self.paper_replay_status()
 
     def pause_paper_replay(self) -> dict[str, Any]:
@@ -1978,6 +1981,53 @@ def _approved_strategy_assets_file() -> Path:
 
 def _paper_replay_progress_file() -> Path:
     return _repo_root() / "var" / "paper_replay_progress.json"
+
+
+def _launch_paper_replay_process(session: ReplaySession, *, speed: str, strategy_asset_id: str = "") -> None:
+    root = _repo_root()
+    python = _python_executable(root)
+    log_file = root / "var" / "log" / "paper-replay.log"
+    command = [
+        str(python),
+        str(root / "scripts" / "replay_paper_trading.py"),
+        "--from",
+        session.start_time.isoformat(),
+        "--to",
+        session.end_time.isoformat(),
+        "--pairs",
+        ",".join(session.pairs),
+        "--timeframes",
+        ",".join(session.timeframes),
+        "--speed",
+        speed,
+        "--replay-id",
+        session.replay_id,
+    ]
+    if strategy_asset_id:
+        command.extend(("--strategy-asset-id", strategy_asset_id))
+
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    handle = log_file.open("a", encoding="utf-8")
+    handle.write(f"\n[{datetime.now(UTC).isoformat()}] starting paper replay: {' '.join(command)}\n")
+    handle.flush()
+    try:
+        subprocess.Popen(
+            command,
+            cwd=root,
+            stdout=handle,
+            stderr=subprocess.STDOUT,
+            text=True,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
+        )
+    finally:
+        handle.close()
+
+
+def _python_executable(root: Path) -> Path:
+    local_python = root / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    if local_python.exists():
+        return local_python
+    return Path(sys.executable)
 
 
 def _paper_replay_report_file() -> Path:

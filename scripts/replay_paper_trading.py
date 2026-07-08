@@ -30,6 +30,7 @@ def parse_args() -> argparse.Namespace:
         help="Replay speed metadata used by dashboard controls. MAXIMUM processes without waiting.",
     )
     parser.add_argument("--strategy-asset-id", help="Approved Strategy Asset ID. Defaults to the latest approved asset.")
+    parser.add_argument("--replay-id", help="Replay ID to use. Defaults to a timestamped ID.")
     return parser.parse_args()
 
 
@@ -38,7 +39,7 @@ def main() -> None:
     pairs = tuple(item.strip().upper() for item in args.pairs.split(",") if item.strip())
     timeframes = tuple(item.strip().upper() for item in args.timeframes.split(",") if item.strip())
     session = ReplaySession(
-        replay_id=f"REPLAY-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
+        replay_id=args.replay_id or f"REPLAY-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
         pairs=pairs,
         timeframes=timeframes,
         start_time=parse_datetime(args.start, end_of_date=False),

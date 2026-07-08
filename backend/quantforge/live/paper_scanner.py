@@ -210,7 +210,7 @@ class PaperPositionStore:
     def add_many(
         self,
         positions: tuple[PositionSnapshot, ...],
-        signal_by_pair: dict[str, PaperSignalRecord],
+        signals: tuple[PaperSignalRecord, ...],
         price_by_pair_timeframe: dict[str, float],
         conversion_prices: dict[str, float] | None = None,
     ) -> None:
@@ -222,7 +222,7 @@ class PaperPositionStore:
         }
         now = datetime.now(UTC).isoformat(timespec="seconds")
         for position in positions:
-            signal = signal_by_pair.get(position.instrument)
+            signal = _signal_for_position(position, signals)
             timeframe = signal.timeframe if signal else ""
             entry_time = _iso(signal.candle_time) if signal else now
             entry_price = price_by_pair_timeframe.get(_pair_timeframe_key(position.instrument, timeframe), 0.0)
@@ -728,8 +728,7 @@ class MultiPairPaperScanner:
                     _paper_order(selected.strategy_asset_id, paper_signal, receipt) if receipt else None,
                 )
 
-        signal_by_pair = {signal.pair: signal for signal in paper_signals}
-        self.positions.add_many(tuple(new_positions), signal_by_pair, price_by_pair_timeframe, conversion_prices)
+        self.positions.add_many(tuple(new_positions), tuple(paper_signals), price_by_pair_timeframe, conversion_prices)
         candles_loaded += self._load_position_monitor_candles(
             price_by_pair_timeframe,
             candle_by_pair_timeframe,
@@ -984,6 +983,23 @@ def _iso(value: Any) -> str:
 
 def _pair_timeframe_key(pair: str, timeframe: str) -> str:
     return f"{pair}:{timeframe}"
+
+
+def _signal_for_position(position: PositionSnapshot, signals: tuple[PaperSignalRecord, ...]) -> PaperSignalRecord | None:
+    position_id = str(position.position_id).lower()
+    for signal in signals:
+        signal_order_id = f"pos_paper_{signal.signal_id.lower().replace(':', '_')}"
+        if position_id == signal_order_id:
+            return signal
+    matching_strategy = [
+        signal
+        for signal in signals
+        if signal.pair == position.instrument and signal.strategy_asset_id == position.strategy_id
+    ]
+    if len(matching_strategy) == 1:
+        return matching_strategy[0]
+    matching_pair = [signal for signal in signals if signal.pair == position.instrument]
+    return matching_pair[0] if len(matching_pair) == 1 else None
 
 
 def _safe_key(value: str) -> str:

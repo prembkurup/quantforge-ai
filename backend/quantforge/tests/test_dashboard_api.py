@@ -414,6 +414,8 @@ def test_paper_summary_uses_real_position_store_and_rows_include_strategy(monkey
     service = DashboardService()
     summary = service.paper_summary()
     rows = service._paper_position_rows("OPEN")
+    open_trades = service.paper_open_trades()
+    closed_trades = service.paper_closed_trades()
 
     assert summary["paper_balance"] == 100_020.0
     assert summary["paper_equity"] == 100_030.0
@@ -421,6 +423,8 @@ def test_paper_summary_uses_real_position_store_and_rows_include_strategy(monkey
     assert summary["floating_pl"] == 10.0
     assert rows[0]["strategy"] == record.strategy_name
     assert rows[0]["strategy_asset_id"] == record.strategy_asset_id
+    assert open_trades[0]["position_id"] == "open"
+    assert closed_trades[0]["position_id"] == "closed"
 
 
 def test_paper_open_rows_calculate_missing_usd_index_pl(monkeypatch, tmp_path: Path) -> None:

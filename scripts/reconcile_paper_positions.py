@@ -39,11 +39,13 @@ def main() -> int:
             audit.append(result)
             changed = result["changed"] or changed
 
+    successful_statuses = {"MATCHED", "ALREADY_M1", "NO_M1_EXIT_HIT"}
     summary = {
         "checked_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "positions_checked": len(audit),
         "positions_changed": sum(1 for item in audit if item["changed"]),
-        "positions_unmatched": sum(1 for item in audit if item["status"] != "MATCHED"),
+        "positions_without_clear_m1_hit": sum(1 for item in audit if item["status"] == "NO_M1_EXIT_HIT"),
+        "positions_unmatched": sum(1 for item in audit if item["status"] not in successful_statuses),
         "items": audit,
     }
     audit_path = Path(args.audit_file)
@@ -57,7 +59,7 @@ def main() -> int:
         backup_path.write_text(positions_path.read_text(encoding="utf-8"), encoding="utf-8")
         positions_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
-    print(json.dumps({k: summary[k] for k in ("positions_checked", "positions_changed", "positions_unmatched")}, indent=2))
+    print(json.dumps({k: summary[k] for k in ("positions_checked", "positions_changed", "positions_without_clear_m1_hit", "positions_unmatched")}, indent=2))
     return 1 if summary["positions_unmatched"] else 0
 
 

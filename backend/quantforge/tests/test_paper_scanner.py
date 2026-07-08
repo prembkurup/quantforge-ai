@@ -7,12 +7,14 @@ from pathlib import Path
 from quantforge.live.paper_scanner import (
     DecisionTraceStore,
     MultiPairPaperScanner,
+    PaperSignalRecord,
     PaperPositionStore,
     PaperScannerConfig,
     ProcessedCandleStore,
     ProcessedSignalStore,
     _coerce_datetime,
 )
+from quantforge.live.engine import PositionSnapshot
 from quantforge.research.strategy_assets import (
     ApprovedStrategyAssetStatus,
     ApprovedStrategyAssetStore,
@@ -149,6 +151,68 @@ def test_existing_paper_position_blocks_duplicate_order(tmp_path: Path) -> None:
     assert result.orders_executed == 0
     assert result.pair_results[0].reason == "CONFLICTING_PAPER_POSITION"
     assert result.open_positions == 1
+
+
+def test_position_store_matches_new_positions_to_exact_signal_timeframe(tmp_path: Path) -> None:
+    position_store = PaperPositionStore(tmp_path / "positions.json")
+    h1_signal = PaperSignalRecord(
+        signal_id="SIG-REPLAY-EUR_USD-H1-000001",
+        strategy_asset_id="QF-H1",
+        pair="EUR_USD",
+        timeframe="H1",
+        candle_time="2026-07-07T04:00:00+00:00",
+        signal_type="BUY",
+        confidence=0.93,
+        reason_codes=(),
+        feature_vector_id="fv-h1",
+        signal_key="key-h1",
+    )
+    m15_signal = PaperSignalRecord(
+        signal_id="SIG-REPLAY-EUR_USD-M15-000001",
+        strategy_asset_id="QF-M15",
+        pair="EUR_USD",
+        timeframe="M15",
+        candle_time="2026-07-07T03:45:00+00:00",
+        signal_type="SELL",
+        confidence=0.91,
+        reason_codes=(),
+        feature_vector_id="fv-m15",
+        signal_key="key-m15",
+    )
+
+    position_store.add_many(
+        (
+            PositionSnapshot(
+                strategy_id="QF-LIVE-0001",
+                instrument="EUR_USD",
+                units=10000,
+                floating_pl=0.0,
+                margin_used=363.0,
+                exposure=0.1,
+                position_id="pos_paper_sig-replay-eur_usd-m15-000001",
+            ),
+            PositionSnapshot(
+                strategy_id="QF-LIVE-0001",
+                instrument="EUR_USD",
+                units=10000,
+                floating_pl=0.0,
+                margin_used=363.0,
+                exposure=0.1,
+                position_id="pos_paper_sig-replay-eur_usd-h1-000001",
+            ),
+        ),
+        (h1_signal, m15_signal),
+        {"EUR_USD:H1": 1.2, "EUR_USD:M15": 1.1},
+    )
+
+    by_id = {position["position_id"]: position for position in position_store._load()["positions"]}
+
+    assert by_id["pos_paper_sig-replay-eur_usd-m15-000001"]["timeframe"] == "M15"
+    assert by_id["pos_paper_sig-replay-eur_usd-m15-000001"]["source_signal_id"] == m15_signal.signal_id
+    assert by_id["pos_paper_sig-replay-eur_usd-m15-000001"]["entry_price"] == 1.1
+    assert by_id["pos_paper_sig-replay-eur_usd-h1-000001"]["timeframe"] == "H1"
+    assert by_id["pos_paper_sig-replay-eur_usd-h1-000001"]["source_signal_id"] == h1_signal.signal_id
+    assert by_id["pos_paper_sig-replay-eur_usd-h1-000001"]["entry_price"] == 1.2
 
 
 def test_paper_position_store_enriches_legacy_open_positions(tmp_path: Path) -> None:

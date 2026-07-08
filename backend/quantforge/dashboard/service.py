@@ -1288,19 +1288,10 @@ class DashboardService:
         }
 
     def paper_open_trades(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "order_id": order.order_id,
-                "instrument": order.instrument,
-                "action": order.action.value,
-                "units": order.units,
-                "expected_price": order.expected_price,
-            }
-            for order in self._paper.paper_orders
-        ]
+        return self._paper_position_rows("OPEN")
 
     def paper_closed_trades(self) -> list[dict[str, Any]]:
-        return []
+        return self._paper_position_rows("CLOSED")
 
     def paper_drift(self) -> dict[str, Any]:
         return {

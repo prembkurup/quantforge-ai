@@ -2933,6 +2933,11 @@ function PaperPeriodTradesPanel({
     () => rows.filter((row) => paperTradePeriodKey(row, period) === selectedPeriod),
     [rows, period, selectedPeriod]
   );
+  React.useEffect(() => {
+    if (selectedPeriod && !periodRows.some((row) => row.period_key === selectedPeriod)) {
+      setSelectedPeriod("");
+    }
+  }, [periodRows, selectedPeriod]);
   const selectedDisplay = periodRows.find((row) => row.period_key === selectedPeriod)?.[labels.column] ?? selectedPeriod;
   if (selectedPeriod) {
     return (
@@ -3117,17 +3122,6 @@ function paperTradePeriodLabels(period: "day" | "week" | "month") {
   };
 }
 
-function filterPaperTradesByPeriod(rows: Row[], period: "day" | "week" | "month") {
-  const now = new Date();
-  return rows.filter((row) => {
-    const date = paperTradeDate(row);
-    if (!date) return false;
-    if (period === "day") return localDateKey(date) === localDateKey(now);
-    if (period === "week") return weekKey(date) === weekKey(now);
-    return monthKey(date) === monthKey(now);
-  });
-}
-
 function summarizePaperTrades(rows: Row[]) {
   const values = rows.map((row) => moneyNumber(row.p_l)).filter((value): value is number => value !== null);
   const wins = values.filter((value) => value > 0);
@@ -3142,7 +3136,7 @@ function summarizePaperTrades(rows: Row[]) {
     closedTrades: rows.filter((row) => String(row.trade_status ?? row.status ?? "").toUpperCase() === "CLOSED").length,
     winningTrades: wins.length,
     losingTrades: losses.length,
-    winRate: formatPercent(values.length ? wins.length / values.length : 0),
+    winRate: formatPercent(rows.length ? wins.length / rows.length : 0),
     profitFactor: formatRatio(profitFactorValue(wins, losses)),
     averageProfit: values.length ? formatUsd(average(values)) : "N/A",
     bestTrade: values.length ? formatUsd(best) : "N/A",

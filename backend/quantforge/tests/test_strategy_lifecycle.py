@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from pathlib import Path
 
 from quantforge.live import (
     RootCauseCategory,
@@ -8,6 +9,8 @@ from quantforge.live import (
     StrategyLifecycleStatus,
     demo_strategy_lifecycle_inputs,
 )
+from scripts.quantforge_247 import _jobs, _python_exe
+from scripts.strategy_lifecycle import _load_json, _upsert_research_requests
 
 
 def test_strategy_lifecycle_scores_every_strategy_and_serializes_reports() -> None:
@@ -117,3 +120,34 @@ def test_retirement_requires_evidence_and_replacement_support() -> None:
     assert "Health below threshold for 35 days" in decision.retirement_evidence
     assert decision.replacement_candidate is not None
     assert decision.portfolio_impact["decision"] == "RETIRE"
+
+
+def test_strategy_lifecycle_supervisor_job_is_registered() -> None:
+    jobs = _jobs(
+        _python_exe(),
+        trading_enabled=False,
+        trading_interval_seconds=60,
+        operations_interval_seconds=3600,
+    )
+
+    lifecycle = next(job for job in jobs if job.name == "strategy-lifecycle")
+
+    assert lifecycle.interval_seconds == 3600
+    assert Path(lifecycle.command[1]).name == "strategy_lifecycle.py"
+    assert lifecycle.log_file.name == "strategy-lifecycle.log"
+
+
+def test_strategy_lifecycle_runner_queues_research_requests(tmp_path) -> None:
+    payload = StrategyLifecycleEngine().analyze(
+        demo_strategy_lifecycle_inputs(),
+        generated_at=datetime(2026, 7, 8, tzinfo=UTC),
+    ).to_payload()
+    path = tmp_path / "history_validation_improvements.json"
+
+    queued = _upsert_research_requests(payload, path)
+    rows = _load_json(path)["improvements"]
+
+    assert queued >= 1
+    assert any(row["source"] == "strategy_lifecycle" for row in rows)
+    assert all(row["status"] == "REQUESTED" for row in rows)
+    assert all(row["research_program_id"].startswith("RP-") for row in rows)

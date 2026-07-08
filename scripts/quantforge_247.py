@@ -199,6 +199,12 @@ def _jobs(
             log_file=PROJECT_ROOT / "var" / "log" / "performance-learning.log",
             interval_seconds=operations_interval_seconds,
         ),
+        RecurringJob(
+            name="strategy-lifecycle",
+            command=(str(python), str(PROJECT_ROOT / "scripts" / "strategy_lifecycle.py")),
+            log_file=PROJECT_ROOT / "var" / "log" / "strategy-lifecycle.log",
+            interval_seconds=operations_interval_seconds,
+        ),
     ]
     if trading_enabled:
         jobs.insert(

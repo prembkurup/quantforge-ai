@@ -1778,6 +1778,17 @@ function PaperReplayControlPanel({ replay, onReplayUpdated }: { replay: any; onR
     stage: displayLabel(stage),
     component: String(component),
   }));
+  const summary = replay.replay_summary ?? {};
+  const comparisonRows = (replay.replay_comparison?.rows ?? []) as Row[];
+  const investigation = replay.replay_investigation ?? {};
+  const investigationRows = Object.entries(investigation.questions ?? {}).map(([question, status]) => ({
+    question: displayLabel(question),
+    status: String(status),
+  }));
+  const improvementRequests = (replay.strategy_improvement_report?.requests ?? []) as Row[];
+  const acceptanceRows = Object.entries(replay.acceptance ?? {})
+    .filter(([key]) => key !== "gaps")
+    .map(([criterion, value]) => ({ criterion: displayLabel(criterion), status: value ? "PASS" : "GAP" }));
 
   return (
     <section className="card panel dashboard-card">
@@ -1849,6 +1860,48 @@ function PaperReplayControlPanel({ replay, onReplayUpdated }: { replay: any; onR
             <MiniFact label="Updated" value={formatDate(replay.updated_at || replay.timestamp)} />
           </div>
         </section>
+      </div>
+      <section className="card panel dashboard-card mt-4">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Summary</div>
+        <div className="pipeline-detail-grid">
+          <MiniFact label="Replay Period" value={summary.replay_period || "n/a"} />
+          <MiniFact label="Pairs" value={(summary.pairs ?? []).join(", ") || replay.pair || "n/a"} />
+          <MiniFact label="Timeframes" value={(summary.timeframes ?? []).join(", ") || replay.timeframe || "n/a"} />
+          <MiniFact label="Candles Replayed" value={number(summary.candles_replayed ?? replay.processed_events ?? 0)} />
+          <MiniFact label="Trades" value={number(summary.trades ?? replay.paper_orders ?? 0)} />
+          <MiniFact label="Profit Factor" value={summary.profit_factor ?? "n/a"} />
+          <MiniFact label="Win Rate" value={formatPercent(Number(summary.win_rate ?? 0))} />
+          <MiniFact label="Drawdown" value={formatPercent(Number(summary.drawdown ?? 0))} />
+          <MiniFact label="Strategy Health" value={summary.strategy_health ?? "n/a"} />
+          <MiniFact label="Portfolio Health" value={summary.portfolio_health ?? "n/a"} />
+          <MiniFact label="Research Requests Generated" value={number(summary.research_requests_generated ?? 0)} />
+          <MiniFact label="Knowledge Updates" value={number(summary.knowledge_updates ?? 0)} />
+        </div>
+      </section>
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Investigation</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Required" value={investigation.required ? "YES" : "NO"} />
+            <MiniFact label="Decision Quality" value={investigation.decision_quality ?? "n/a"} />
+            <MiniFact label="Recommendation" value={investigation.recommendation ?? "n/a"} />
+            <MiniFact label="Root Causes" value={(investigation.root_causes ?? []).join(", ") || "None"} />
+          </div>
+          <DataTable title="Investigation Questions" rows={investigationRows as Row[]} />
+        </section>
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Learning Feedback</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Knowledge Base Updated" value={replay.knowledge_feedback?.knowledge_base_updated ? "YES" : "NO"} />
+            <MiniFact label="Learning Sources" value={(replay.knowledge_feedback?.learning_sources ?? []).join(", ")} />
+            <MiniFact label="Policy" value={replay.strategy_improvement_report?.policy ?? "Research requests only."} />
+          </div>
+          <DataTable title={`Research Improvement Requests (${improvementRequests.length})`} rows={improvementRequests} />
+        </section>
+      </div>
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <DataTable title="Backtest vs Replay vs Paper" rows={comparisonRows} />
+        <DataTable title="Milestone 29 Acceptance" rows={acceptanceRows as Row[]} />
       </div>
       <DataTable title="Shared Paper Trading Pipeline" rows={pipelineRows} />
     </section>

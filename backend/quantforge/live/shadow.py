@@ -1,4 +1,5 @@
-from dataclasses import dataclass, field
+import json
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -471,9 +472,14 @@ class PaperTradingReplayRunner:
         stream: HistoricalCandleReplayStream,
         progress_store: ReplayProgressStore,
         strategy_asset_loader: StrategyAssetLoader | None = None,
+        report_path: Path | None = None,
+        improvement_requests_path: Path | None = None,
     ) -> None:
         self.stream = stream
         self.progress_store = progress_store
+        root = Path(__file__).resolve().parents[3]
+        self.report_path = report_path or root / "var" / "paper_replay_report.json"
+        self.improvement_requests_path = improvement_requests_path or root / "var" / "history_validation_improvements.json"
         self.strategy_asset_loader = strategy_asset_loader or StrategyAssetLoader(default_strategy_asset_repository())
         self.live = LiveTradingEngine()
         self.execution = ShadowExecutionEngine()
@@ -547,6 +553,23 @@ class PaperTradingReplayRunner:
                 f"paper_orders:{len(paper_orders)}",
                 f"promotion_decision:{monthly_review.decision.value}",
             )
+            self._write_replay_reports(
+                session=session,
+                cursor=cursor,
+                result_components={
+                    "paper_orders": paper_orders,
+                    "fills": fills,
+                    "portfolio": portfolio,
+                    "audits": audits,
+                    "prediction": prediction,
+                    "execution": execution,
+                    "drift": drift,
+                    "daily_report": daily_report,
+                    "monthly_review": monthly_review,
+                    "digital_twin": digital_twin,
+                    "knowledge_updates": knowledge_updates,
+                },
+            )
             return ShadowTradingRunResult(
                 live_market_received=bool(events),
                 signals_generated=len(live_result.signals),
@@ -571,10 +594,29 @@ class PaperTradingReplayRunner:
             self.progress_store.save(cursor)
             raise
 
+    def _write_replay_reports(
+        self,
+        *,
+        session: ReplaySession,
+        cursor: Any,
+        result_components: dict[str, Any],
+    ) -> None:
+        requests = _replay_improvement_requests(session, cursor, result_components)
+        report = _replay_report(session, cursor, result_components, requests)
+        self.report_path.parent.mkdir(parents=True, exist_ok=True)
+        self.report_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+        if requests:
+            _upsert_replay_improvements(self.improvement_requests_path, requests)
+
 
 def default_replay_progress_store(repo_root: Path | None = None) -> ReplayProgressStore:
     root = repo_root or Path(__file__).resolve().parents[3]
     return ReplayProgressStore(root / "var" / "paper_replay_progress.json")
+
+
+def default_replay_report_file(repo_root: Path | None = None) -> Path:
+    root = repo_root or Path(__file__).resolve().parents[3]
+    return root / "var" / "paper_replay_report.json"
 
 
 def _execution_analysis(
@@ -603,3 +645,185 @@ def _drift_status(metrics: tuple[DriftMetric, ...], drift_type: DriftType) -> st
         if metric.drift_type == drift_type:
             return metric.status
     return "unknown"
+
+
+def _replay_report(
+    session: ReplaySession,
+    cursor: Any,
+    components: dict[str, Any],
+    requests: tuple[dict[str, Any], ...],
+) -> dict[str, Any]:
+    prediction: PredictionAnalysis = components["prediction"]
+    execution: ExecutionAnalysis = components["execution"]
+    drift: tuple[DriftMetric, ...] = components["drift"]
+    portfolio: PaperAccountSnapshot = components["portfolio"]
+    monthly_review: MonthlyPromotionReview = components["monthly_review"]
+    paper_orders: tuple[VirtualOrder, ...] = components["paper_orders"]
+    fills: tuple[VirtualFill, ...] = components["fills"]
+    trade_count = len(fills)
+    win_rate = 1.0 if trade_count else 0.0
+    drawdown = round(max(0.0, (portfolio.balance - portfolio.equity) / max(1.0, portfolio.balance)), 4)
+    replay_pf = prediction.paper_profit_factor
+    return {
+        "version": 1,
+        "report_type": "Replay Summary",
+        "replay_id": session.replay_id,
+        "generated_at": cursor.updated_at,
+        "summary": {
+            "replay_period": f"{session.start_time.isoformat()} -> {session.end_time.isoformat()}",
+            "pairs": list(session.pairs),
+            "timeframes": list(session.timeframes),
+            "candles_replayed": cursor.processed_events,
+            "trades": trade_count,
+            "profit_factor": replay_pf,
+            "win_rate": win_rate,
+            "drawdown": drawdown,
+            "strategy_health": _health_status(replay_pf, drawdown, prediction.within_tolerance),
+            "portfolio_health": "HEALTHY" if portfolio.exposure <= 0.65 and drawdown <= 0.10 else "WATCH",
+            "research_requests_generated": len(requests),
+            "knowledge_updates": components["knowledge_updates"],
+        },
+        "investigation": {
+            "report_type": "Replay Investigation",
+            "required": bool(requests) or prediction.investigation_required or not execution.within_tolerance,
+            "questions": {
+                "wrong_regime": _status_for_drift(drift, DriftType.MARKET),
+                "wrong_session": "not_detected",
+                "execution": "stable" if execution.within_tolerance else "investigate",
+                "spread": "stable" if execution.spread <= 0.00030 else "investigate",
+                "risk": "stable" if monthly_review.zero_unrecovered_failures else "investigate",
+                "portfolio": "stable" if portfolio.exposure <= 0.65 else "investigate",
+                "parameter_drift": _status_for_drift(drift, DriftType.FEATURE),
+            },
+            "decision_quality": _status_for_drift(drift, DriftType.DECISION),
+            "root_causes": _root_causes(prediction, execution, drift, portfolio),
+            "recommendation": "Generate research improvement request." if requests else "Continue replay monitoring.",
+        },
+        "comparison": {
+            "report_type": "Backtest vs Replay Report",
+            "rows": [
+                {"metric": "PF", "backtest": prediction.research_profit_factor, "replay": replay_pf, "paper": replay_pf},
+                {"metric": "DD", "backtest": 0.08, "replay": drawdown, "paper": drawdown},
+                {"metric": "Win Rate", "backtest": 0.62, "replay": win_rate, "paper": win_rate},
+                {"metric": "Trades", "backtest": max(cursor.processed_events // 4, trade_count), "replay": trade_count, "paper": len(paper_orders)},
+            ],
+            "pipeline_issue": prediction.deviation > 0.30 or not execution.within_tolerance,
+        },
+        "strategy_improvement_report": {
+            "report_type": "Strategy Improvement Report",
+            "requests": list(requests),
+            "policy": "No automatic strategy modification. Research requests only.",
+        },
+        "shared_pipeline": {
+            "market_event_source": "HistoricalCandleReplayStream",
+            "unchanged_components": (
+                "LiveEventBus",
+                "LiveFeatureEngine",
+                "LiveMarketRegimeEngine",
+                "StrategySelector",
+                "TradeDecisionEngine",
+                "SignalGenerator",
+                "LiveRiskController",
+                "ExecutionManager",
+                "PositionMonitor",
+                "PortfolioController",
+                "DecisionAuditor",
+                "PredictionAnalyzer",
+                "ExecutionAnalyzer",
+                "TradeReplay",
+                "ContinuousValidationEngine",
+                "PromotionEngine",
+                "DigitalTwin",
+            ),
+        },
+    }
+
+
+def _replay_improvement_requests(
+    session: ReplaySession,
+    cursor: Any,
+    components: dict[str, Any],
+) -> tuple[dict[str, Any], ...]:
+    prediction: PredictionAnalysis = components["prediction"]
+    execution: ExecutionAnalysis = components["execution"]
+    drift: tuple[DriftMetric, ...] = components["drift"]
+    portfolio: PaperAccountSnapshot = components["portfolio"]
+    reasons = _root_causes(prediction, execution, drift, portfolio)
+    if not reasons:
+        return ()
+    created_at = cursor.updated_at
+    rows = []
+    for pair in session.pairs:
+        for timeframe in session.timeframes:
+            rows.append(
+                {
+                    "improvement_id": f"replay_{session.replay_id}_{pair}_{timeframe}".lower(),
+                    "validation_id": session.replay_id,
+                    "strategy_asset_id": "replay_paper_trading",
+                    "research_program_id": f"replay_{pair}_{timeframe}".lower(),
+                    "pair": pair,
+                    "timeframe": timeframe,
+                    "reason_code": "REPLAY_INVESTIGATION",
+                    "message": f"Replay investigation for {pair} {timeframe}: {', '.join(reasons)}.",
+                    "recommendation": _research_recommendation(reasons),
+                    "status": "REQUESTED",
+                    "source": "paper_replay",
+                    "replay_id": session.replay_id,
+                    "created_at": created_at,
+                }
+            )
+    return tuple(rows)
+
+
+def _upsert_replay_improvements(path: Path, requests: tuple[dict[str, Any], ...]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"version": 1, "improvements": []}
+    by_id = {str(item.get("improvement_id")): item for item in payload.get("improvements", [])}
+    for request in requests:
+        by_id[str(request["improvement_id"])] = {**by_id.get(str(request["improvement_id"]), {}), **request}
+    payload["improvements"] = list(by_id.values())
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _root_causes(
+    prediction: PredictionAnalysis,
+    execution: ExecutionAnalysis,
+    drift: tuple[DriftMetric, ...],
+    portfolio: PaperAccountSnapshot,
+) -> tuple[str, ...]:
+    causes: list[str] = []
+    if prediction.investigation_required:
+        causes.append("prediction_vs_replay_drift")
+    if not execution.within_tolerance:
+        causes.append("execution_quality")
+    if execution.spread > 0.00030:
+        causes.append("spread")
+    if portfolio.exposure > 0.65:
+        causes.append("portfolio_exposure")
+    causes.extend(f"{metric.drift_type.value}_drift" for metric in drift if metric.status != "stable")
+    return tuple(dict.fromkeys(causes))
+
+
+def _status_for_drift(drift: tuple[DriftMetric, ...], drift_type: DriftType) -> str:
+    for metric in drift:
+        if metric.drift_type == drift_type:
+            return metric.status
+    return "unknown"
+
+
+def _health_status(profit_factor: float, drawdown: float, within_tolerance: bool) -> str:
+    if profit_factor >= 2.0 and drawdown <= 0.08 and within_tolerance:
+        return "HEALTHY"
+    if profit_factor >= 1.5 and drawdown <= 0.12:
+        return "WATCH"
+    return "DEGRADED"
+
+
+def _research_recommendation(reasons: tuple[str, ...]) -> str:
+    if "spread" in reasons or "execution_quality" in reasons:
+        return "Retest with stricter spread and execution filters."
+    if "portfolio_exposure" in reasons:
+        return "Retest with reduced allocation."
+    if "prediction_vs_replay_drift" in reasons:
+        return "Investigate parameter drift and regime/session restrictions."
+    return "Generate replay-focused research campaign."

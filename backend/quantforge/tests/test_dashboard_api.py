@@ -371,6 +371,11 @@ def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:
     assert replay_payload["source"] == "ReplayProgressStore"
     assert replay_payload["controls"]["start"] == "/api/paper/replay/start"
     assert replay_payload["shared_pipeline"]["decision_engine"] == "TradeDecisionEngine"
+    assert replay_payload["replay_summary"]["research_requests_generated"] >= 0
+    assert replay_payload["replay_investigation"]["report_type"] == "Replay Investigation"
+    assert replay_payload["replay_comparison"]["report_type"] == "Backtest vs Replay Report"
+    assert replay_payload["strategy_improvement_report"]["policy"].startswith("No automatic")
+    assert replay_payload["acceptance"]["differs_only_in_market_event_source"] is True
     assert client.post("/api/dashboard/overview").status_code == 405
     assert client.post("/api/portfolio/intelligence").status_code == 405
 

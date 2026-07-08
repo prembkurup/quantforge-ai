@@ -90,6 +90,8 @@ def test_paper_trading_replay_runner_processes_real_style_candle_events(tmp_path
         HistoricalCandleReplayStream(FakeCandleRepository(500)),
         progress,
         strategy_asset_loader=StrategyAssetLoader(repository),
+        report_path=tmp_path / "paper_replay_report.json",
+        improvement_requests_path=tmp_path / "history_validation_improvements.json",
     ).run(session, strategy_asset_id="QF-REPLAY-0001")
 
     assert result.live_market_received is True
@@ -100,6 +102,7 @@ def test_paper_trading_replay_runner_processes_real_style_candle_events(tmp_path
     assert progress.load().status.value == "COMPLETE"
     assert progress.load().replay_mode == "SINGLE_PAIR_SINGLE_TIMEFRAME"
     assert progress.load().progress_percent == 100.0
+    assert (tmp_path / "paper_replay_report.json").exists()
 
 
 def test_replay_progress_store_loads_legacy_cursor_payload(tmp_path: Path) -> None:

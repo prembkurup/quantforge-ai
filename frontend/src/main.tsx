@@ -2264,7 +2264,7 @@ function ReplayPeriodTradesPanel({ period, rows }: { period: "day" | "week" | "m
           selectedTrade={selectedTrade}
           onSelectTrade={setSelectedTrade}
         />
-        {selectedTrade && <ReplayTradeDetailsPanel trade={selectedTrade} />}
+        {selectedTrade && <PaperPositionChart position={selectedTrade} onClose={() => setSelectedTrade(null)} />}
       </div>
     );
   }
@@ -2410,44 +2410,6 @@ function ReplayTradeListPanel({
         {rows.length === 0 && <div className="pt-3 text-sm text-slate-400">No replay trades found for this selection.</div>}
       </div>
     </div>
-  );
-}
-
-function ReplayTradeDetailsPanel({ trade }: { trade: Row }) {
-  const detailRows = [
-    { field: "Trade ID", value: trade.trade_id },
-    { field: "Replay Result", value: trade.replay_result },
-    { field: "Group / Job", value: `${trade.group_id} / ${trade.job_id}` },
-    { field: "Pair / Timeframe", value: `${trade.pair} ${trade.timeframe}` },
-    { field: "Strategy", value: `${trade.strategy} (${trade.strategy_asset_id})` },
-    { field: "Direction", value: trade.direction },
-    { field: "Opened", value: formatDate(trade.opened_at) },
-    { field: "Closed", value: formatDate(trade.closed_at) },
-    { field: "Source Candle", value: formatDate(trade.source_candle_time) },
-    { field: "Open Price", value: trade.open_price },
-    { field: "Close Price", value: trade.close_price },
-    { field: "Stop Loss", value: trade.stop_loss },
-    { field: "Take Profit", value: trade.take_profit },
-    { field: "Profit / Loss", value: trade.p_l },
-    { field: "Result", value: trade.result },
-    { field: "Profit Factor", value: trade.profit_factor },
-    { field: "Expectancy", value: trade.expectancy },
-    { field: "Comfort Score", value: trade.comfort_score },
-    { field: "Decision", value: trade.decision },
-    { field: "Close Reason", value: trade.close_reason },
-  ] as Row[];
-  return (
-    <section className="card panel dashboard-card replay-trade-detail">
-      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Single Replay Trade Full Details</div>
-      <div className="replay-trade-detail-grid">
-        {detailRows.map((row) => (
-          <div className="replay-trade-detail-item" key={String(row.field)}>
-            <div className="replay-trade-detail-label">{String(row.field)}</div>
-            <div className={`replay-trade-detail-value ${paperPositionCellClass(String(row.field), row.value)}`}>{String(row.value)}</div>
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -4230,13 +4192,19 @@ function PaperPositionChart({ position, onClose }: { position: Row; onClose: () 
   }, [position]);
   const data = useApi<PaperPositionChartPayload>(`/api/paper/positions/chart?${query}`);
   const candles = data?.candles ?? [];
+  const isReplayTrade = String(position.replay_result ?? "").toLowerCase().includes("replay");
+  const chartTitle = data
+    ? `${data.display_pair} ${data.timeframe} ${isReplayTrade ? "Replay Paper Trade Chart" : "Paper Position Chart"}`
+    : isReplayTrade
+      ? "Replay Paper Trade Chart"
+      : "Paper Position Chart";
   return (
     <div className="trade-chart-modal-backdrop" role="presentation" onClick={onClose}>
-      <section className="card panel dashboard-card trade-chart-modal" role="dialog" aria-modal="true" aria-label="Paper position chart" onClick={(event) => event.stopPropagation()}>
+      <section className="card panel dashboard-card trade-chart-modal" role="dialog" aria-modal="true" aria-label={chartTitle} onClick={(event) => event.stopPropagation()}>
         <div className="trade-chart-header">
           <div>
             <div className="card-header border-0 bg-transparent p-0 font-medium">
-              {data ? `${data.display_pair} ${data.timeframe} Paper Position Chart` : "Paper Position Chart"}
+              {chartTitle}
             </div>
             <div className="trade-chart-subtitle">
               {candles.length.toLocaleString()} / 3000 candles
@@ -4410,6 +4378,8 @@ function buildTradeInvestigationReport(position: Row, chartData?: PaperPositionC
       summary: "Immutable trade identity, prices, timing, and result.",
       items: [
         { label: "Trade ID", value: position.position_id || `${pair}-${timeframe}-${openedAt}` },
+        { label: "Replay Trade ID", value: position.trade_id || "N/A" },
+        { label: "Replay Job", value: position.job_id || "N/A" },
         { label: "Pair", value: pair },
         { label: "Timeframe", value: timeframe },
         { label: "Direction", value: direction },

@@ -1451,10 +1451,8 @@ function Paper() {
         {
           label: "Daily Trades",
           content: (
-            <PaperTradePeriodPanel
-              title="Daily Paper Trades"
-              rows={filterPaperTradesByPeriod(periodTradeRows, "day")}
-              emptyText="No paper trades found for today."
+            <PaperDailyTradesPanel
+              rows={periodTradeRows}
               selected={selectedPosition}
               onSelect={setSelectedPosition}
             />
@@ -1947,6 +1945,12 @@ function startOfLocalWeek(value: Date) {
 
 function monthKey(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatDayKey(value: string) {
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+  return `${day}-${month}-${year}`;
 }
 
 function tradingQualityScore({
@@ -2898,9 +2902,154 @@ function PaperTradePeriodPanel({
   );
 }
 
+function PaperDailyTradesPanel({
+  rows,
+  selected,
+  onSelect
+}: {
+  rows: Row[];
+  selected: Row | null;
+  onSelect: (row: Row) => void;
+}) {
+  const [selectedDay, setSelectedDay] = React.useState("");
+  const dayRows = React.useMemo(() => buildDailyTradeSummaryRows(rows), [rows]);
+  const selectedRows = React.useMemo(
+    () => rows.filter((row) => paperTradeDateKey(row) === selectedDay),
+    [rows, selectedDay]
+  );
+  const selectedDisplayDay = dayRows.find((row) => row.day_key === selectedDay)?.Day ?? selectedDay;
+  if (selectedDay) {
+    return (
+      <div className="paper-period-trades-panel">
+        <div>
+          <button className="pagination-button" type="button" onClick={() => setSelectedDay("")}>Back to Days</button>
+        </div>
+        <PaperTradePeriodPanel
+          title={`${selectedDisplayDay} Daily Paper Trades`}
+          rows={selectedRows}
+          emptyText="No paper trades found for this day."
+          selected={selected}
+          onSelect={onSelect}
+        />
+      </div>
+    );
+  }
+  return (
+    <PaperDailySummaryTable
+      title={`Daily Paper Trades (${dayRows.length})`}
+      rows={dayRows}
+      onSelectDay={setSelectedDay}
+    />
+  );
+}
+
+function PaperDailySummaryTable({
+  title,
+  rows,
+  onSelectDay
+}: {
+  title: string;
+  rows: Row[];
+  onSelectDay: (day: string) => void;
+}) {
+  const columns = ["Day", "Total Profit", "Trades", "Open Trades", "Closed Trades", "Winning Trades", "Losing Trades", "Win Rate", "Profit Factor", "Average P/L", "Best Trade", "Worst Trade"];
+  const [query, setQuery] = React.useState("");
+  const [page, setPage] = React.useState(1);
+  const pageSize = 30;
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredRows = normalizedQuery
+    ? rows.filter((row) => JSON.stringify(row).toLowerCase().includes(normalizedQuery))
+    : rows;
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  React.useEffect(() => {
+    setPage(1);
+  }, [query, rows]);
+  React.useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+  const pageRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
+  return (
+    <div className="card panel dashboard-card overflow-hidden">
+      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">
+        {title}
+        {filteredRows.length !== rows.length ? ` - ${filteredRows.length} matched` : ""}
+      </div>
+      <div className="pb-3">
+        <input
+          className="input"
+          placeholder="Filter by day, profit, trade count, win rate, or any visible field..."
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </div>
+      <div className="overflow-auto">
+        <table className="table table-dark table-hover dashboard-table w-full min-w-[1120px] text-left text-sm">
+          <thead className="bg-slate-900 text-xs uppercase text-slate-400">
+            <tr>{columns.map((column) => <th key={column} className="px-3 py-2">{column}</th>)}</tr>
+          </thead>
+          <tbody>
+            {pageRows.map((row) => (
+              <tr
+                key={String(row.day_key)}
+                className="cursor-pointer border-t border-slate-800"
+                role="button"
+                tabIndex={0}
+                title="Open day trades"
+                onClick={() => onSelectDay(String(row.day_key))}
+                onKeyDown={(event) => openPaperDailyRowFromKeyboard(event, String(row.day_key), onSelectDay)}
+              >
+                {columns.map((column) => (
+                  <td key={column} className={`px-3 py-2 ${paperDailySummaryCellClass(column, row[column])}`}>{String(row[column])}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {filteredRows.length === 0 && <div className="pt-3 text-sm text-slate-400">{rows.length === 0 ? "No paper trade days found." : "No paper trade days match the current filter."}</div>}
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalRows={filteredRows.length}
+        onPageChange={setPage}
+      />
+    </div>
+  );
+}
+
 function buildPaperTradePeriodRows(openRows: Row[], closedRows: Row[]) {
   return [...openRows.map((row) => ({ trade_status: "OPEN", ...row })), ...closedRows.map((row) => ({ trade_status: "CLOSED", ...row }))]
     .sort((left, right) => paperTradeTimeValue(right) - paperTradeTimeValue(left));
+}
+
+function buildDailyTradeSummaryRows(rows: Row[]) {
+  const byDay = new Map<string, Row[]>();
+  for (const row of rows) {
+    const day = paperTradeDateKey(row);
+    if (!day) continue;
+    byDay.set(day, [...(byDay.get(day) ?? []), row]);
+  }
+  return Array.from(byDay.entries())
+    .sort(([left], [right]) => right.localeCompare(left))
+    .map(([day, dayTrades]) => {
+      const summary = summarizePaperTrades(dayTrades);
+      return {
+        day_key: day,
+        Day: formatDayKey(day),
+        "Total Profit": summary.totalProfit,
+        Trades: summary.trades,
+        "Open Trades": summary.openTrades,
+        "Closed Trades": summary.closedTrades,
+        "Winning Trades": summary.winningTrades,
+        "Losing Trades": summary.losingTrades,
+        "Win Rate": summary.winRate,
+        "Profit Factor": summary.profitFactor,
+        "Average P/L": summary.averageProfit,
+        "Best Trade": summary.bestTrade,
+        "Worst Trade": summary.worstTrade,
+      };
+    });
 }
 
 function filterPaperTradesByPeriod(rows: Row[], period: "day" | "week" | "month") {
@@ -2949,6 +3098,19 @@ function openPaperPositionRowFromKeyboard(event: React.KeyboardEvent<HTMLTableRo
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();
   onSelect(row);
+}
+
+function openPaperDailyRowFromKeyboard(event: React.KeyboardEvent<HTMLTableRowElement>, day: string, onSelectDay: (day: string) => void) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  onSelectDay(day);
+}
+
+function paperDailySummaryCellClass(column: string, value: Row[string]) {
+  if (!["Total Profit", "Average P/L", "Best Trade", "Worst Trade"].includes(column)) return "text-slate-200";
+  const number = parseMoneyValue(value);
+  if (number === null || number === 0) return "text-slate-200";
+  return number > 0 ? "paper-pl-positive" : "paper-pl-negative";
 }
 
 function paperPositionCellClass(column: string, value: Row[string]) {

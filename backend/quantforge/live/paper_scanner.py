@@ -270,12 +270,14 @@ class PaperPositionStore:
         self,
         price_by_pair_timeframe: dict[str, float],
         candle_by_pair_timeframe: dict[str, dict[str, Any]] | None = None,
+        candle_history_by_pair_timeframe: dict[str, list[dict[str, Any]]] | None = None,
         conversion_prices: dict[str, float] | None = None,
     ) -> None:
         payload = self._load()
         now = datetime.now(UTC).isoformat(timespec="seconds")
         changed = self._enrich_open_positions(payload)
         candle_by_pair_timeframe = candle_by_pair_timeframe or {}
+        candle_history_by_pair_timeframe = candle_history_by_pair_timeframe or {}
         for position in payload.get("positions", []):
             changed = _normalize_position_pl(position, conversion_prices=conversion_prices) or changed
             if position.get("status") != "OPEN":
@@ -292,7 +294,8 @@ class PaperPositionStore:
             direction = str(position.get("direction") or "")
             units = _float_or_zero(position.get("units"))
             candle = candle_by_pair_timeframe.get(key, {})
-            exit_price, exit_reason = _exit_price_for_candle(position, candle)
+            candles = candle_history_by_pair_timeframe.get(key, [candle] if candle else [])
+            exit_price, exit_reason, exit_candle = _exit_price_for_candles(position, candles)
             if exit_price is not None:
                 realized_pl = _position_pl_account_currency(
                     pair,
@@ -311,7 +314,7 @@ class PaperPositionStore:
                 position["status"] = "CLOSED"
                 position["close_reason"] = exit_reason
                 position["close_timeframe"] = monitor_timeframe if key == monitor_key else timeframe
-                position["closed_at"] = _iso(candle.get("time")) if candle.get("time") else now
+                position["closed_at"] = _iso(exit_candle.get("time")) if exit_candle.get("time") else now
                 position["updated_at"] = now
                 changed = True
                 continue
@@ -458,6 +461,7 @@ class MultiPairPaperScanner:
         events_processed = 0
         price_by_pair_timeframe: dict[str, float] = {}
         candle_by_pair_timeframe: dict[str, dict[str, Any]] = {}
+        candle_history_by_pair_timeframe: dict[str, list[dict[str, Any]]] = {}
         conversion_prices: dict[str, float] = {}
 
         for pair in self.config.pairs[: self.config.max_pairs_per_scan]:
@@ -729,9 +733,15 @@ class MultiPairPaperScanner:
         candles_loaded += self._load_position_monitor_candles(
             price_by_pair_timeframe,
             candle_by_pair_timeframe,
+            candle_history_by_pair_timeframe,
             conversion_prices,
         )
-        self.positions.mark_to_market(price_by_pair_timeframe, candle_by_pair_timeframe, conversion_prices)
+        self.positions.mark_to_market(
+            price_by_pair_timeframe,
+            candle_by_pair_timeframe,
+            candle_history_by_pair_timeframe,
+            conversion_prices,
+        )
         open_position_records = self.positions.list_open()
         closed_position_records = self.positions.list_closed()
         open_positions = len(open_position_records)
@@ -802,6 +812,7 @@ class MultiPairPaperScanner:
         self,
         price_by_pair_timeframe: dict[str, float],
         candle_by_pair_timeframe: dict[str, dict[str, Any]],
+        candle_history_by_pair_timeframe: dict[str, list[dict[str, Any]]],
         conversion_prices: dict[str, float],
     ) -> int:
         candles_loaded = 0
@@ -817,7 +828,7 @@ class MultiPairPaperScanner:
                 pair,
                 "M1",
                 complete_only=True,
-                limit=3,
+                limit=max(180, self.config.candle_lookback),
             )
             candles_loaded += len(rows)
             if not rows:
@@ -826,6 +837,7 @@ class MultiPairPaperScanner:
             price_by_pair_timeframe[key] = _candle_close(rows[-1])
             conversion_prices[pair] = _candle_close(rows[-1])
             candle_by_pair_timeframe[key] = rows[-1]
+            candle_history_by_pair_timeframe[key] = rows
         return candles_loaded
 
     def _trade_eligibility(
@@ -1212,6 +1224,21 @@ def _exit_price_for_candle(position: dict[str, Any], candle: dict[str, Any]) -> 
         if high >= take_profit:
             return take_profit, "TAKE_PROFIT"
     return None, ""
+
+
+def _exit_price_for_candles(
+    position: dict[str, Any],
+    candles: list[dict[str, Any]],
+) -> tuple[float | None, str, dict[str, Any]]:
+    ordered = sorted(
+        (candle for candle in candles if candle and candle.get("time")),
+        key=lambda item: _coerce_datetime(item.get("time")),
+    )
+    for candle in ordered:
+        exit_price, exit_reason = _exit_price_for_candle(position, candle)
+        if exit_price is not None:
+            return exit_price, exit_reason, candle
+    return None, "", {}
 
 
 def _paper_signal(

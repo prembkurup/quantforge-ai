@@ -345,6 +345,72 @@ def test_mark_to_market_uses_m1_monitor_candle_for_h1_position_exit(tmp_path: Pa
     assert positions[0]["closed_at"] == "2026-07-07T03:41:00+00:00"
 
 
+def test_mark_to_market_uses_first_m1_hit_instead_of_next_h1_close_time(tmp_path: Path) -> None:
+    position_store = PaperPositionStore(tmp_path / "positions.json")
+    position_store._save(
+        {
+            "positions": [
+                {
+                    "position_id": "first-m1-hit",
+                    "pair": "EUR_USD",
+                    "instrument": "EUR_USD",
+                    "timeframe": "H1",
+                    "direction": "BUY",
+                    "status": "OPEN",
+                    "units": 10000,
+                    "entry_price": 1.1,
+                    "open_price": 1.1,
+                    "stop_loss": 1.099,
+                    "take_profit": 1.102,
+                    "source_candle_time": "2026-07-07T03:00:00+00:00",
+                    "opened_at": "2026-07-07T03:00:00+00:00",
+                }
+            ]
+        }
+    )
+
+    position_store.mark_to_market(
+        {"EUR_USD:H1": 1.103, "EUR_USD:M1": 1.1025},
+        {
+            "EUR_USD:H1": {
+                "time": datetime(2026, 7, 7, 4, 0, tzinfo=UTC),
+                "high_price": 1.103,
+                "low_price": 1.1002,
+            },
+            "EUR_USD:M1": {
+                "time": datetime(2026, 7, 7, 3, 59, tzinfo=UTC),
+                "high_price": 1.1025,
+                "low_price": 1.1018,
+            },
+        },
+        {
+            "EUR_USD:M1": [
+                {
+                    "time": datetime(2026, 7, 7, 3, 1, tzinfo=UTC),
+                    "high_price": 1.1004,
+                    "low_price": 1.0998,
+                },
+                {
+                    "time": datetime(2026, 7, 7, 3, 12, tzinfo=UTC),
+                    "high_price": 1.1022,
+                    "low_price": 1.1011,
+                },
+                {
+                    "time": datetime(2026, 7, 7, 3, 59, tzinfo=UTC),
+                    "high_price": 1.1025,
+                    "low_price": 1.1018,
+                },
+            ],
+        },
+    )
+
+    positions = position_store._load()["positions"]
+    assert positions[0]["status"] == "CLOSED"
+    assert positions[0]["close_reason"] == "TAKE_PROFIT"
+    assert positions[0]["close_timeframe"] == "M1"
+    assert positions[0]["closed_at"] == "2026-07-07T03:12:00+00:00"
+
+
 def test_mark_to_market_converts_jpy_quote_pl_to_usd_account_currency(tmp_path: Path) -> None:
     position_store = PaperPositionStore(tmp_path / "positions.json")
     position_store._save(

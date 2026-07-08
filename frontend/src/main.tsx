@@ -12,6 +12,11 @@ const apiBase = import.meta.env.VITE_API_BASE ?? "";
 
 type Row = Record<string, string | number | boolean>;
 
+type DashboardTab = {
+  label: string;
+  content: React.ReactNode;
+};
+
 type PaperPositionChartCandle = {
   time: string;
   open: number;
@@ -218,26 +223,38 @@ function Overview() {
   return (
     <div className="space-y-5">
       <ReadinessBanner value={String(data.decision_banner)} source={String(data.source)} />
-      <div className="kpi-grid">
-        <KpiCard title="Platform" value={data.platform_status} tone="good" />
-        <KpiCard title="Research" value={data.research_status} tone="good" />
-        <KpiCard title="Portfolio" value={data.portfolio_readiness} tone="good" />
-        <KpiCard title="Paper Trading" value={data.paper_trading_status} />
-        <KpiCard title="Live Trading" value={data.live_trading_status} tone="warn" />
-        <KpiCard title="Alerts" value={data.critical_alerts} tone="good" />
-      </div>
-      <div className="kpi-grid">
-        <KpiCard title="Experiments" value={number(data.experiments)} />
-        <KpiCard title="Candidates" value={number(data.candidate_strategies)} />
-        <KpiCard title="Optimized" value={number(data.optimized_strategies)} />
-        <KpiCard title="Validated Assets" value={number(data.validated_assets)} />
-        <KpiCard title="Production Grade" value={number(data.production_strategies)} />
-        <KpiCard title="Knowledge Records" value={number(data.knowledge_records)} />
-        <KpiCard title="Avg Confidence" value={`${data.average_confidence}%`} />
-        <KpiCard title="Avg PF" value={data.average_profit_factor} />
-        <KpiCard title="Max Drawdown" value={`${data.max_drawdown}%`} />
-        <KpiCard title="Architecture" value={data.architecture_freeze} />
-      </div>
+      <DashboardTabs tabs={[
+        {
+          label: "Status",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Platform" value={data.platform_status} tone="good" />
+              <KpiCard title="Research" value={data.research_status} tone="good" />
+              <KpiCard title="Portfolio" value={data.portfolio_readiness} tone="good" />
+              <KpiCard title="Paper Trading" value={data.paper_trading_status} />
+              <KpiCard title="Live Trading" value={data.live_trading_status} tone="warn" />
+              <KpiCard title="Alerts" value={data.critical_alerts} tone="good" />
+            </div>
+          ),
+        },
+        {
+          label: "Research Metrics",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Experiments" value={number(data.experiments)} />
+              <KpiCard title="Candidates" value={number(data.candidate_strategies)} />
+              <KpiCard title="Optimized" value={number(data.optimized_strategies)} />
+              <KpiCard title="Validated Assets" value={number(data.validated_assets)} />
+              <KpiCard title="Production Grade" value={number(data.production_strategies)} />
+              <KpiCard title="Knowledge Records" value={number(data.knowledge_records)} />
+              <KpiCard title="Avg Confidence" value={`${data.average_confidence}%`} />
+              <KpiCard title="Avg PF" value={data.average_profit_factor} />
+              <KpiCard title="Max Drawdown" value={`${data.max_drawdown}%`} />
+              <KpiCard title="Architecture" value={data.architecture_freeze} />
+            </div>
+          ),
+        },
+      ]} />
     </div>
   );
 }
@@ -288,62 +305,95 @@ function Research() {
   const latestGuardrails = guardrails.slice(-10).reverse();
   return (
     <Page title="Research Progress">
-      <div className="kpi-grid">
-        <KpiCard title="Orchestrator" value={orchestrator.state} tone={orchestrator.state === "ERROR" ? "warn" : "good"} />
-        <KpiCard title="Idle Reason" value={orchestrator.idle_reason?.reason_code ?? "NONE"} />
-        <KpiCard title="Next Check" value={shortTime(orchestrator.next_check_at)} />
-        <KpiCard title="Last Jobs" value={orchestrator.last_jobs_launched ?? 0} />
-        <KpiCard title="Weak Programs" value={orchestrator.totals?.weak_programs ?? 0} tone={(orchestrator.totals?.weak_programs ?? 0) ? "warn" : "good"} />
-        <KpiCard title="Stale Programs" value={orchestrator.totals?.stale_programs ?? 0} />
-        <KpiCard title="Blocked Programs" value={orchestrator.totals?.blocked_programs ?? 0} />
-        <KpiCard title="Fine-Tuning" value={fineTuning.state} />
-        <KpiCard title="Usable Datasets" value={`${coverage.usable_datasets}/${coverage.total_datasets}`} tone="good" />
-        <KpiCard title="Research Coverage" value={`${coverage.coverage_percent}%`} tone="good" />
-        <KpiCard title="Programs" value={coverage.research_programs} />
-        <KpiCard title="Candidates" value={number(coverage.candidate_count)} />
-        <KpiCard title="Approved Assets" value={number(coverage.approved_asset_count)} tone="good" />
-        <KpiCard title="Efficiency" value={`${coverage.candidate_efficiency}%`} />
-        <KpiCard title="Pairs" value={diversity.pair_count} />
-        <KpiCard title="Timeframes" value={diversity.timeframe_count} />
-        <KpiCard title="Families" value={diversity.family_count} />
-        <KpiCard title="Regimes" value={diversity.regime_count} />
-      </div>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <LinePanel title="Experiments completed" data={progress.charts.experiments_over_time} />
-        <LinePanel title="Knowledge growth" data={progress.charts.knowledge_growth} />
-        <BarPanel title="Profit factor distribution" data={progress.charts.profit_factor_distribution} />
-        <BarPanel title="Drawdown distribution" data={progress.charts.drawdown_distribution} />
-      </div>
-      <section className="card panel dashboard-card">
-        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Always-On Research Orchestrator</div>
-        <div className="pipeline-current">
-          <div>
-            <div className="pipeline-current-title">{orchestrator.idle_reason?.reason_code ?? orchestrator.state}</div>
-            <div className="pipeline-current-meta">
-              Last checked {shortTime(orchestrator.last_checked_at)} - next check {shortTime(orchestrator.next_check_at)}
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Orchestrator" value={orchestrator.state} tone={orchestrator.state === "ERROR" ? "warn" : "good"} />
+              <KpiCard title="Idle Reason" value={orchestrator.idle_reason?.reason_code ?? "NONE"} />
+              <KpiCard title="Next Check" value={shortTime(orchestrator.next_check_at)} />
+              <KpiCard title="Last Jobs" value={orchestrator.last_jobs_launched ?? 0} />
+              <KpiCard title="Weak Programs" value={orchestrator.totals?.weak_programs ?? 0} tone={(orchestrator.totals?.weak_programs ?? 0) ? "warn" : "good"} />
+              <KpiCard title="Stale Programs" value={orchestrator.totals?.stale_programs ?? 0} />
+              <KpiCard title="Blocked Programs" value={orchestrator.totals?.blocked_programs ?? 0} />
+              <KpiCard title="Fine-Tuning" value={fineTuning.state} />
+              <KpiCard title="Usable Datasets" value={`${coverage.usable_datasets}/${coverage.total_datasets}`} tone="good" />
+              <KpiCard title="Research Coverage" value={`${coverage.coverage_percent}%`} tone="good" />
+              <KpiCard title="Programs" value={coverage.research_programs} />
+              <KpiCard title="Candidates" value={number(coverage.candidate_count)} />
+              <KpiCard title="Approved Assets" value={number(coverage.approved_asset_count)} tone="good" />
+              <KpiCard title="Efficiency" value={`${coverage.candidate_efficiency}%`} />
+              <KpiCard title="Pairs" value={diversity.pair_count} />
+              <KpiCard title="Timeframes" value={diversity.timeframe_count} />
+              <KpiCard title="Families" value={diversity.family_count} />
+              <KpiCard title="Regimes" value={diversity.regime_count} />
             </div>
-            <div className="pipeline-current-detail">{orchestrator.idle_reason?.message ?? "Research orchestrator is active."}</div>
-          </div>
-        </div>
-      </section>
-      <section className="card panel dashboard-card">
-        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Fine-Tuning Status</div>
-        <div className="pipeline-current">
-          <div>
-            <div className="pipeline-current-title">{fineTuning.state}</div>
-            <div className="pipeline-current-meta">Eligible assets {fineTuning.eligible_assets ?? 0}</div>
-            <div className="pipeline-current-detail">{fineTuning.message}</div>
-          </div>
-        </div>
-      </section>
-      <DataTable title={`Orchestrator Runs (${orchestratorRuns.length})`} rows={latestRuns} />
-      <DataTable title={`Orchestrator Idle Reasons (${idleReasons.length})`} rows={latestIdleReasons} />
-      <DataTable title={`Orchestrator Guardrails (${guardrails.length})`} rows={latestGuardrails} />
-      <PaginatedDataTable title={`Multi-Market Research Programs (${programs.length})`} rows={programs} />
-      <PaginatedDataTable title={`Research Productivity by Dataset (${productivity.length})`} rows={productivity} />
-      <PaginatedDataTable title={`Full-History Research Matrix (${matrix.length})`} rows={matrix} />
-      <PaginatedDataTable title={`Rejected Strategy Candidates (${rejected.length})`} rows={rejected} />
-      <PaginatedDataTable title={`Rejected Strategy Reasons (${rejections.length})`} rows={rejections} />
+          ),
+        },
+        {
+          label: "Charts",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <LinePanel title="Experiments completed" data={progress.charts.experiments_over_time} />
+              <LinePanel title="Knowledge growth" data={progress.charts.knowledge_growth} />
+              <BarPanel title="Profit factor distribution" data={progress.charts.profit_factor_distribution} />
+              <BarPanel title="Drawdown distribution" data={progress.charts.drawdown_distribution} />
+            </div>
+          ),
+        },
+        {
+          label: "Orchestrator",
+          content: (
+            <>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Always-On Research Orchestrator</div>
+                <div className="pipeline-current">
+                  <div>
+                    <div className="pipeline-current-title">{orchestrator.idle_reason?.reason_code ?? orchestrator.state}</div>
+                    <div className="pipeline-current-meta">
+                      Last checked {shortTime(orchestrator.last_checked_at)} - next check {shortTime(orchestrator.next_check_at)}
+                    </div>
+                    <div className="pipeline-current-detail">{orchestrator.idle_reason?.message ?? "Research orchestrator is active."}</div>
+                  </div>
+                </div>
+              </section>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Fine-Tuning Status</div>
+                <div className="pipeline-current">
+                  <div>
+                    <div className="pipeline-current-title">{fineTuning.state}</div>
+                    <div className="pipeline-current-meta">Eligible assets {fineTuning.eligible_assets ?? 0}</div>
+                    <div className="pipeline-current-detail">{fineTuning.message}</div>
+                  </div>
+                </div>
+              </section>
+              <DataTable title={`Orchestrator Runs (${orchestratorRuns.length})`} rows={latestRuns} />
+              <DataTable title={`Orchestrator Idle Reasons (${idleReasons.length})`} rows={latestIdleReasons} />
+              <DataTable title={`Orchestrator Guardrails (${guardrails.length})`} rows={latestGuardrails} />
+            </>
+          ),
+        },
+        {
+          label: "Programs",
+          content: (
+            <>
+              <PaginatedDataTable title={`Multi-Market Research Programs (${programs.length})`} rows={programs} />
+              <PaginatedDataTable title={`Research Productivity by Dataset (${productivity.length})`} rows={productivity} />
+              <PaginatedDataTable title={`Full-History Research Matrix (${matrix.length})`} rows={matrix} />
+            </>
+          ),
+        },
+        {
+          label: "Rejections",
+          content: (
+            <>
+              <PaginatedDataTable title={`Rejected Strategy Candidates (${rejected.length})`} rows={rejected} />
+              <PaginatedDataTable title={`Rejected Strategy Reasons (${rejections.length})`} rows={rejections} />
+            </>
+          ),
+        },
+      ]} />
     </Page>
   );
 }
@@ -362,81 +412,95 @@ function Pipeline() {
   );
   return (
     <Page title="Pipeline / Engine Monitor">
-      <div className="kpi-grid">
-        <KpiCard title="Pipeline" value={summary.pipeline_status} tone="good" />
-        <KpiCard title="Current Task" value={summary.current_task} />
-        <KpiCard title="Overall Progress" value={`${summary.overall_progress}%`} />
-        <KpiCard title="Full History Jobs" value={`${summary.full_history_completed_jobs}/${summary.full_history_planned_jobs}`} />
-        <KpiCard title="Full History Failed" value={summary.full_history_failed_jobs} tone={summary.full_history_failed_jobs ? "warn" : "good"} />
-        <KpiCard title="Active Engines" value={`${summary.active_engines}/${summary.total_engines}`} tone="good" />
-        <KpiCard title="Healthy Engines" value={`${summary.healthy_engines}/${summary.total_engines}`} tone="good" />
-        <KpiCard title="Queue Depth" value={summary.queue_depth} />
-        <KpiCard title="Running Tasks" value={summary.running_tasks} />
-        <KpiCard title="Queued Tasks" value={summary.queued_tasks} tone="warn" />
-      </div>
-
-      <section className="card panel dashboard-card">
-        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Current Running Task</div>
-        <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-          <div>
-            <div className="pipeline-current-title">{current.task}</div>
-            <div className="pipeline-current-meta">
-              {current.engine} / {current.stage}
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Pipeline" value={summary.pipeline_status} tone="good" />
+              <KpiCard title="Current Task" value={summary.current_task} />
+              <KpiCard title="Overall Progress" value={`${summary.overall_progress}%`} />
+              <KpiCard title="Full History Jobs" value={`${summary.full_history_completed_jobs}/${summary.full_history_planned_jobs}`} />
+              <KpiCard title="Full History Failed" value={summary.full_history_failed_jobs} tone={summary.full_history_failed_jobs ? "warn" : "good"} />
+              <KpiCard title="Active Engines" value={`${summary.active_engines}/${summary.total_engines}`} tone="good" />
+              <KpiCard title="Healthy Engines" value={`${summary.healthy_engines}/${summary.total_engines}`} tone="good" />
+              <KpiCard title="Queue Depth" value={summary.queue_depth} />
+              <KpiCard title="Running Tasks" value={summary.running_tasks} />
+              <KpiCard title="Queued Tasks" value={summary.queued_tasks} tone="warn" />
             </div>
-            <ProgressBar value={Number(current.progress)} />
-            <div className="pipeline-current-detail">{current.last_event}</div>
-          </div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Task ID" value={current.task_id} />
-            <MiniFact label="Status" value={current.status} />
-            <MiniFact label="Started" value={current.started_at} />
-            <MiniFact label="ETA" value={current.eta} />
-            <MiniFact label="Input" value={current.input} />
-            <MiniFact label="Output" value={current.output} />
-          </div>
-        </div>
-      </section>
-
-      {full_history && (
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Full History Research Scheduler</div>
-          <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-            <div>
-              <div className="pipeline-current-title">{full_history.status}</div>
-              <div className="pipeline-current-meta">
-                {full_history.completed_jobs}/{full_history.planned_jobs} jobs complete / {full_history.pending_jobs} pending
+          ),
+        },
+        {
+          label: "Current Task",
+          content: (
+            <section className="card panel dashboard-card">
+              <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Current Running Task</div>
+              <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+                <div>
+                  <div className="pipeline-current-title">{current.task}</div>
+                  <div className="pipeline-current-meta">{current.engine} / {current.stage}</div>
+                  <ProgressBar value={Number(current.progress)} />
+                  <div className="pipeline-current-detail">{current.last_event}</div>
+                </div>
+                <div className="pipeline-detail-grid">
+                  <MiniFact label="Task ID" value={current.task_id} />
+                  <MiniFact label="Status" value={current.status} />
+                  <MiniFact label="Started" value={current.started_at} />
+                  <MiniFact label="ETA" value={current.eta} />
+                  <MiniFact label="Input" value={current.input} />
+                  <MiniFact label="Output" value={current.output} />
+                </div>
               </div>
-              <ProgressBar value={Number(full_history.progress_percent)} />
-              <div className="pipeline-current-detail">{full_history.latest_job}</div>
+            </section>
+          ),
+        },
+        {
+          label: "Full History",
+          content: full_history ? (
+            <>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Full History Research Scheduler</div>
+                <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+                  <div>
+                    <div className="pipeline-current-title">{full_history.status}</div>
+                    <div className="pipeline-current-meta">
+                      {full_history.completed_jobs}/{full_history.planned_jobs} jobs complete / {full_history.pending_jobs} pending
+                    </div>
+                    <ProgressBar value={Number(full_history.progress_percent)} />
+                    <div className="pipeline-current-detail">{full_history.latest_job}</div>
+                  </div>
+                  <div className="pipeline-detail-grid">
+                    <MiniFact label="Completed" value={full_history.completed_jobs} />
+                    <MiniFact label="Failed" value={full_history.failed_jobs} />
+                    <MiniFact label="Pending" value={full_history.pending_jobs} />
+                    <MiniFact label="Latest Update" value={full_history.latest_recorded_at || "waiting"} />
+                    <MiniFact label="State File" value={full_history.state_file} />
+                  </div>
+                </div>
+              </section>
+              {fullHistoryJobs.length ? (
+                <>
+                  <DataTable title={`Full History Scheduler Jobs (${fullHistoryJobs.length})`} rows={fullHistoryRows} />
+                  <PaginationControls page={fullHistoryPage} totalPages={fullHistoryTotalPages} pageSize={fullHistoryPageSize} totalRows={fullHistoryJobs.length} onPageChange={setFullHistoryPage} />
+                </>
+              ) : null}
+            </>
+          ) : null,
+        },
+        {
+          label: "Engines",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <WorkloadPanel rows={workload} />
+              <DataTable title="Current Status of All Engines" rows={engines} />
             </div>
-            <div className="pipeline-detail-grid">
-              <MiniFact label="Completed" value={full_history.completed_jobs} />
-              <MiniFact label="Failed" value={full_history.failed_jobs} />
-              <MiniFact label="Pending" value={full_history.pending_jobs} />
-              <MiniFact label="Latest Update" value={full_history.latest_recorded_at || "waiting"} />
-              <MiniFact label="State File" value={full_history.state_file} />
-            </div>
-          </div>
-        </section>
-      )}
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <WorkloadPanel rows={workload} />
-        <DataTable title="Current Status of All Engines" rows={engines} />
-      </div>
-      <DataTable title="Tasks in the Pipeline" rows={tasks} />
-      {fullHistoryJobs.length ? (
-        <>
-          <DataTable title={`Full History Scheduler Jobs (${fullHistoryJobs.length})`} rows={fullHistoryRows} />
-          <PaginationControls
-            page={fullHistoryPage}
-            totalPages={fullHistoryTotalPages}
-            pageSize={fullHistoryPageSize}
-            totalRows={fullHistoryJobs.length}
-            onPageChange={setFullHistoryPage}
-          />
-        </>
-      ) : null}
+          ),
+        },
+        {
+          label: "Tasks",
+          content: <DataTable title="Tasks in the Pipeline" rows={tasks} />,
+        },
+      ]} />
     </Page>
   );
 }
@@ -504,57 +568,71 @@ function Workflow() {
   }));
   return (
     <Page title="Workflow Orchestration">
-      <div className="kpi-grid">
-        <KpiCard title="Current Stage" value={run.current_stage} />
-        <KpiCard title="Workflow Status" value={run.status} tone={run.status === "RUNNING" ? "good" : run.status === "BLOCKED" ? "warn" : "neutral"} />
-        <KpiCard title="Progress" value={`${run.completed_tasks}/${run.total_tasks}`} />
-        <KpiCard title="Running" value={run.running_tasks} tone="good" />
-        <KpiCard title="Failed" value={run.failed_tasks} tone={run.failed_tasks ? "warn" : "good"} />
-        <KpiCard title="Retryable" value={run.retryable_tasks} tone={run.retryable_tasks ? "warn" : "good"} />
-        <KpiCard title="Blocked" value={run.blocked_tasks} tone={run.blocked_tasks ? "warn" : "good"} />
-        <KpiCard title="Live Trading" value={run.live_trading_status} tone="warn" />
-        <KpiCard title="Live Gate Reason" value={data.live_gate?.reason ?? "Manual approval required"} tone="warn" />
-      </div>
-
-      <section className="card panel dashboard-card">
-        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Current Workflow Run</div>
-        <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-          <div>
-            <div className="pipeline-current-title">{run.name}</div>
-            <div className="pipeline-current-meta">{run.workflow_id}</div>
-            <ProgressBar value={Number(run.total_tasks ? Math.round((run.completed_tasks / run.total_tasks) * 100) : 0)} />
-            <div className="pipeline-current-detail">{run.next_action}</div>
-          </div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Plan Hash" value={run.plan_hash} />
-            <MiniFact label="Started" value={run.started_at} />
-            <MiniFact label="Live Gate" value={`${data.live_gate?.status ?? run.live_trading_status}: ${data.live_gate?.reason ?? "blocked"}`} />
-            <MiniFact label="Source" value={data.source} />
-          </div>
-        </div>
-      </section>
-
-      <DataTable title="Workflow Stage Timeline" rows={stageRows} />
-      <DataTable title={`Workflow Tasks (${tasks.length})`} rows={taskTableRows} />
-      <PaginationControls
-        page={taskPage}
-        totalPages={taskTotalPages}
-        pageSize={taskPageSize}
-        totalRows={tasks.length}
-        onPageChange={setTaskPage}
-      />
-      <div className="grid gap-4 xl:grid-cols-2">
-        <DataTable title="Approvals" rows={approvalRows} />
-        <DataTable title="Approval Audit Log" rows={audit} />
-      </div>
-      <DataTable title={`Workflow Events (${events.length})`} rows={eventRows} />
-      <PaginationControls
-        page={eventPage}
-        totalPages={eventTotalPages}
-        pageSize={eventPageSize}
-        totalRows={events.length}
-        onPageChange={setEventPage}
-      />
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <>
+              <div className="kpi-grid">
+                <KpiCard title="Current Stage" value={run.current_stage} />
+                <KpiCard title="Workflow Status" value={run.status} tone={run.status === "RUNNING" ? "good" : run.status === "BLOCKED" ? "warn" : "neutral"} />
+                <KpiCard title="Progress" value={`${run.completed_tasks}/${run.total_tasks}`} />
+                <KpiCard title="Running" value={run.running_tasks} tone="good" />
+                <KpiCard title="Failed" value={run.failed_tasks} tone={run.failed_tasks ? "warn" : "good"} />
+                <KpiCard title="Retryable" value={run.retryable_tasks} tone={run.retryable_tasks ? "warn" : "good"} />
+                <KpiCard title="Blocked" value={run.blocked_tasks} tone={run.blocked_tasks ? "warn" : "good"} />
+                <KpiCard title="Live Trading" value={run.live_trading_status} tone="warn" />
+                <KpiCard title="Live Gate Reason" value={data.live_gate?.reason ?? "Manual approval required"} tone="warn" />
+              </div>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Current Workflow Run</div>
+                <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+                  <div>
+                    <div className="pipeline-current-title">{run.name}</div>
+                    <div className="pipeline-current-meta">{run.workflow_id}</div>
+                    <ProgressBar value={Number(run.total_tasks ? Math.round((run.completed_tasks / run.total_tasks) * 100) : 0)} />
+                    <div className="pipeline-current-detail">{run.next_action}</div>
+                  </div>
+                  <div className="pipeline-detail-grid">
+                    <MiniFact label="Plan Hash" value={run.plan_hash} />
+                    <MiniFact label="Started" value={run.started_at} />
+                    <MiniFact label="Live Gate" value={`${data.live_gate?.status ?? run.live_trading_status}: ${data.live_gate?.reason ?? "blocked"}`} />
+                    <MiniFact label="Source" value={data.source} />
+                  </div>
+                </div>
+              </section>
+            </>
+          ),
+        },
+        { label: "Stages", content: <DataTable title="Workflow Stage Timeline" rows={stageRows} /> },
+        {
+          label: "Tasks",
+          content: (
+            <>
+              <DataTable title={`Workflow Tasks (${tasks.length})`} rows={taskTableRows} />
+              <PaginationControls page={taskPage} totalPages={taskTotalPages} pageSize={taskPageSize} totalRows={tasks.length} onPageChange={setTaskPage} />
+            </>
+          ),
+        },
+        {
+          label: "Approvals",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <DataTable title="Approvals" rows={approvalRows} />
+              <DataTable title="Approval Audit Log" rows={audit} />
+            </div>
+          ),
+        },
+        {
+          label: "Events",
+          content: (
+            <>
+              <DataTable title={`Workflow Events (${events.length})`} rows={eventRows} />
+              <PaginationControls page={eventPage} totalPages={eventTotalPages} pageSize={eventPageSize} totalRows={events.length} onPageChange={setEventPage} />
+            </>
+          ),
+        },
+      ]} />
     </Page>
   );
 }
@@ -571,9 +649,21 @@ function Strategies() {
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
   return (
     <Page title="Strategy Library">
-      <input className="input" placeholder="Filter by pair, timeframe, regime, grade, PF, drawdown..." value={query} onChange={(event) => setQuery(event.target.value)} />
-      <DataTable title={`Production-Grade Strategies (${filtered.length})`} rows={pageRows} linkKey="strategy_id" />
-      <PaginationControls page={page} totalPages={totalPages} pageSize={pageSize} totalRows={filtered.length} onPageChange={setPage} />
+      <DashboardTabs tabs={[
+        {
+          label: "Search",
+          content: <input className="input" placeholder="Filter by pair, timeframe, regime, grade, PF, drawdown..." value={query} onChange={(event) => setQuery(event.target.value)} />,
+        },
+        {
+          label: "Strategies",
+          content: (
+            <>
+              <DataTable title={`Production-Grade Strategies (${filtered.length})`} rows={pageRows} linkKey="strategy_id" />
+              <PaginationControls page={page} totalPages={totalPages} pageSize={pageSize} totalRows={filtered.length} onPageChange={setPage} />
+            </>
+          ),
+        },
+      ]} />
     </Page>
   );
 }
@@ -585,22 +675,29 @@ function StrategyDetail() {
   if (!data || !trace) return <Loading />;
   return (
     <Page title={data.strategy_name}>
-      <div className="grid gap-3 md:grid-cols-4">
-        <KpiCard title="Pair" value={data.pair} />
-        <KpiCard title="Timeframe" value={data.timeframe} />
-        <KpiCard title="Confidence" value={`${data.confidence}%`} />
-        <KpiCard title="Grade" value={data.validation_grade} tone="good" />
-        <KpiCard title="Source Workflow" value={data.source_workflow_id || "n/a"} />
-        <KpiCard title="Paper Replay" value={`${trace.paper_replay?.status ?? "UNKNOWN"} / ${number(trace.paper_replay?.processed_events ?? 0)} events`} tone="good" />
-        <KpiCard title="Approval Gate" value={trace.approval_gate?.status ?? "WAITING"} tone="warn" />
-        <KpiCard title="Demo Mode" value={String(data.demo_mode)} tone={data.demo_mode ? "warn" : "good"} />
-      </div>
-      <JsonPanel title="End-to-End Source Trace" data={trace} />
-      <JsonPanel title="Strategy Passport" data={data.passport} />
-      <JsonPanel title="Decision Trace" data={data.decision_trace} />
-      <JsonPanel title="Optimization Report" data={data.optimization_report} />
-      <JsonPanel title="Validation Report" data={data.validation_report} />
-      <JsonPanel title="Backtest Report" data={data.backtest_report} />
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="grid gap-3 md:grid-cols-4">
+              <KpiCard title="Pair" value={data.pair} />
+              <KpiCard title="Timeframe" value={data.timeframe} />
+              <KpiCard title="Confidence" value={`${data.confidence}%`} />
+              <KpiCard title="Grade" value={data.validation_grade} tone="good" />
+              <KpiCard title="Source Workflow" value={data.source_workflow_id || "n/a"} />
+              <KpiCard title="Paper Replay" value={`${trace.paper_replay?.status ?? "UNKNOWN"} / ${number(trace.paper_replay?.processed_events ?? 0)} events`} tone="good" />
+              <KpiCard title="Approval Gate" value={trace.approval_gate?.status ?? "WAITING"} tone="warn" />
+              <KpiCard title="Demo Mode" value={String(data.demo_mode)} tone={data.demo_mode ? "warn" : "good"} />
+            </div>
+          ),
+        },
+        { label: "Source Trace", content: <JsonPanel title="End-to-End Source Trace" data={trace} /> },
+        { label: "Passport", content: <JsonPanel title="Strategy Passport" data={data.passport} /> },
+        { label: "Decision Trace", content: <JsonPanel title="Decision Trace" data={data.decision_trace} /> },
+        { label: "Optimization", content: <JsonPanel title="Optimization Report" data={data.optimization_report} /> },
+        { label: "Validation", content: <JsonPanel title="Validation Report" data={data.validation_report} /> },
+        { label: "Backtest", content: <JsonPanel title="Backtest Report" data={data.backtest_report} /> },
+      ]} />
     </Page>
   );
 }
@@ -613,13 +710,27 @@ function Indicators() {
   const categories = new Set(rows.map((row) => String(row.category))).size;
   return (
     <Page title="Indicators Used">
-      <div className="kpi-grid">
-        <KpiCard title="Active Indicators" value={rows.length} tone="good" />
-        <KpiCard title="Categories" value={categories} />
-        <KpiCard title="Status" value="ACTIVE" tone="good" />
-      </div>
-      <input className="input" placeholder="Filter by indicator, category, purpose, or engine usage..." value={query} onChange={(event) => setQuery(event.target.value)} />
-      <DataTable title={`Indicator / Calculator Reference (${filtered.length})`} rows={filtered} />
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Active Indicators" value={rows.length} tone="good" />
+              <KpiCard title="Categories" value={categories} />
+              <KpiCard title="Status" value="ACTIVE" tone="good" />
+            </div>
+          ),
+        },
+        {
+          label: "Reference",
+          content: (
+            <>
+              <input className="input" placeholder="Filter by indicator, category, purpose, or engine usage..." value={query} onChange={(event) => setQuery(event.target.value)} />
+              <DataTable title={`Indicator / Calculator Reference (${filtered.length})`} rows={filtered} />
+            </>
+          ),
+        },
+      ]} />
     </Page>
   );
 }
@@ -633,22 +744,34 @@ function FullHistoryResearch() {
   const timeframes = data.timeframes ?? [];
   return (
     <Page title="Full History Research">
-      <div className="kpi-grid">
-        <KpiCard title="Pairs / Instruments" value={data.pair_count} tone="good" />
-        <KpiCard title="Timeframes" value={data.timeframe_count} />
-        <KpiCard title="Pair-Timeframe Tests" value={data.pair_timeframe_count} />
-        <KpiCard title="Scheduler Jobs" value={scheduler.planned_jobs ?? 0} />
-        <KpiCard title="Completed Jobs" value={scheduler.completed_jobs ?? 0} tone="good" />
-        <KpiCard title="Failed Jobs" value={scheduler.failed_jobs ?? 0} tone={scheduler.failed_jobs ? "warn" : "good"} />
-        <KpiCard title="Pending Jobs" value={scheduler.pending_jobs ?? 0} />
-        <KpiCard title="Progress" value={`${scheduler.progress_percent ?? 0}%`} />
-      </div>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <DataTable title={`Pairs / Instruments (${pairs.length})`} rows={pairs} />
-        <DataTable title={`Timeframes (${timeframes.length})`} rows={timeframes} />
-      </div>
-      <DataTable title={`Full History Candle Coverage (${coverage.length})`} rows={coverage} />
-      <JsonPanel title="Scheduler Status" data={{ status: scheduler.status, latest_job: scheduler.latest_job, state_file: scheduler.state_file, database_status: data.database_status }} />
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Pairs / Instruments" value={data.pair_count} tone="good" />
+              <KpiCard title="Timeframes" value={data.timeframe_count} />
+              <KpiCard title="Pair-Timeframe Tests" value={data.pair_timeframe_count} />
+              <KpiCard title="Scheduler Jobs" value={scheduler.planned_jobs ?? 0} />
+              <KpiCard title="Completed Jobs" value={scheduler.completed_jobs ?? 0} tone="good" />
+              <KpiCard title="Failed Jobs" value={scheduler.failed_jobs ?? 0} tone={scheduler.failed_jobs ? "warn" : "good"} />
+              <KpiCard title="Pending Jobs" value={scheduler.pending_jobs ?? 0} />
+              <KpiCard title="Progress" value={`${scheduler.progress_percent ?? 0}%`} />
+            </div>
+          ),
+        },
+        {
+          label: "Universe",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <DataTable title={`Pairs / Instruments (${pairs.length})`} rows={pairs} />
+              <DataTable title={`Timeframes (${timeframes.length})`} rows={timeframes} />
+            </div>
+          ),
+        },
+        { label: "Coverage", content: <DataTable title={`Full History Candle Coverage (${coverage.length})`} rows={coverage} /> },
+        { label: "Scheduler", content: <JsonPanel title="Scheduler Status" data={{ status: scheduler.status, latest_job: scheduler.latest_job, state_file: scheduler.state_file, database_status: data.database_status }} /> },
+      ]} />
     </Page>
   );
 }
@@ -661,18 +784,37 @@ function Portfolio() {
   return (
     <Page title="Portfolio Readiness">
       <ReadinessBanner value={String(ready.portfolio_readiness)} source={String(ready.source)} />
-      <div className="kpi-grid">
-        <KpiCard title="Production Strategies" value={ready.production_strategies} />
-        <KpiCard title="Selected Portfolio" value={ready.selected_portfolio_strategies} />
-        <KpiCard title="Average Correlation" value={ready.average_correlation} />
-        <KpiCard title="Expected PF" value={ready.expected_portfolio_pf} />
-      </div>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <BarPanel title="Regime Coverage" data={Object.values(coverage.regimes)} labels={Object.keys(coverage.regimes)} />
-        <BarPanel title="Pair Exposure" data={Object.values(coverage.pairs)} labels={Object.keys(coverage.pairs)} />
-        <LinePanel title="Expected Drawdown" data={risk.expected_drawdown_curve} />
-        <LinePanel title="Validation Equity Curve" data={risk.portfolio_equity_curve} />
-      </div>
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Production Strategies" value={ready.production_strategies} />
+              <KpiCard title="Selected Portfolio" value={ready.selected_portfolio_strategies} />
+              <KpiCard title="Average Correlation" value={ready.average_correlation} />
+              <KpiCard title="Expected PF" value={ready.expected_portfolio_pf} />
+            </div>
+          ),
+        },
+        {
+          label: "Coverage",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <BarPanel title="Regime Coverage" data={Object.values(coverage.regimes)} labels={Object.keys(coverage.regimes)} />
+              <BarPanel title="Pair Exposure" data={Object.values(coverage.pairs)} labels={Object.keys(coverage.pairs)} />
+            </div>
+          ),
+        },
+        {
+          label: "Risk",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <LinePanel title="Expected Drawdown" data={risk.expected_drawdown_curve} />
+              <LinePanel title="Validation Equity Curve" data={risk.portfolio_equity_curve} />
+            </div>
+          ),
+        },
+      ]} />
     </Page>
   );
 }
@@ -699,57 +841,72 @@ function PortfolioIntelligence() {
   return (
     <Page title="Portfolio Intelligence">
       <ReadinessBanner value={String(health.status ?? "UNKNOWN")} source={String(data.source ?? "PortfolioIntelligenceEngine")} />
-      <div className="kpi-grid">
-        <KpiCard title="Health Score" value={`${health.score ?? 0}/100`} tone={health.status === "READY" ? "good" : "warn"} />
-        <KpiCard title="Allocation" value={allocation.approved ? "APPROVED" : "REBALANCE"} tone={allocation.approved ? "good" : "warn"} />
-        <KpiCard title="Acceptance" value={acceptance.accepted ? "PASS" : "FAIL"} tone={acceptance.accepted ? "good" : "warn"} />
-        <KpiCard title="Lifecycle" value={lifecycle.stage ?? "UNKNOWN"} />
-        <KpiCard title="Strategies" value={kpis.strategy_count ?? 0} />
-        <KpiCard title="Families" value={kpis.family_count ?? 0} />
-        <KpiCard title="Instruments" value={kpis.instrument_count ?? 0} />
-        <KpiCard title="Regimes" value={kpis.regime_count ?? 0} />
-        <KpiCard title="Expected PF" value={kpis.expected_profit_factor ?? 0} />
-        <KpiCard title="Expected DD" value={kpis.expected_drawdown ?? 0} tone={Number(kpis.expected_drawdown ?? 0) > 0.1 ? "warn" : "good"} />
-        <KpiCard title="Avg Correlation" value={data.correlation?.average_correlation ?? 0} />
-        <KpiCard title="Worst Stress DD" value={stress.worst_expected_drawdown ?? 0} tone={stress.passed ? "good" : "warn"} />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Daily Review</div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Review" value={review.review_id ?? "UNKNOWN"} />
-            <MiniFact label="Trading Day" value={review.trading_day ?? ""} />
-            <MiniFact label="Status" value={review.status ?? "UNKNOWN"} />
-            <MiniFact label="Watchlist" value={(review.watchlist ?? []).join(", ") || "None"} />
-          </div>
-        </section>
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Drift Detection</div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Status" value={drift.status ?? "UNKNOWN"} />
-            <MiniFact label="Degraded" value={(drift.degraded_strategies ?? []).join(", ") || "None"} />
-            <MiniFact label="Reasons" value={(drift.reasons ?? []).join(", ") || "No drift detected"} />
-          </div>
-        </section>
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Lifecycle</div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Portfolio" value={lifecycle.portfolio_id ?? data.portfolio_id} />
-            <MiniFact label="Stage" value={lifecycle.stage ?? "UNKNOWN"} />
-            <MiniFact label="Promotion Ready" value={lifecycle.promotion_ready ? "YES" : "NO"} />
-            <MiniFact label="Retirement" value={(lifecycle.retirement_candidates ?? []).join(", ") || "None"} />
-          </div>
-        </section>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <DataTable title="Instrument Exposure" rows={exposureRows as Row[]} />
-        <DataTable title="Family Exposure" rows={familyRows as Row[]} />
-      </div>
-      <JsonPanel title="Allocation Decision Trace" data={data.decision_trace ?? {}} />
-      <JsonPanel title="Stress Tests" data={stress} />
-      <JsonPanel title="Acceptance Criteria" data={acceptance} />
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Health Score" value={`${health.score ?? 0}/100`} tone={health.status === "READY" ? "good" : "warn"} />
+              <KpiCard title="Allocation" value={allocation.approved ? "APPROVED" : "REBALANCE"} tone={allocation.approved ? "good" : "warn"} />
+              <KpiCard title="Acceptance" value={acceptance.accepted ? "PASS" : "FAIL"} tone={acceptance.accepted ? "good" : "warn"} />
+              <KpiCard title="Lifecycle" value={lifecycle.stage ?? "UNKNOWN"} />
+              <KpiCard title="Strategies" value={kpis.strategy_count ?? 0} />
+              <KpiCard title="Families" value={kpis.family_count ?? 0} />
+              <KpiCard title="Instruments" value={kpis.instrument_count ?? 0} />
+              <KpiCard title="Regimes" value={kpis.regime_count ?? 0} />
+              <KpiCard title="Expected PF" value={kpis.expected_profit_factor ?? 0} />
+              <KpiCard title="Expected DD" value={kpis.expected_drawdown ?? 0} tone={Number(kpis.expected_drawdown ?? 0) > 0.1 ? "warn" : "good"} />
+              <KpiCard title="Avg Correlation" value={data.correlation?.average_correlation ?? 0} />
+              <KpiCard title="Worst Stress DD" value={stress.worst_expected_drawdown ?? 0} tone={stress.passed ? "good" : "warn"} />
+            </div>
+          ),
+        },
+        {
+          label: "Review",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-3">
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Daily Review</div>
+                <div className="pipeline-detail-grid">
+                  <MiniFact label="Review" value={review.review_id ?? "UNKNOWN"} />
+                  <MiniFact label="Trading Day" value={review.trading_day ?? ""} />
+                  <MiniFact label="Status" value={review.status ?? "UNKNOWN"} />
+                  <MiniFact label="Watchlist" value={(review.watchlist ?? []).join(", ") || "None"} />
+                </div>
+              </section>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Drift Detection</div>
+                <div className="pipeline-detail-grid">
+                  <MiniFact label="Status" value={drift.status ?? "UNKNOWN"} />
+                  <MiniFact label="Degraded" value={(drift.degraded_strategies ?? []).join(", ") || "None"} />
+                  <MiniFact label="Reasons" value={(drift.reasons ?? []).join(", ") || "No drift detected"} />
+                </div>
+              </section>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Lifecycle</div>
+                <div className="pipeline-detail-grid">
+                  <MiniFact label="Portfolio" value={lifecycle.portfolio_id ?? data.portfolio_id} />
+                  <MiniFact label="Stage" value={lifecycle.stage ?? "UNKNOWN"} />
+                  <MiniFact label="Promotion Ready" value={lifecycle.promotion_ready ? "YES" : "NO"} />
+                  <MiniFact label="Retirement" value={(lifecycle.retirement_candidates ?? []).join(", ") || "None"} />
+                </div>
+              </section>
+            </div>
+          ),
+        },
+        {
+          label: "Exposure",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <DataTable title="Instrument Exposure" rows={exposureRows as Row[]} />
+              <DataTable title="Family Exposure" rows={familyRows as Row[]} />
+            </div>
+          ),
+        },
+        { label: "Decision Trace", content: <JsonPanel title="Allocation Decision Trace" data={data.decision_trace ?? {}} /> },
+        { label: "Stress Tests", content: <JsonPanel title="Stress Tests" data={stress} /> },
+        { label: "Acceptance", content: <JsonPanel title="Acceptance Criteria" data={acceptance} /> },
+      ]} />
     </Page>
   );
 }
@@ -766,61 +923,69 @@ function PerformanceLearning() {
   return (
     <Page title="Performance Learning">
       <ReadinessBanner value="ADAPTIVE INTELLIGENCE" source={String(data.source ?? "PerformanceLearningEngine")} />
-      <div className="kpi-grid">
-        <KpiCard title="Total P/L" value={`$${number(attribution.total_profit_loss ?? 0)}`} tone={Number(attribution.total_profit_loss ?? 0) >= 0 ? "good" : "warn"} />
-        <KpiCard title="Knowledge Updates" value={learning.knowledge_records_written ?? 0} tone="good" />
-        <KpiCard title="Decision Accuracy" value={`${Math.round(Number(quality.decision_accuracy ?? 0) * 100)}%`} />
-        <KpiCard title="Opportunity Accuracy" value={`${Math.round(Number(quality.opportunity_accuracy ?? 0) * 100)}%`} />
-        <KpiCard title="Acceptance Quality" value={`${Math.round(Number(quality.trade_acceptance_quality ?? 0) * 100)}%`} />
-        <KpiCard title="Rejection Quality" value={`${Math.round(Number(quality.trade_rejection_quality ?? 0) * 100)}%`} />
-        <KpiCard title="Risk Quality" value={`${Math.round(Number(quality.risk_decision_quality ?? 0) * 100)}%`} />
-        <KpiCard title="Portfolio Quality" value={`${Math.round(Number(quality.portfolio_decision_quality ?? 0) * 100)}%`} />
-        <KpiCard title="Daily Report" value={daily.report_id ?? "UNKNOWN"} />
-        <KpiCard title="Weekly Review" value={weekly.review_id ?? "UNKNOWN"} />
-        <KpiCard title="Monthly Review" value={monthly.review_id ?? "UNKNOWN"} />
-        <KpiCard title="KB Maturity" value={`${Math.round(Number(monthly.knowledge_base_maturity ?? 0) * 100)}%`} />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <DataTable title="Strategy Attribution" rows={(attribution.strategy ?? []) as Row[]} />
-        <DataTable title="Market Regime Attribution" rows={(attribution.market_regime ?? []) as Row[]} />
-        <DataTable title="Session Attribution" rows={(attribution.session ?? []) as Row[]} />
-        <DataTable title="Feature Attribution" rows={(attribution.feature ?? []) as Row[]} />
-        <DataTable title="Plugin Attribution" rows={(attribution.plugin ?? []) as Row[]} />
-        <DataTable title="Portfolio Attribution" rows={(attribution.portfolio_allocation ?? []) as Row[]} />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Research Priorities</div>
-          <div className="pipeline-detail-grid">
-            {(data.research_priorities ?? []).map((priority: any) => (
-              <MiniFact key={priority.priority_id} label={priority.theme} value={priority.action} />
-            ))}
-          </div>
-        </section>
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Strategy Evolution</div>
-          <div className="pipeline-detail-grid">
-            {(data.strategy_evolution ?? []).slice(0, 6).map((item: any) => (
-              <MiniFact key={item.strategy_id} label={item.strategy_id} value={item.action} />
-            ))}
-          </div>
-        </section>
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Portfolio Evolution</div>
-          <div className="pipeline-detail-grid">
-            {(data.portfolio_evolution ?? []).map((item: any) => (
-              <MiniFact key={item.decision_id} label={item.decision_id} value={item.action} />
-            ))}
-          </div>
-        </section>
-      </div>
-
-      <JsonPanel title="Daily Learning Report" data={daily} />
-      <JsonPanel title="Weekly Research Review" data={weekly} />
-      <JsonPanel title="Monthly Intelligence Review" data={monthly} />
-      <JsonPanel title="Hypothesis Confidence" data={learning.hypothesis_confidence ?? {}} />
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Total P/L" value={`$${number(attribution.total_profit_loss ?? 0)}`} tone={Number(attribution.total_profit_loss ?? 0) >= 0 ? "good" : "warn"} />
+              <KpiCard title="Knowledge Updates" value={learning.knowledge_records_written ?? 0} tone="good" />
+              <KpiCard title="Decision Accuracy" value={`${Math.round(Number(quality.decision_accuracy ?? 0) * 100)}%`} />
+              <KpiCard title="Opportunity Accuracy" value={`${Math.round(Number(quality.opportunity_accuracy ?? 0) * 100)}%`} />
+              <KpiCard title="Acceptance Quality" value={`${Math.round(Number(quality.trade_acceptance_quality ?? 0) * 100)}%`} />
+              <KpiCard title="Rejection Quality" value={`${Math.round(Number(quality.trade_rejection_quality ?? 0) * 100)}%`} />
+              <KpiCard title="Risk Quality" value={`${Math.round(Number(quality.risk_decision_quality ?? 0) * 100)}%`} />
+              <KpiCard title="Portfolio Quality" value={`${Math.round(Number(quality.portfolio_decision_quality ?? 0) * 100)}%`} />
+              <KpiCard title="Daily Report" value={daily.report_id ?? "UNKNOWN"} />
+              <KpiCard title="Weekly Review" value={weekly.review_id ?? "UNKNOWN"} />
+              <KpiCard title="Monthly Review" value={monthly.review_id ?? "UNKNOWN"} />
+              <KpiCard title="KB Maturity" value={`${Math.round(Number(monthly.knowledge_base_maturity ?? 0) * 100)}%`} />
+            </div>
+          ),
+        },
+        {
+          label: "Attribution",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <DataTable title="Strategy Attribution" rows={(attribution.strategy ?? []) as Row[]} />
+              <DataTable title="Market Regime Attribution" rows={(attribution.market_regime ?? []) as Row[]} />
+              <DataTable title="Session Attribution" rows={(attribution.session ?? []) as Row[]} />
+              <DataTable title="Feature Attribution" rows={(attribution.feature ?? []) as Row[]} />
+              <DataTable title="Plugin Attribution" rows={(attribution.plugin ?? []) as Row[]} />
+              <DataTable title="Portfolio Attribution" rows={(attribution.portfolio_allocation ?? []) as Row[]} />
+            </div>
+          ),
+        },
+        {
+          label: "Evolution",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-3">
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Research Priorities</div>
+                <div className="pipeline-detail-grid">
+                  {(data.research_priorities ?? []).map((priority: any) => <MiniFact key={priority.priority_id} label={priority.theme} value={priority.action} />)}
+                </div>
+              </section>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Strategy Evolution</div>
+                <div className="pipeline-detail-grid">
+                  {(data.strategy_evolution ?? []).slice(0, 6).map((item: any) => <MiniFact key={item.strategy_id} label={item.strategy_id} value={item.action} />)}
+                </div>
+              </section>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Portfolio Evolution</div>
+                <div className="pipeline-detail-grid">
+                  {(data.portfolio_evolution ?? []).map((item: any) => <MiniFact key={item.decision_id} label={item.decision_id} value={item.action} />)}
+                </div>
+              </section>
+            </div>
+          ),
+        },
+        { label: "Daily Report", content: <JsonPanel title="Daily Learning Report" data={daily} /> },
+        { label: "Weekly Review", content: <JsonPanel title="Weekly Research Review" data={weekly} /> },
+        { label: "Monthly Review", content: <JsonPanel title="Monthly Intelligence Review" data={monthly} /> },
+        { label: "Hypotheses", content: <JsonPanel title="Hypothesis Confidence" data={learning.hypothesis_confidence ?? {}} /> },
+      ]} />
     </Page>
   );
 }
@@ -841,58 +1006,72 @@ function HistoryValidation() {
   const remainingWork = Math.max(0, totalWork - completedWork);
   return (
     <Page title="Historical Validation">
-      <div className="kpi-grid">
-        <KpiCard title="Hist Balance" value={`$${number(sheet.paper_balance ?? 0)}`} />
-        <KpiCard title="Hist Equity" value={`$${number(sheet.paper_equity ?? 0)}`} />
-        <KpiCard title="Hist P/L" value={`$${number(sheet.historical_pl ?? 0)}`} tone={Number(sheet.historical_pl ?? 0) >= 0 ? "good" : "warn"} />
-        <KpiCard title="Spread Cost" value={`$${number(sheet.spread_slippage_cost ?? 0)}`} tone={Number(sheet.spread_slippage_cost ?? 0) > 0 ? "warn" : "neutral"} />
-        <KpiCard title="Spread / Slip" value={`${sheet.spread_pips ?? 0} / ${sheet.slippage_pips ?? 0} pips`} />
-        <KpiCard title="Promotion" value={sheet.promotion_readiness ?? "HOLD"} tone={sheet.promotion_readiness === "PROMOTE" ? "good" : "warn"} />
-        <KpiCard title="State" value={status.state} tone={status.state === "ERROR" ? "warn" : "good"} />
-        <KpiCard title="Current" value={status.current_pair ? `${status.current_pair} ${status.current_timeframe}` : "Waiting"} />
-        <KpiCard title="Progress" value={`${status.progress?.completed ?? 0}/${status.progress?.total ?? 0}`} />
-        <KpiCard title="Overall" value={`${status.overall_completion_pct ?? 0}%`} tone="good" />
-        <KpiCard title="Running" value={status.running_validations ?? 0} />
-        <KpiCard title="Queued" value={status.queued_validations ?? 0} />
-        <KpiCard title="Passed" value={status.passed_validations ?? 0} tone="good" />
-        <KpiCard title="Failed" value={status.failed_validations ?? 0} tone={status.failed_validations ? "warn" : "good"} />
-        <KpiCard title="Improvements" value={status.improvement_requests ?? 0} tone={status.improvement_requests ? "warn" : "good"} />
-        <KpiCard title="ETA" value={`${status.estimated_remaining_minutes ?? 0}m`} />
-      </div>
-      <section className="card panel dashboard-card">
-        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Historical Validation Progress</div>
-        <ProgressBar value={progressPct} />
-        <div className="pipeline-detail-grid mt-3">
-          <MiniFact label="Current Work" value={status.current_pair ? `${status.current_pair} ${status.current_timeframe}` : status.state} />
-          <MiniFact label="Completed" value={number(completedWork)} />
-          <MiniFact label="Total Work" value={number(totalWork)} />
-          <MiniFact label="Remaining" value={number(remainingWork)} />
-          <MiniFact label="Running" value={status.running_validations ?? 0} />
-          <MiniFact label="Queued" value={status.queued_validations ?? 0} />
-          <MiniFact label="Needs Research" value={status.needs_research_validations ?? 0} />
-          <MiniFact label="ETA" value={`${status.estimated_remaining_minutes ?? 0}m`} />
-        </div>
-      </section>
-      <DataTable title="Historical Validation Balance Sheet" rows={[sheet as Row]} />
-      <section className="card panel dashboard-card">
-        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Current Batch</div>
-        <div className="pipeline-current">
-          <div>
-            <div className="pipeline-current-title">{status.current_pair ? `${status.current_pair} ${status.current_timeframe}` : status.state}</div>
-            <div className="pipeline-current-meta">
-              Next {status.next?.pair ? `${status.next.pair} ${status.next.timeframe}` : "none"} - queue length {status.queue_length ?? 0}
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Hist Balance" value={`$${number(sheet.paper_balance ?? 0)}`} />
+              <KpiCard title="Hist Equity" value={`$${number(sheet.paper_equity ?? 0)}`} />
+              <KpiCard title="Hist P/L" value={`$${number(sheet.historical_pl ?? 0)}`} tone={Number(sheet.historical_pl ?? 0) >= 0 ? "good" : "warn"} />
+              <KpiCard title="Spread Cost" value={`$${number(sheet.spread_slippage_cost ?? 0)}`} tone={Number(sheet.spread_slippage_cost ?? 0) > 0 ? "warn" : "neutral"} />
+              <KpiCard title="Spread / Slip" value={`${sheet.spread_pips ?? 0} / ${sheet.slippage_pips ?? 0} pips`} />
+              <KpiCard title="Promotion" value={sheet.promotion_readiness ?? "HOLD"} tone={sheet.promotion_readiness === "PROMOTE" ? "good" : "warn"} />
+              <KpiCard title="State" value={status.state} tone={status.state === "ERROR" ? "warn" : "good"} />
+              <KpiCard title="Current" value={status.current_pair ? `${status.current_pair} ${status.current_timeframe}` : "Waiting"} />
+              <KpiCard title="Progress" value={`${status.progress?.completed ?? 0}/${status.progress?.total ?? 0}`} />
+              <KpiCard title="Overall" value={`${status.overall_completion_pct ?? 0}%`} tone="good" />
+              <KpiCard title="Running" value={status.running_validations ?? 0} />
+              <KpiCard title="Queued" value={status.queued_validations ?? 0} />
+              <KpiCard title="Passed" value={status.passed_validations ?? 0} tone="good" />
+              <KpiCard title="Failed" value={status.failed_validations ?? 0} tone={status.failed_validations ? "warn" : "good"} />
+              <KpiCard title="Improvements" value={status.improvement_requests ?? 0} tone={status.improvement_requests ? "warn" : "good"} />
+              <KpiCard title="ETA" value={`${status.estimated_remaining_minutes ?? 0}m`} />
             </div>
-            <div className="pipeline-current-detail">
-              Historical paper trading validates one pair/timeframe batch at a time against the configured long-term dataset.
-            </div>
-          </div>
-        </div>
-      </section>
-      <PaginatedDataTable title={`Validation Queue (${queue.length})`} rows={queue} pageSize={30} />
-      <PaginatedDataTable title={`Running Tests (${running.length})`} rows={running} pageSize={30} />
-      <PaginatedDataTable title={`Validation Results (${results.length})`} rows={[...results].reverse()} pageSize={30} />
-      <PaginatedDataTable title={`Pair Spread Model (${spreads.length})`} rows={spreads} pageSize={30} />
-      <PaginatedDataTable title={`Improvement Requests (${improvements.length})`} rows={[...improvements].reverse()} pageSize={30} />
+          ),
+        },
+        {
+          label: "Progress",
+          content: (
+            <>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Historical Validation Progress</div>
+                <ProgressBar value={progressPct} />
+                <div className="pipeline-detail-grid mt-3">
+                  <MiniFact label="Current Work" value={status.current_pair ? `${status.current_pair} ${status.current_timeframe}` : status.state} />
+                  <MiniFact label="Completed" value={number(completedWork)} />
+                  <MiniFact label="Total Work" value={number(totalWork)} />
+                  <MiniFact label="Remaining" value={number(remainingWork)} />
+                  <MiniFact label="Running" value={status.running_validations ?? 0} />
+                  <MiniFact label="Queued" value={status.queued_validations ?? 0} />
+                  <MiniFact label="Needs Research" value={status.needs_research_validations ?? 0} />
+                  <MiniFact label="ETA" value={`${status.estimated_remaining_minutes ?? 0}m`} />
+                </div>
+              </section>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Current Batch</div>
+                <div className="pipeline-current">
+                  <div>
+                    <div className="pipeline-current-title">{status.current_pair ? `${status.current_pair} ${status.current_timeframe}` : status.state}</div>
+                    <div className="pipeline-current-meta">
+                      Next {status.next?.pair ? `${status.next.pair} ${status.next.timeframe}` : "none"} - queue length {status.queue_length ?? 0}
+                    </div>
+                    <div className="pipeline-current-detail">
+                      Historical paper trading validates one pair/timeframe batch at a time against the configured long-term dataset.
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </>
+          ),
+        },
+        { label: "Balance Sheet", content: <DataTable title="Historical Validation Balance Sheet" rows={[sheet as Row]} /> },
+        { label: "Queue", content: <PaginatedDataTable title={`Validation Queue (${queue.length})`} rows={queue} pageSize={30} /> },
+        { label: "Running", content: <PaginatedDataTable title={`Running Tests (${running.length})`} rows={running} pageSize={30} /> },
+        { label: "Results", content: <PaginatedDataTable title={`Validation Results (${results.length})`} rows={[...results].reverse()} pageSize={30} /> },
+        { label: "Spreads", content: <PaginatedDataTable title={`Pair Spread Model (${spreads.length})`} rows={spreads} pageSize={30} /> },
+        { label: "Improvements", content: <PaginatedDataTable title={`Improvement Requests (${improvements.length})`} rows={[...improvements].reverse()} pageSize={30} /> },
+      ]} />
     </Page>
   );
 }
@@ -910,68 +1089,78 @@ function IntradayDaily() {
   const readiness = data.market_readiness ?? {};
   return (
     <Page title="Intraday Daily Operations">
-      <div className="kpi-grid">
-        <KpiCard title="Market Readiness" value={`${readiness.score ?? 0}/100`} tone={Number(readiness.score ?? 0) >= 70 ? "good" : "warn"} />
-        <KpiCard title="First Decision" value={readiness.decision ?? "UNKNOWN"} tone={readiness.decision === "NO_NEW_TRADES" ? "warn" : "good"} />
-        <KpiCard title="Trading Status" value={data.trading_status} tone={data.trading_status === "ACTIVE" ? "good" : "warn"} />
-        <KpiCard title="Current Session" value={data.current_session} />
-        <KpiCard title="Today's P/L" value={`$${number(data.todays_pl)}`} tone={Number(data.todays_pl) >= 0 ? "good" : "warn"} />
-        <KpiCard title="Today's Trades" value={data.todays_trades} />
-        <KpiCard title="Open Positions" value={data.open_positions} tone={Number(data.open_positions) === 0 ? "good" : "warn"} />
-        <KpiCard title="Remaining Daily Risk" value={data.remaining_daily_risk} />
-        <KpiCard title="Daily Drawdown" value={data.daily_drawdown} tone={Number(data.daily_drawdown) > 0.02 ? "warn" : "good"} />
-        <KpiCard title="Session Portfolio" value={data.session_portfolio} />
-        <KpiCard title="Risk Gate" value={riskDecision.approved ? "OPEN" : "PAUSED"} tone={riskDecision.approved ? "good" : "warn"} />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Market Readiness</div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Band" value={readiness.band ?? "UNKNOWN"} />
-            <MiniFact label="Market Regime" value={readiness.inputs?.market_regime ?? "UNKNOWN"} />
-            <MiniFact label="Volatility" value={readiness.inputs?.volatility ?? 0} />
-            <MiniFact label="Spread" value={readiness.inputs?.spread ?? 0} />
-            <MiniFact label="Strategy Availability" value={readiness.inputs?.available_strategies ?? 0} />
-            <MiniFact label="Portfolio Exposure" value={readiness.inputs?.portfolio_exposure ?? 0} />
-          </div>
-        </section>
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Performance</div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Average Daily Profit" value={`$${number(performance.average_daily_profit)}`} />
-            <MiniFact label="Winning Days" value={performance.winning_days ?? 0} />
-            <MiniFact label="Losing Days" value={performance.losing_days ?? 0} />
-            <MiniFact label="Trades / Day" value={performance.average_trades_per_day ?? 0} />
-            <MiniFact label="Trade Duration" value={`${performance.average_trade_duration_minutes ?? 0} min`} />
-            <MiniFact label="Daily Expectancy" value={`$${number(performance.daily_expectancy)}`} />
-          </div>
-        </section>
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Risk</div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Max Daily Drawdown" value={risk.maximum_daily_drawdown ?? 0} />
-            <MiniFact label="Average Drawdown" value={risk.average_daily_drawdown ?? 0} />
-            <MiniFact label="Risk Utilization" value={risk.daily_risk_utilization ?? 0} />
-            <MiniFact label="Risk Reasons" value={(riskDecision.reasons ?? []).join(", ") || "None"} />
-          </div>
-        </section>
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Operational</div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Signals / Day" value={operational.average_daily_signals ?? 0} />
-            <MiniFact label="Executions / Day" value={operational.average_daily_executions ?? 0} />
-            <MiniFact label="Exposure / Day" value={operational.average_daily_exposure ?? 0} />
-            <MiniFact label="Slippage / Day" value={operational.average_daily_slippage ?? 0} />
-          </div>
-        </section>
-      </div>
-
-      <PaginatedDataTable title={`Intraday Certification (${(data.certification ?? []).length})`} rows={data.certification ?? []} linkKey="strategy_asset_id" pageSize={30} />
-      <JsonPanel title="Market Readiness Factors" data={{ factors: readiness.factors ?? {}, reasons: readiness.reasons ?? [] }} />
-      <JsonPanel title="Daily Report" data={report} />
-      <JsonPanel title="Daily Learning Loop" data={learning} />
-      <JsonPanel title="Trade Journal Evidence" data={data.trade_journal ?? []} />
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Market Readiness" value={`${readiness.score ?? 0}/100`} tone={Number(readiness.score ?? 0) >= 70 ? "good" : "warn"} />
+              <KpiCard title="First Decision" value={readiness.decision ?? "UNKNOWN"} tone={readiness.decision === "NO_NEW_TRADES" ? "warn" : "good"} />
+              <KpiCard title="Trading Status" value={data.trading_status} tone={data.trading_status === "ACTIVE" ? "good" : "warn"} />
+              <KpiCard title="Current Session" value={data.current_session} />
+              <KpiCard title="Today's P/L" value={`$${number(data.todays_pl)}`} tone={Number(data.todays_pl) >= 0 ? "good" : "warn"} />
+              <KpiCard title="Today's Trades" value={data.todays_trades} />
+              <KpiCard title="Open Positions" value={data.open_positions} tone={Number(data.open_positions) === 0 ? "good" : "warn"} />
+              <KpiCard title="Remaining Daily Risk" value={data.remaining_daily_risk} />
+              <KpiCard title="Daily Drawdown" value={data.daily_drawdown} tone={Number(data.daily_drawdown) > 0.02 ? "warn" : "good"} />
+              <KpiCard title="Session Portfolio" value={data.session_portfolio} />
+              <KpiCard title="Risk Gate" value={riskDecision.approved ? "OPEN" : "PAUSED"} tone={riskDecision.approved ? "good" : "warn"} />
+            </div>
+          ),
+        },
+        {
+          label: "Daily Metrics",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-3">
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Market Readiness</div>
+                <div className="pipeline-detail-grid">
+                  <MiniFact label="Band" value={readiness.band ?? "UNKNOWN"} />
+                  <MiniFact label="Market Regime" value={readiness.inputs?.market_regime ?? "UNKNOWN"} />
+                  <MiniFact label="Volatility" value={readiness.inputs?.volatility ?? 0} />
+                  <MiniFact label="Spread" value={readiness.inputs?.spread ?? 0} />
+                  <MiniFact label="Strategy Availability" value={readiness.inputs?.available_strategies ?? 0} />
+                  <MiniFact label="Portfolio Exposure" value={readiness.inputs?.portfolio_exposure ?? 0} />
+                </div>
+              </section>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Performance</div>
+                <div className="pipeline-detail-grid">
+                  <MiniFact label="Average Daily Profit" value={`$${number(performance.average_daily_profit)}`} />
+                  <MiniFact label="Winning Days" value={performance.winning_days ?? 0} />
+                  <MiniFact label="Losing Days" value={performance.losing_days ?? 0} />
+                  <MiniFact label="Trades / Day" value={performance.average_trades_per_day ?? 0} />
+                  <MiniFact label="Trade Duration" value={`${performance.average_trade_duration_minutes ?? 0} min`} />
+                  <MiniFact label="Daily Expectancy" value={`$${number(performance.daily_expectancy)}`} />
+                </div>
+              </section>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Risk</div>
+                <div className="pipeline-detail-grid">
+                  <MiniFact label="Max Daily Drawdown" value={risk.maximum_daily_drawdown ?? 0} />
+                  <MiniFact label="Average Drawdown" value={risk.average_daily_drawdown ?? 0} />
+                  <MiniFact label="Risk Utilization" value={risk.daily_risk_utilization ?? 0} />
+                  <MiniFact label="Risk Reasons" value={(riskDecision.reasons ?? []).join(", ") || "None"} />
+                </div>
+              </section>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Operational</div>
+                <div className="pipeline-detail-grid">
+                  <MiniFact label="Signals / Day" value={operational.average_daily_signals ?? 0} />
+                  <MiniFact label="Executions / Day" value={operational.average_daily_executions ?? 0} />
+                  <MiniFact label="Exposure / Day" value={operational.average_daily_exposure ?? 0} />
+                  <MiniFact label="Slippage / Day" value={operational.average_daily_slippage ?? 0} />
+                </div>
+              </section>
+            </div>
+          ),
+        },
+        { label: "Certification", content: <PaginatedDataTable title={`Intraday Certification (${(data.certification ?? []).length})`} rows={data.certification ?? []} linkKey="strategy_asset_id" pageSize={30} /> },
+        { label: "Readiness Factors", content: <JsonPanel title="Market Readiness Factors" data={{ factors: readiness.factors ?? {}, reasons: readiness.reasons ?? [] }} /> },
+        { label: "Daily Report", content: <JsonPanel title="Daily Report" data={report} /> },
+        { label: "Learning Loop", content: <JsonPanel title="Daily Learning Loop" data={learning} /> },
+        { label: "Journal", content: <JsonPanel title="Trade Journal Evidence" data={data.trade_journal ?? []} /> },
+      ]} />
     </Page>
   );
 }
@@ -990,59 +1179,74 @@ function DecisionIntelligence() {
   const qualityMetrics = data.decision_quality_metrics ?? {};
   return (
     <Page title="Intraday Decision Intelligence">
-      <div className="kpi-grid">
-        <KpiCard title="Opportunity" value={`${opportunity.score ?? 0}/100`} tone={Number(opportunity.score ?? 0) >= 70 ? "good" : "warn"} />
-        <KpiCard title="Market Quality" value={quality.rating ?? "UNKNOWN"} tone={(quality.rating ?? "") === "Poor" ? "warn" : "good"} />
-        <KpiCard title="Eligibility" value={eligibility.status ?? "UNKNOWN"} tone={eligibility.eligible ? "good" : "warn"} />
-        <KpiCard title="Final Decision" value={decision.decision ?? "UNKNOWN"} tone={decision.decision === "NO TRADE" ? "warn" : "good"} />
-        <KpiCard title="Confidence" value={decision.confidence ?? 0} />
-        <KpiCard title="Trading Status" value={status.status ?? "UNKNOWN"} tone={status.status === "ACTIVE" ? "good" : "warn"} />
-        <KpiCard title="Today's Risk Usage" value={dashboard.todays_risk_usage ?? 0} />
-        <KpiCard title="Today's Trades" value={dashboard.todays_trades ?? 0} />
-        <KpiCard title="Risk Budget" value={budget.budget ?? 0} />
-        <KpiCard title="Remaining Risk" value={dashboard.remaining_risk_budget ?? 0} />
-        <KpiCard title="Current Portfolio" value={dashboard.current_portfolio ?? "UNKNOWN"} />
-        <KpiCard title="Expected Regime" value={dashboard.expected_market_regime ?? "UNKNOWN"} />
-        <KpiCard title="Risk Policy" value={budget.policy ?? "UNKNOWN"} />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Daily Trading Plan</div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Preferred Sessions" value={(plan.preferred_sessions ?? []).join(", ")} />
-            <MiniFact label="Strategy Families" value={(plan.preferred_strategy_families ?? []).join(", ")} />
-            <MiniFact label="Expected Regimes" value={(plan.expected_regimes ?? []).join(", ")} />
-            <MiniFact label="Max Trades" value={plan.maximum_trades ?? 0} />
-          </div>
-        </section>
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Decision Reasons</div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Eligibility" value={(eligibility.reasons ?? []).join(", ") || "Eligible"} />
-            <MiniFact label="Decision" value={decision.reason ?? "No decision reason"} />
-            <MiniFact label="Status" value={(status.reasons ?? []).join(", ")} />
-          </div>
-        </section>
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">News Filter</div>
-          <div className="pipeline-detail-grid">
-            <MiniFact label="Paused" value={data.news_filter?.paused ? "YES" : "NO"} />
-            <MiniFact label="Reason" value={data.news_filter?.reason ?? "None"} />
-            <MiniFact label="Minutes" value={data.news_filter?.minutes_to_event ?? "N/A"} />
-            <MiniFact label="Next Event" value={dashboard.next_high_impact_event?.event_type ?? "None"} />
-          </div>
-        </section>
-      </div>
-
-      <DataTable title={`Decision Timeline (${(data.decision_timeline ?? []).length})`} rows={data.decision_timeline ?? []} />
-      <div className="grid gap-4 xl:grid-cols-2">
-        <JsonPanel title="Daily Trading Journal" data={data.daily_trading_journal ?? {}} />
-        <JsonPanel title="Decision Quality Metrics" data={qualityMetrics} />
-      </div>
-      <JsonPanel title="Opportunity Evidence" data={opportunity} />
-      <JsonPanel title="Market Quality Evidence" data={quality} />
-      <JsonPanel title="Decision Trace" data={decision.decision_trace ?? {}} />
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Opportunity" value={`${opportunity.score ?? 0}/100`} tone={Number(opportunity.score ?? 0) >= 70 ? "good" : "warn"} />
+              <KpiCard title="Market Quality" value={quality.rating ?? "UNKNOWN"} tone={(quality.rating ?? "") === "Poor" ? "warn" : "good"} />
+              <KpiCard title="Eligibility" value={eligibility.status ?? "UNKNOWN"} tone={eligibility.eligible ? "good" : "warn"} />
+              <KpiCard title="Final Decision" value={decision.decision ?? "UNKNOWN"} tone={decision.decision === "NO TRADE" ? "warn" : "good"} />
+              <KpiCard title="Confidence" value={decision.confidence ?? 0} />
+              <KpiCard title="Trading Status" value={status.status ?? "UNKNOWN"} tone={status.status === "ACTIVE" ? "good" : "warn"} />
+              <KpiCard title="Today's Risk Usage" value={dashboard.todays_risk_usage ?? 0} />
+              <KpiCard title="Today's Trades" value={dashboard.todays_trades ?? 0} />
+              <KpiCard title="Risk Budget" value={budget.budget ?? 0} />
+              <KpiCard title="Remaining Risk" value={dashboard.remaining_risk_budget ?? 0} />
+              <KpiCard title="Current Portfolio" value={dashboard.current_portfolio ?? "UNKNOWN"} />
+              <KpiCard title="Expected Regime" value={dashboard.expected_market_regime ?? "UNKNOWN"} />
+              <KpiCard title="Risk Policy" value={budget.policy ?? "UNKNOWN"} />
+            </div>
+          ),
+        },
+        {
+          label: "Plan",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-3">
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Daily Trading Plan</div>
+                <div className="pipeline-detail-grid">
+                  <MiniFact label="Preferred Sessions" value={(plan.preferred_sessions ?? []).join(", ")} />
+                  <MiniFact label="Strategy Families" value={(plan.preferred_strategy_families ?? []).join(", ")} />
+                  <MiniFact label="Expected Regimes" value={(plan.expected_regimes ?? []).join(", ")} />
+                  <MiniFact label="Max Trades" value={plan.maximum_trades ?? 0} />
+                </div>
+              </section>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Decision Reasons</div>
+                <div className="pipeline-detail-grid">
+                  <MiniFact label="Eligibility" value={(eligibility.reasons ?? []).join(", ") || "Eligible"} />
+                  <MiniFact label="Decision" value={decision.reason ?? "No decision reason"} />
+                  <MiniFact label="Status" value={(status.reasons ?? []).join(", ")} />
+                </div>
+              </section>
+              <section className="card panel dashboard-card">
+                <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">News Filter</div>
+                <div className="pipeline-detail-grid">
+                  <MiniFact label="Paused" value={data.news_filter?.paused ? "YES" : "NO"} />
+                  <MiniFact label="Reason" value={data.news_filter?.reason ?? "None"} />
+                  <MiniFact label="Minutes" value={data.news_filter?.minutes_to_event ?? "N/A"} />
+                  <MiniFact label="Next Event" value={dashboard.next_high_impact_event?.event_type ?? "None"} />
+                </div>
+              </section>
+            </div>
+          ),
+        },
+        { label: "Timeline", content: <DataTable title={`Decision Timeline (${(data.decision_timeline ?? []).length})`} rows={data.decision_timeline ?? []} /> },
+        {
+          label: "Journal",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <JsonPanel title="Daily Trading Journal" data={data.daily_trading_journal ?? {}} />
+              <JsonPanel title="Decision Quality Metrics" data={qualityMetrics} />
+            </div>
+          ),
+        },
+        { label: "Opportunity", content: <JsonPanel title="Opportunity Evidence" data={opportunity} /> },
+        { label: "Market Quality", content: <JsonPanel title="Market Quality Evidence" data={quality} /> },
+        { label: "Decision Trace", content: <JsonPanel title="Decision Trace" data={decision.decision_trace ?? {}} /> },
+      ]} />
     </Page>
   );
 }
@@ -1062,6 +1266,11 @@ function Paper() {
   const dashboard = buildPaperDashboardV2(practice, summary, openPositions, closedPositions, paperMetrics);
   return (
     <Page title="Paper Trading Dashboard v2.0">
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <>
       <section className="card panel dashboard-card">
         <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Philosophy</div>
         <div className="text-sm text-slate-300">
@@ -1107,6 +1316,13 @@ function Paper() {
           <MiniFact label="Expectancy" value={paperMetrics.todaysExpectancy} />
         </div>
       </section>
+            </>
+          ),
+        },
+        {
+          label: "Scanner",
+          content: (
+            <>
       <PaginatedDataTable title={`Pair Scanner (${dashboard.pairScannerRows.length})`} rows={dashboard.pairScannerRows} pageSize={30} />
       <PaperDecisionTracePanel position={selectedPosition} dashboard={dashboard} />
       <section className="card panel dashboard-card">
@@ -1119,6 +1335,13 @@ function Paper() {
         </div>
       </section>
       <DataTable title="Skip Reasons" rows={dashboard.skipReasonRows} />
+            </>
+          ),
+        },
+        {
+          label: "Performance",
+          content: (
+            <>
       <div className="grid gap-4 xl:grid-cols-2">
         <DataTable title="Losing Trade Analysis" rows={dashboard.losingAnalysisRows} />
         <DataTable title="Winning Trade Analysis" rows={dashboard.winningAnalysisRows} />
@@ -1130,6 +1353,13 @@ function Paper() {
         <DataTable title="Market Regime Performance" rows={dashboard.regimeRows} />
       </div>
       <DataTable title="Strategy Health" rows={dashboard.strategyHealthRows} />
+            </>
+          ),
+        },
+        {
+          label: "Portfolio",
+          content: (
+            <>
       <section className="card panel dashboard-card">
         <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Portfolio Health</div>
         <div className="pipeline-detail-grid">
@@ -1152,6 +1382,13 @@ function Paper() {
           {dashboard.aiSummary.map((line, index) => <div key={index}>{line}</div>)}
         </div>
       </section>
+            </>
+          ),
+        },
+        {
+          label: "Loop",
+          content: (
+            <>
 
       <section className="card panel dashboard-card">
         <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Latest 24/7 Paper-Practice Loop</div>
@@ -1174,6 +1411,17 @@ function Paper() {
           <MiniFact label="Replay Orders" value={number(replay.paper_orders)} />
         </div>
       </section>
+      <JsonPanel title="Real Candle Replay Cursor" data={replay} />
+      <PaginatedDataTable title={`Recent 24/7 Paper-Practice Runs (${practiceHistory.length})`} rows={practiceHistory} pageSize={30} />
+      <PaginatedDataTable title={`Legacy Open Paper Trades (${trades.length})`} rows={trades} pageSize={30} />
+      <JsonPanel title="Drift" data={drift} />
+            </>
+          ),
+        },
+        {
+          label: "Trades",
+          content: (
+            <>
       <OpenPaperPositionsTable rows={openPositions} selected={selectedPosition} onSelect={setSelectedPosition} />
       {selectedPosition && <PaperPositionChart position={selectedPosition} onClose={() => setSelectedPosition(null)} />}
       <PaperPositionsTable
@@ -1183,10 +1431,10 @@ function Paper() {
         selected={selectedPosition}
         onSelect={setSelectedPosition}
       />
-      <JsonPanel title="Real Candle Replay Cursor" data={replay} />
-      <PaginatedDataTable title={`Recent 24/7 Paper-Practice Runs (${practiceHistory.length})`} rows={practiceHistory} pageSize={30} />
-      <PaginatedDataTable title={`Legacy Open Paper Trades (${trades.length})`} rows={trades} pageSize={30} />
-      <JsonPanel title="Drift" data={drift} />
+            </>
+          ),
+        },
+      ]} />
     </Page>
   );
 }
@@ -1198,17 +1446,29 @@ function Operations() {
   if (!health || !services || !system) return <Loading />;
   return (
     <Page title="Operations Health">
-      <div className="kpi-grid">
-        <KpiCard title="Status" value={health.platform_status} tone="good" />
-        <KpiCard title="Services Online" value={health.services_online} />
-        <KpiCard title="Warnings" value={health.warnings} tone="good" />
-        <KpiCard title="Queue Size" value={health.queue_size} />
-      </div>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <LinePanel title="CPU Trend" data={system.cpu} />
-        <LinePanel title="RAM Trend" data={system.ram} />
-      </div>
-      <DataTable title="Service Health" rows={services} />
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Status" value={health.platform_status} tone="good" />
+              <KpiCard title="Services Online" value={health.services_online} />
+              <KpiCard title="Warnings" value={health.warnings} tone="good" />
+              <KpiCard title="Queue Size" value={health.queue_size} />
+            </div>
+          ),
+        },
+        {
+          label: "Resources",
+          content: (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <LinePanel title="CPU Trend" data={system.cpu} />
+              <LinePanel title="RAM Trend" data={system.ram} />
+            </div>
+          ),
+        },
+        { label: "Services", content: <DataTable title="Service Health" rows={services} /> },
+      ]} />
     </Page>
   );
 }
@@ -1656,39 +1916,47 @@ function Logs() {
   const rows = payload.rows ?? [];
   return (
     <Page title="Process Logs">
-      <div className="log-filter-grid">
-        <label className="log-filter">
-          <span>Category</span>
-          <select className="input" value={category} onChange={(event) => updateFilter(setCategory, event.target.value)}>
-            <option value="">All categories</option>
-            {(payload.categories ?? []).map((item: string) => <option key={item} value={item}>{item}</option>)}
-          </select>
-        </label>
-        <label className="log-filter">
-          <span>Process</span>
-          <select className="input" value={process} onChange={(event) => updateFilter(setProcess, event.target.value)}>
-            <option value="">All processes</option>
-            {(payload.processes ?? []).map((item: string) => <option key={item} value={item}>{item}</option>)}
-          </select>
-        </label>
-        <label className="log-filter">
-          <span>Level</span>
-          <select className="input" value={level} onChange={(event) => updateFilter(setLevel, event.target.value)}>
-            <option value="">All levels</option>
-            <option value="INFO">INFO</option>
-            <option value="WARNING">WARNING</option>
-            <option value="ERROR">ERROR</option>
-          </select>
-        </label>
-      </div>
-      <LogTable rows={rows} />
-      <PaginationControls
-        page={payload.page}
-        totalPages={payload.total_pages}
-        pageSize={payload.page_size}
-        totalRows={payload.total}
-        onPageChange={setPage}
-      />
+      <DashboardTabs tabs={[
+        {
+          label: "Filters",
+          content: (
+            <div className="log-filter-grid">
+              <label className="log-filter">
+                <span>Category</span>
+                <select className="input" value={category} onChange={(event) => updateFilter(setCategory, event.target.value)}>
+                  <option value="">All categories</option>
+                  {(payload.categories ?? []).map((item: string) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </label>
+              <label className="log-filter">
+                <span>Process</span>
+                <select className="input" value={process} onChange={(event) => updateFilter(setProcess, event.target.value)}>
+                  <option value="">All processes</option>
+                  {(payload.processes ?? []).map((item: string) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </label>
+              <label className="log-filter">
+                <span>Level</span>
+                <select className="input" value={level} onChange={(event) => updateFilter(setLevel, event.target.value)}>
+                  <option value="">All levels</option>
+                  <option value="INFO">INFO</option>
+                  <option value="WARNING">WARNING</option>
+                  <option value="ERROR">ERROR</option>
+                </select>
+              </label>
+            </div>
+          ),
+        },
+        {
+          label: "Log Rows",
+          content: (
+            <>
+              <LogTable rows={rows} />
+              <PaginationControls page={payload.page} totalPages={payload.total_pages} pageSize={payload.page_size} totalRows={payload.total} onPageChange={setPage} />
+            </>
+          ),
+        },
+      ]} />
     </Page>
   );
 }
@@ -1701,17 +1969,24 @@ function Knowledge() {
   if (!summary || !features || !plugins || !hypotheses) return <Loading />;
   return (
     <Page title="Knowledge Base">
-      <div className="kpi-grid">
-        <KpiCard title="Records" value={number(summary.knowledge_records)} />
-        <KpiCard title="Confirmed" value={summary.confirmed_hypotheses} />
-        <KpiCard title="Rejected" value={summary.rejected_hypotheses} />
-        <KpiCard title="Top Feature" value={summary.top_feature_family} />
-        <KpiCard title="Top Template" value={summary.top_strategy_template} />
-        <KpiCard title="Top Regime" value={summary.top_regime} />
-      </div>
-      <DataTable title="Feature Rankings" rows={features} />
-      <DataTable title="Plugin Rankings" rows={plugins} />
-      <DataTable title="Hypothesis Confidence" rows={hypotheses} />
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Records" value={number(summary.knowledge_records)} />
+              <KpiCard title="Confirmed" value={summary.confirmed_hypotheses} />
+              <KpiCard title="Rejected" value={summary.rejected_hypotheses} />
+              <KpiCard title="Top Feature" value={summary.top_feature_family} />
+              <KpiCard title="Top Template" value={summary.top_strategy_template} />
+              <KpiCard title="Top Regime" value={summary.top_regime} />
+            </div>
+          ),
+        },
+        { label: "Features", content: <DataTable title="Feature Rankings" rows={features} /> },
+        { label: "Plugins", content: <DataTable title="Plugin Rankings" rows={plugins} /> },
+        { label: "Hypotheses", content: <DataTable title="Hypothesis Confidence" rows={hypotheses} /> },
+      ]} />
     </Page>
   );
 }
@@ -1726,33 +2001,45 @@ function Architecture() {
   const future = orphans.filter((row) => row.classification === "KEEP_FOR_FUTURE").length;
   return (
     <Page title="Architecture Integration">
-      <div className="kpi-grid">
-        <KpiCard title="Classified Modules" value={orphans.length} />
-        <KpiCard title="Wire Now" value={wireNow} tone={wireNow ? "warn" : "good"} />
-        <KpiCard title="Move To Legacy" value={legacy} />
-        <KpiCard title="Keep For Future" value={future} />
-        <KpiCard title="Live Gate" value={workflow.live_gate?.status ?? "UNKNOWN"} tone="warn" />
-        <KpiCard title="Paper Replay" value={`${replay.status} / ${number(replay.processed_events)} events`} tone="good" />
-      </div>
-      <JsonPanel
-        title="Production Integration Graph"
-        data={{
-          flow: [
-            "Full-History Research",
-            "Autonomous Research",
-            "Approved Strategy Asset Store",
-            "Strategy Library",
-            "Paper Trading Replay",
-            "Production Certification",
-            "Manual Approval Gate",
-            "Live Trading Blocked / Approved"
-          ],
-          strategy_library_source: "ApprovedStrategyAssetStore",
-          paper_replay_source: "ReplayProgressStore + candle database",
-          approval_source: "WorkflowApprovalGate + ApprovalRepository"
-        }}
-      />
-      <DataTable title="Orphan Module Resolution Report" rows={orphans} />
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Classified Modules" value={orphans.length} />
+              <KpiCard title="Wire Now" value={wireNow} tone={wireNow ? "warn" : "good"} />
+              <KpiCard title="Move To Legacy" value={legacy} />
+              <KpiCard title="Keep For Future" value={future} />
+              <KpiCard title="Live Gate" value={workflow.live_gate?.status ?? "UNKNOWN"} tone="warn" />
+              <KpiCard title="Paper Replay" value={`${replay.status} / ${number(replay.processed_events)} events`} tone="good" />
+            </div>
+          ),
+        },
+        {
+          label: "Integration Graph",
+          content: (
+            <JsonPanel
+              title="Production Integration Graph"
+              data={{
+                flow: [
+                  "Full-History Research",
+                  "Autonomous Research",
+                  "Approved Strategy Asset Store",
+                  "Strategy Library",
+                  "Paper Trading Replay",
+                  "Production Certification",
+                  "Manual Approval Gate",
+                  "Live Trading Blocked / Approved"
+                ],
+                strategy_library_source: "ApprovedStrategyAssetStore",
+                paper_replay_source: "ReplayProgressStore + candle database",
+                approval_source: "WorkflowApprovalGate + ApprovalRepository"
+              }}
+            />
+          ),
+        },
+        { label: "Module Report", content: <DataTable title="Orphan Module Resolution Report" rows={orphans} /> },
+      ]} />
     </Page>
   );
 }
@@ -1923,53 +2210,54 @@ const workflowSteps = [
 function Help() {
   return (
     <Page title="Manual / Help">
-      <div className="manual-grid">
-        <section className="card panel dashboard-card manual-panel">
-          <div className="card-header border-0 bg-transparent p-0 pb-2 font-medium">How to use the dashboard</div>
-          <ol className="manual-steps">
-            {workflowSteps.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ol>
-        </section>
-        <section className="card panel dashboard-card manual-panel">
-          <div className="card-header border-0 bg-transparent p-0 pb-2 font-medium">Safety model</div>
-          <div className="manual-copy">
-            <p>This dashboard is a read-only control surface for research, validation, portfolio readiness, paper trading, operations, and evidence review.</p>
-            <p>It is designed to help decide what to inspect next. It does not place trades, enable live trading, deploy strategies, or mutate research records from the browser.</p>
-          </div>
-        </section>
-      </div>
-
-      <div className="manual-section-grid">
-        {manualSections.map((section) => (
-          <section className="card panel dashboard-card manual-panel" key={section.title}>
-            <div className="flex items-start gap-3">
-              <BookOpen className="mt-1 shrink-0 text-cyan-300" size={18} />
-              <div>
-                <h3 className="manual-title">{section.title}</h3>
-                <p className="manual-purpose">{section.purpose}</p>
+      <DashboardTabs tabs={[
+        {
+          label: "Workflow",
+          content: (
+            <div className="manual-grid">
+              <section className="card panel dashboard-card manual-panel">
+                <div className="card-header border-0 bg-transparent p-0 pb-2 font-medium">How to use the dashboard</div>
+                <ol className="manual-steps">
+                  {workflowSteps.map((step) => <li key={step}>{step}</li>)}
+                </ol>
+              </section>
+              <section className="card panel dashboard-card manual-panel">
+                <div className="card-header border-0 bg-transparent p-0 pb-2 font-medium">Safety model</div>
+                <div className="manual-copy">
+                  <p>This dashboard is a read-only control surface for research, validation, portfolio readiness, paper trading, operations, and evidence review.</p>
+                  <p>It is designed to help decide what to inspect next. It does not place trades, enable live trading, deploy strategies, or mutate research records from the browser.</p>
+                </div>
+              </section>
+            </div>
+          ),
+        },
+        ...manualSections.map((section) => ({
+          label: section.title,
+          content: (
+            <section className="card panel dashboard-card manual-panel">
+              <div className="flex items-start gap-3">
+                <BookOpen className="mt-1 shrink-0 text-cyan-300" size={18} />
+                <div>
+                  <h3 className="manual-title">{section.title}</h3>
+                  <p className="manual-purpose">{section.purpose}</p>
+                </div>
               </div>
-            </div>
-            <div className="manual-block">
-              <div className="manual-label">How to work with it</div>
-              <ul className="manual-list">
-                {section.use.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="manual-block">
-              <div className="manual-label">Details</div>
-              <ul className="manual-list">
-                {section.details.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </section>
-        ))}
-      </div>
+              <div className="manual-block">
+                <div className="manual-label">How to work with it</div>
+                <ul className="manual-list">
+                  {section.use.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+              <div className="manual-block">
+                <div className="manual-label">Details</div>
+                <ul className="manual-list">
+                  {section.details.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+            </section>
+          ),
+        })),
+      ]} />
     </Page>
   );
 }
@@ -2043,49 +2331,60 @@ function AdminSettings() {
 
   return (
     <Page title="Admin Settings">
-      <div className="kpi-grid">
-        <KpiCard title="Settings" value={settings.length} />
-        <KpiCard title="Editable" value={editableCount} tone="good" />
-        <KpiCard title="Changed" value={changedCount} tone={changedCount ? "warn" : "good"} />
-        <KpiCard title="Restart Notes" value={restartCount} />
-      </div>
-
-      <section className="card panel dashboard-card">
-        <div className="admin-toolbar">
-          <div className="admin-source">
-            <div className="mini-fact-label">Source</div>
-            <div className="mini-fact-value">{data.source}</div>
-          </div>
-          <div className="admin-actions">
-            {notice && <span className="admin-notice">{notice}</span>}
-            <button className="pagination-button" onClick={() => { setDraft(_draftFromAdminPayload(data)); setNotice("Reset"); }} type="button">
-              Reset
-            </button>
-            <button className="admin-save-button" disabled={saving || changedCount === 0} onClick={save} type="button">
-              <Save size={16} />
-              {saving ? "Saving" : "Save"}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <div className="admin-settings-grid">
-        {data.groups.map((group) => (
-          <section className="card panel dashboard-card admin-group" key={group.group}>
-            <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{group.group}</div>
-            <div className="admin-setting-list">
-              {group.settings.map((setting) => (
-                <AdminSettingControl
-                  key={setting.setting_id}
-                  setting={setting}
-                  value={draft[setting.setting_id]}
-                  onChange={(value) => setDraft((current) => ({ ...current, [setting.setting_id]: value }))}
-                />
-              ))}
+      <DashboardTabs tabs={[
+        {
+          label: "Summary",
+          content: (
+            <div className="kpi-grid">
+              <KpiCard title="Settings" value={settings.length} />
+              <KpiCard title="Editable" value={editableCount} tone="good" />
+              <KpiCard title="Changed" value={changedCount} tone={changedCount ? "warn" : "good"} />
+              <KpiCard title="Restart Notes" value={restartCount} />
             </div>
-          </section>
-        ))}
-      </div>
+          ),
+        },
+        {
+          label: "Actions",
+          content: (
+            <section className="card panel dashboard-card">
+              <div className="admin-toolbar">
+                <div className="admin-source">
+                  <div className="mini-fact-label">Source</div>
+                  <div className="mini-fact-value">{data.source}</div>
+                </div>
+                <div className="admin-actions">
+                  {notice && <span className="admin-notice">{notice}</span>}
+                  <button className="pagination-button" onClick={() => { setDraft(_draftFromAdminPayload(data)); setNotice("Reset"); }} type="button">
+                    Reset
+                  </button>
+                  <button className="admin-save-button" disabled={saving || changedCount === 0} onClick={save} type="button">
+                    <Save size={16} />
+                    {saving ? "Saving" : "Save"}
+                  </button>
+                </div>
+              </div>
+            </section>
+          ),
+        },
+        ...data.groups.map((group) => ({
+          label: group.group,
+          content: (
+            <section className="card panel dashboard-card admin-group">
+              <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{group.group}</div>
+              <div className="admin-setting-list">
+                {group.settings.map((setting) => (
+                  <AdminSettingControl
+                    key={setting.setting_id}
+                    setting={setting}
+                    value={draft[setting.setting_id]}
+                    onChange={(value) => setDraft((current) => ({ ...current, [setting.setting_id]: value }))}
+                  />
+                ))}
+              </div>
+            </section>
+          ),
+        })),
+      ]} />
     </Page>
   );
 }
@@ -2249,6 +2548,39 @@ function PaginationControls({
         <button className="pagination-button" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</button>
       </div>
     </div>
+  );
+}
+
+function DashboardTabs({ tabs }: { tabs: DashboardTab[] }) {
+  const availableTabs = tabs.filter((tab) => tab.content !== null && tab.content !== undefined);
+  const [active, setActive] = React.useState(availableTabs[0]?.label ?? "");
+  React.useEffect(() => {
+    if (!availableTabs.some((tab) => tab.label === active)) {
+      setActive(availableTabs[0]?.label ?? "");
+    }
+  }, [active, availableTabs]);
+  const selected = availableTabs.find((tab) => tab.label === active) ?? availableTabs[0];
+  if (!selected) return null;
+  return (
+    <section className="dashboard-tabs-shell">
+      <div className="dashboard-tabs" role="tablist">
+        {availableTabs.map((tab) => (
+          <button
+            className={`dashboard-tab ${tab.label === selected.label ? "active" : ""}`}
+            key={tab.label}
+            type="button"
+            role="tab"
+            aria-selected={tab.label === selected.label}
+            onClick={() => setActive(tab.label)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div className="dashboard-tab-panel" role="tabpanel">
+        {selected.content}
+      </div>
+    </section>
   );
 }
 

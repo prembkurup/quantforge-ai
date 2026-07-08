@@ -1034,7 +1034,8 @@ def _first_positive_price(position: dict[str, Any], *keys: str) -> float:
 def _reconstruct_entry_price(position: dict[str, Any], close_price: float, direction: str) -> float:
     if close_price <= 0:
         return 0.0
-    units = abs(_float_or_zero(position.get("units")))
+    pair = str(position.get("pair") or position.get("instrument") or "")
+    units = _effective_pl_units(pair, _float_or_zero(position.get("units")))
     floating_pl = _float_or_zero(position.get("p_l") or position.get("floating_pl"))
     if units <= 0 or floating_pl == 0 or direction not in {"BUY", "SELL"}:
         return close_price
@@ -1053,11 +1054,19 @@ def _default_exit_prices(entry_price: float, direction: str) -> tuple[float | No
     return round(entry_price * 1.0020, 8), round(entry_price * 0.9990, 8)
 
 
-def _position_pl_quote_currency(entry_price: float, close_price: float, units: float, direction: str, *, fallback: float = 0.0) -> float:
+def _position_pl_quote_currency(
+    entry_price: float,
+    close_price: float,
+    units: float,
+    direction: str,
+    *,
+    pair: str = "",
+    fallback: float = 0.0,
+) -> float:
     if entry_price <= 0 or close_price <= 0 or units == 0:
         return round(fallback, 4)
     multiplier = -1.0 if direction.upper() == "SELL" else 1.0
-    return round((close_price - entry_price) * abs(units) * multiplier, 4)
+    return round((close_price - entry_price) * _effective_pl_units(pair, units) * multiplier, 4)
 
 
 def _position_pl_account_currency(
@@ -1070,7 +1079,7 @@ def _position_pl_account_currency(
     conversion_prices: dict[str, float] | None = None,
     fallback: float = 0.0,
 ) -> float:
-    quote_pl = _position_pl_quote_currency(entry_price, close_price, units, direction, fallback=fallback)
+    quote_pl = _position_pl_quote_currency(entry_price, close_price, units, direction, pair=pair, fallback=fallback)
     conversion_rate = _quote_to_usd_rate(pair, close_price, conversion_prices or {})
     return round(quote_pl * conversion_rate, 4)
 
@@ -1115,6 +1124,16 @@ def _quote_to_usd_rate(pair: str, close_price: float, conversion_prices: dict[st
     if base == "USD" and close_price > 0:
         return 1.0 / close_price
     return 1.0
+
+
+def _effective_pl_units(pair: str, units: float) -> float:
+    if _normalized_pair(pair) in {"NAS100_USD", "SPX500_USD"}:
+        return abs(units) / 10_000.0
+    return abs(units)
+
+
+def _normalized_pair(pair: str) -> str:
+    return pair.replace("/", "_").upper()
 
 
 def _split_pair(pair: str) -> tuple[str, str]:

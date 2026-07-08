@@ -77,7 +77,7 @@ def _reconcile_position(repository: CoreUiCandleRepository, position: dict[str, 
     direction = str(position.get("direction") or "").upper()
     units = _float(position.get("units"))
     take_profit, stop_loss = _default_exit_prices(entry_price, direction)
-    floating_pl = _position_pl(entry_price, current_price, units, direction)
+    floating_pl = _position_pl(pair, entry_price, current_price, units, direction)
     normalized_time = candle["time"].isoformat()
     updates = {
         "entry_time": normalized_time,
@@ -167,11 +167,17 @@ def _default_exit_prices(entry_price: float, direction: str) -> tuple[float | No
     return round(entry_price * 1.0020, 8), round(entry_price * 0.9990, 8)
 
 
-def _position_pl(entry_price: float, close_price: float, units: float, direction: str) -> float:
+def _position_pl(pair: str, entry_price: float, close_price: float, units: float, direction: str) -> float:
     if entry_price <= 0 or close_price <= 0 or units == 0:
         return 0.0
     multiplier = -1.0 if direction == "SELL" else 1.0
-    return round((close_price - entry_price) * abs(units) * multiplier, 4)
+    return round((close_price - entry_price) * _effective_pl_units(pair, units) * multiplier, 4)
+
+
+def _effective_pl_units(pair: str, units: float) -> float:
+    if pair.replace("/", "_").upper() in {"NAS100_USD", "SPX500_USD"}:
+        return abs(units) / 10_000.0
+    return abs(units)
 
 
 def _float(value: Any) -> float:

@@ -1736,7 +1736,27 @@ def _position_pl_value(position: dict[str, Any]) -> float:
     if value is not None:
         return value
     value = _safe_float(position.get("floating_pl"))
-    return value if value is not None else 0.0
+    if value is not None:
+        return value
+    return _calculated_position_pl(position)
+
+
+def _calculated_position_pl(position: dict[str, Any]) -> float:
+    pair = str(position.get("pair") or position.get("instrument") or "")
+    entry_price = _safe_float(position.get("entry_price") or position.get("open_price")) or 0.0
+    close_price = _safe_float(position.get("close_price") or position.get("current_price")) or 0.0
+    units = _safe_float(position.get("units")) or 0.0
+    direction = str(position.get("direction") or "").upper()
+    if pair == "" or entry_price <= 0 or close_price <= 0 or units == 0:
+        return 0.0
+    multiplier = -1.0 if direction == "SELL" else 1.0
+    return round((close_price - entry_price) * _effective_paper_pl_units(pair, units) * multiplier, 4)
+
+
+def _effective_paper_pl_units(pair: str, units: float) -> float:
+    if pair.replace("/", "_").upper() in {"NAS100_USD", "SPX500_USD"}:
+        return abs(units) / 10_000.0
+    return abs(units)
 
 
 def _strategy_name_lookup(repository: StrategyAssetRepository) -> dict[str, str]:

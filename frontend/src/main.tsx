@@ -2784,7 +2784,7 @@ function PaperPositionsTable({
 }
 
 function paperTradeListingColumns(rows: Row[]) {
-  const columns = rows[0] ? Object.keys(rows[0]) : [];
+  const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
   const strategyColumns = new Set(["strategy", "strategy_asset", "strategy_asset_id"]);
   return [
     ...columns.filter((column) => !strategyColumns.has(column)),

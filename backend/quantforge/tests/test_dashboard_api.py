@@ -423,6 +423,35 @@ def test_paper_summary_uses_real_position_store_and_rows_include_strategy(monkey
     assert rows[0]["strategy_asset_id"] == record.strategy_asset_id
 
 
+def test_paper_open_rows_calculate_missing_usd_index_pl(monkeypatch, tmp_path: Path) -> None:
+    positions_file = tmp_path / "paper_positions.json"
+    positions_file.write_text(
+        """
+        {
+          "positions": [
+            {
+              "position_id": "nas-open",
+              "status": "OPEN",
+              "pair": "NAS100_USD",
+              "timeframe": "H1",
+              "strategy_asset_id": "QF-IDX",
+              "direction": "BUY",
+              "units": 10000,
+              "entry_price": 28831.0,
+              "close_price": 28841.0
+            }
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard_service, "default_paper_positions_file", lambda: positions_file)
+
+    rows = DashboardService()._paper_position_rows("OPEN")
+
+    assert rows[0]["p_l"] == "10.00"
+
+
 def test_trade_investigation_endpoints_expose_milestone_27_report(monkeypatch, tmp_path: Path) -> None:
     positions_file = tmp_path / "paper_positions.json"
     positions_file.write_text(

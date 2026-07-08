@@ -331,6 +331,52 @@ def test_mark_to_market_converts_jpy_quote_pl_to_usd_account_currency(tmp_path: 
     assert positions[0]["p_l"] == -10.0
 
 
+def test_mark_to_market_normalizes_usd_index_pl_units(tmp_path: Path) -> None:
+    position_store = PaperPositionStore(tmp_path / "positions.json")
+    position_store._save(
+        {
+            "positions": [
+                {
+                    "position_id": "nas-open",
+                    "pair": "NAS100_USD",
+                    "instrument": "NAS100_USD",
+                    "timeframe": "H1",
+                    "direction": "BUY",
+                    "status": "OPEN",
+                    "units": 10000,
+                    "entry_price": 28831.0,
+                    "open_price": 28831.0,
+                    "close_price": 28831.0,
+                    "opened_at": "2026-07-08T10:00:00+00:00",
+                },
+                {
+                    "position_id": "spx-open",
+                    "pair": "SPX500_USD",
+                    "instrument": "SPX500_USD",
+                    "timeframe": "H1",
+                    "direction": "BUY",
+                    "status": "OPEN",
+                    "units": 10000,
+                    "entry_price": 7447.4,
+                    "open_price": 7447.4,
+                    "close_price": 7447.4,
+                    "opened_at": "2026-07-08T10:00:00+00:00",
+                },
+            ]
+        }
+    )
+
+    position_store.mark_to_market({"NAS100_USD:H1": 28841.0, "SPX500_USD:H1": 7442.4})
+
+    positions = position_store._load()["positions"]
+    assert positions[0]["p_l"] == 10.0
+    assert positions[0]["p_l_account_currency"] == 10.0
+    assert positions[0]["p_l_currency"] == "USD"
+    assert positions[1]["p_l"] == -5.0
+    assert positions[1]["p_l_account_currency"] == -5.0
+    assert positions[1]["p_l_currency"] == "USD"
+
+
 def test_risk_rejection_prevents_order(tmp_path: Path) -> None:
     scanner = MultiPairPaperScanner(
         FakeLatestCandleRepository(),

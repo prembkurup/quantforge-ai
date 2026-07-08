@@ -92,6 +92,10 @@ from quantforge.live import (
     demo_trade_performance_inputs,
     intraday_profile_from_strategy_definition,
     ReplayProgressStore,
+    ReplayCursor,
+    ReplaySession,
+    ReplayStatus,
+    infer_replay_mode,
 )
 from quantforge.live.paper_scanner import PaperPositionStore, default_paper_positions_file
 
@@ -1331,6 +1335,28 @@ class DashboardService:
 
     def paper_replay_status(self) -> dict[str, Any]:
         cursor = ReplayProgressStore(_paper_replay_progress_file()).load()
+        shared_components = {
+            "market_event_source": "HistoricalCandleReplayStream",
+            "event_bus": "LiveEventBus",
+            "feature_engine": "LiveFeatureEngine",
+            "regime_engine": "LiveMarketRegimeEngine",
+            "strategy_selector": "StrategySelector",
+            "decision_engine": "TradeDecisionEngine",
+            "risk_controller": "LiveRiskController",
+            "execution_manager": "ExecutionManager",
+            "paper_portfolio": "PaperPortfolio",
+            "investigation": (
+                "DecisionAuditor, PredictionAnalyzer, ExecutionAnalyzer, "
+                "TradeReplay, ContinuousValidationEngine, PromotionEngine, DigitalTwin"
+            ),
+        }
+        controls = {
+            "start": "/api/paper/replay/start",
+            "pause": "/api/paper/replay/pause",
+            "resume": "/api/paper/replay/resume",
+            "stop": "/api/paper/replay/stop",
+            "speeds": ("REAL_TIME", "2X", "5X", "10X", "100X", "MAXIMUM"),
+        }
         if cursor is None:
             return {
                 "status": "NOT_STARTED",
@@ -1344,6 +1370,19 @@ class DashboardService:
                 "generated_signals": 0,
                 "paper_orders": 0,
                 "last_error": "",
+                "replay_mode": "",
+                "replay_speed": "MAXIMUM",
+                "progress_percent": 0.0,
+                "control": "IDLE",
+                "mode_banner": "Historical Replay is idle. Paper Trading is using the live paper-practice data source.",
+                "statistics": {
+                    "processed_events": 0,
+                    "generated_signals": 0,
+                    "paper_orders": 0,
+                    "progress_percent": 0.0,
+                },
+                "controls": controls,
+                "shared_pipeline": shared_components,
                 "source": "ReplayProgressStore",
                 "timestamp": self._timestamp,
             }
@@ -1359,9 +1398,89 @@ class DashboardService:
             "generated_signals": cursor.generated_signals,
             "paper_orders": cursor.paper_orders,
             "last_error": cursor.last_error,
+            "replay_mode": cursor.replay_mode,
+            "replay_speed": cursor.replay_speed,
+            "progress_percent": cursor.progress_percent,
+            "control": cursor.control,
+            "updated_at": cursor.updated_at,
+            "mode_banner": _paper_replay_banner(cursor),
+            "statistics": {
+                "processed_events": cursor.processed_events,
+                "generated_signals": cursor.generated_signals,
+                "paper_orders": cursor.paper_orders,
+                "progress_percent": cursor.progress_percent,
+            },
+            "controls": controls,
+            "shared_pipeline": shared_components,
             "source": "ReplayProgressStore",
             "timestamp": self._timestamp,
         }
+
+    def start_paper_replay(self, payload: dict[str, Any]) -> dict[str, Any]:
+        pairs = _csv_tuple(payload.get("pairs") or payload.get("pair") or "EUR_USD")
+        timeframes = _csv_tuple(payload.get("timeframes") or payload.get("timeframe") or "H1")
+        start_time = _parse_replay_datetime(str(payload.get("from") or payload.get("start_time") or "2024-01-01"), end_of_date=False)
+        end_time = _parse_replay_datetime(str(payload.get("to") or payload.get("end_time") or "2024-12-31"), end_of_date=True)
+        speed = _normalize_replay_speed(str(payload.get("speed") or "MAXIMUM"))
+        replay_id = str(payload.get("replay_id") or f"REPLAY-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}")
+        session = ReplaySession(
+            replay_id=replay_id,
+            pairs=pairs,
+            timeframes=timeframes,
+            start_time=start_time,
+            end_time=end_time,
+            mode=infer_replay_mode(pairs, timeframes),
+            status=ReplayStatus.RUNNING,
+        )
+        cursor = _paper_replay_cursor_from_session(session, status=ReplayStatus.RUNNING, speed=speed, control="START_REQUESTED")
+        ReplayProgressStore(_paper_replay_progress_file()).save(cursor)
+        return self.paper_replay_status()
+
+    def pause_paper_replay(self) -> dict[str, Any]:
+        return self._update_paper_replay_control(ReplayStatus.PAUSED, "PAUSE_REQUESTED")
+
+    def resume_paper_replay(self) -> dict[str, Any]:
+        return self._update_paper_replay_control(ReplayStatus.RUNNING, "RESUME_REQUESTED")
+
+    def stop_paper_replay(self) -> dict[str, Any]:
+        return self._update_paper_replay_control(ReplayStatus.STOPPED, "STOP_REQUESTED")
+
+    def _update_paper_replay_control(self, status: ReplayStatus, control: str) -> dict[str, Any]:
+        store = ReplayProgressStore(_paper_replay_progress_file())
+        cursor = store.load()
+        if cursor is None:
+            session = ReplaySession(
+                replay_id=f"REPLAY-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
+                pairs=("EUR_USD",),
+                timeframes=("H1",),
+                start_time=datetime.now(UTC),
+                end_time=datetime.now(UTC),
+                mode=infer_replay_mode(("EUR_USD",), ("H1",)),
+                status=status,
+            )
+            store.save(_paper_replay_cursor_from_session(session, status=status, control=control))
+            return self.paper_replay_status()
+        store.save(
+            type(cursor)(
+                replay_id=cursor.replay_id,
+                pair=cursor.pair,
+                timeframe=cursor.timeframe,
+                current_candle_time=cursor.current_candle_time,
+                start_time=cursor.start_time,
+                end_time=cursor.end_time,
+                processed_events=cursor.processed_events,
+                generated_signals=cursor.generated_signals,
+                paper_orders=cursor.paper_orders,
+                status=status,
+                last_error=cursor.last_error,
+                replay_mode=cursor.replay_mode,
+                replay_speed=cursor.replay_speed,
+                progress_percent=cursor.progress_percent,
+                control=control,
+                updated_at=datetime.now(UTC).isoformat(),
+            )
+        )
+        return self.paper_replay_status()
 
     def paper_practice_latest(self) -> dict[str, Any]:
         path = _paper_practice_result_file()
@@ -1852,6 +1971,85 @@ def _approved_strategy_assets_file() -> Path:
 
 def _paper_replay_progress_file() -> Path:
     return _repo_root() / "var" / "paper_replay_progress.json"
+
+
+def _paper_replay_cursor_from_session(
+    session: ReplaySession,
+    *,
+    status: ReplayStatus,
+    speed: str = "MAXIMUM",
+    control: str,
+) -> ReplayCursor:
+    return ReplayCursor(
+        replay_id=session.replay_id,
+        pair=",".join(session.pairs),
+        timeframe=",".join(session.timeframes),
+        current_candle_time="",
+        start_time=session.start_time.isoformat(),
+        end_time=session.end_time.isoformat(),
+        processed_events=0,
+        generated_signals=0,
+        paper_orders=0,
+        status=status,
+        replay_mode=session.mode.value,
+        replay_speed=speed,
+        progress_percent=0.0,
+        control=control,
+        updated_at=datetime.now(UTC).isoformat(),
+    )
+
+
+def _paper_replay_banner(cursor: ReplayCursor) -> str:
+    if cursor.status == ReplayStatus.RUNNING:
+        return f"Replay Mode active for {cursor.pair} {cursor.timeframe} at {cursor.replay_speed} speed."
+    if cursor.status == ReplayStatus.PAUSED:
+        return f"Replay Mode paused for {cursor.pair} {cursor.timeframe}."
+    if cursor.status == ReplayStatus.STOPPED:
+        return f"Replay Mode stopped for {cursor.pair} {cursor.timeframe}."
+    if cursor.status == ReplayStatus.COMPLETE:
+        return f"Replay Mode complete for {cursor.pair} {cursor.timeframe}."
+    if cursor.status == ReplayStatus.FAILED:
+        return f"Replay Mode failed: {cursor.last_error or 'unknown error'}"
+    return "Replay Mode is prepared but not running."
+
+
+def _csv_tuple(value: Any) -> tuple[str, ...]:
+    if isinstance(value, (list, tuple)):
+        items = value
+    else:
+        items = str(value).split(",")
+    parsed = tuple(str(item).strip().upper() for item in items if str(item).strip())
+    return parsed or ("EUR_USD",)
+
+
+def _normalize_replay_speed(value: str) -> str:
+    normalized = value.strip().upper().replace("×", "X").replace(" ", "_")
+    aliases = {
+        "REALTIME": "REAL_TIME",
+        "REAL_TIME": "REAL_TIME",
+        "2": "2X",
+        "2X": "2X",
+        "5": "5X",
+        "5X": "5X",
+        "10": "10X",
+        "10X": "10X",
+        "100": "100X",
+        "100X": "100X",
+        "MAX": "MAXIMUM",
+        "MAXIMUM": "MAXIMUM",
+    }
+    return aliases.get(normalized, "MAXIMUM")
+
+
+def _parse_replay_datetime(value: str, *, end_of_date: bool) -> datetime:
+    text_value = value.strip()
+    if len(text_value) == 10 and text_value.count("-") == 2:
+        parsed = datetime.fromisoformat(text_value).replace(tzinfo=UTC)
+        return parsed + timedelta(days=1) if end_of_date else parsed
+    parsed = datetime.fromisoformat(text_value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _paper_practice_result_file() -> Path:

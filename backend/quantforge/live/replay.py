@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -20,6 +21,8 @@ class ReplayMode(StrEnum):
 class ReplayStatus(StrEnum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
+    STOPPED = "STOPPED"
     COMPLETE = "COMPLETE"
     FAILED = "FAILED"
 
@@ -51,6 +54,11 @@ class ReplayCursor:
     paper_orders: int
     status: ReplayStatus
     last_error: str = ""
+    replay_mode: str = ""
+    replay_speed: str = "MAXIMUM"
+    progress_percent: float = 0.0
+    control: str = "IDLE"
+    updated_at: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +86,15 @@ class ReplayProgressStore:
         if not self.path.exists():
             return None
         payload = json.loads(self.path.read_text(encoding="utf-8"))
+        pairs = tuple(str(payload.get("pair", "")).split(","))
+        timeframes = tuple(str(payload.get("timeframe", "")).split(","))
+        payload.setdefault("replay_mode", infer_replay_mode(tuple(item for item in pairs if item), tuple(item for item in timeframes if item)).value)
+        payload.setdefault("replay_speed", "MAXIMUM")
+        payload.setdefault("progress_percent", 0.0)
+        if payload.get("status") == ReplayStatus.COMPLETE.value:
+            payload["progress_percent"] = 100.0
+        payload.setdefault("control", str(payload.get("status", "IDLE")))
+        payload.setdefault("updated_at", "")
         return ReplayCursor(**{**payload, "status": ReplayStatus(str(payload["status"]))})
 
 
@@ -111,7 +128,13 @@ class HistoricalCandleReplayStream:
         self.repository = repository
         self.event_factory = event_factory or ReplayEventFactory()
 
-    def events(self, session: ReplaySession) -> tuple[LiveEvent, ...]:
+    def events(
+        self,
+        session: ReplaySession,
+        *,
+        progress_store: ReplayProgressStore | None = None,
+        replay_speed: str = "MAXIMUM",
+    ) -> tuple[LiveEvent, ...]:
         events: list[LiveEvent] = []
         for pair in session.pairs:
             for timeframe in session.timeframes:
@@ -124,7 +147,51 @@ class HistoricalCandleReplayStream:
                     limit=250_000,
                 )
                 events.extend(self.event_factory.new_candle(row) for row in rows)
-        return tuple(sorted(events, key=lambda event: event.timestamp))
+        ordered = tuple(sorted(events, key=lambda event: event.timestamp))
+        if progress_store is None:
+            return ordered
+
+        published: list[LiveEvent] = []
+        previous_timestamp: datetime | None = None
+        for event in ordered:
+            while _control_status(progress_store) == ReplayStatus.PAUSED:
+                progress_store.save(
+                    replay_cursor(
+                        session,
+                        current_candle_time=event.timestamp.isoformat(),
+                        processed_events=len(published),
+                        status=ReplayStatus.PAUSED,
+                        replay_speed=replay_speed,
+                        control="PAUSED",
+                    )
+                )
+                time.sleep(0.25)
+            if _control_status(progress_store) == ReplayStatus.STOPPED:
+                progress_store.save(
+                    replay_cursor(
+                        session,
+                        current_candle_time=event.timestamp.isoformat(),
+                        processed_events=len(published),
+                        status=ReplayStatus.STOPPED,
+                        replay_speed=replay_speed,
+                        control="STOPPED",
+                    )
+                )
+                break
+            _sleep_for_replay_speed(previous_timestamp, event.timestamp, replay_speed)
+            published.append(event)
+            previous_timestamp = event.timestamp
+            progress_store.save(
+                replay_cursor(
+                    session,
+                    current_candle_time=event.timestamp.isoformat(),
+                    processed_events=len(published),
+                    status=ReplayStatus.RUNNING,
+                    replay_speed=replay_speed,
+                    control="PUBLISHING",
+                )
+            )
+        return tuple(published)
 
 
 def replay_cursor(
@@ -136,9 +203,24 @@ def replay_cursor(
     paper_orders: int = 0,
     status: ReplayStatus = ReplayStatus.RUNNING,
     last_error: str = "",
+    replay_speed: str = "MAXIMUM",
+    control: str = "",
 ) -> ReplayCursor:
     pair = ",".join(session.pairs)
     timeframe = ",".join(session.timeframes)
+    progress_percent = 0.0
+    if current_candle_time:
+        try:
+            start = session.start_time.timestamp()
+            end = session.end_time.timestamp()
+            current = _coerce_datetime(current_candle_time).timestamp()
+            if end > start:
+                progress_percent = round(max(0.0, min(100.0, ((current - start) / (end - start)) * 100.0)), 2)
+        except (TypeError, ValueError):
+            progress_percent = 0.0
+    if status == ReplayStatus.COMPLETE:
+        progress_percent = 100.0
+
     return ReplayCursor(
         replay_id=session.replay_id,
         pair=pair,
@@ -151,6 +233,11 @@ def replay_cursor(
         paper_orders=paper_orders,
         status=status,
         last_error=last_error,
+        replay_mode=session.mode.value,
+        replay_speed=replay_speed,
+        progress_percent=progress_percent,
+        control=control or status.value,
+        updated_at=datetime.now(UTC).isoformat(),
     )
 
 
@@ -164,6 +251,32 @@ def infer_replay_mode(pairs: tuple[str, ...], timeframes: tuple[str, ...]) -> Re
 
 def completed_session(session: ReplaySession) -> ReplaySession:
     return replace(session, status=ReplayStatus.COMPLETE)
+
+
+def _control_status(progress_store: ReplayProgressStore) -> ReplayStatus:
+    cursor = progress_store.load()
+    if cursor is None:
+        return ReplayStatus.RUNNING
+    return cursor.status
+
+
+def _sleep_for_replay_speed(previous_timestamp: datetime | None, timestamp: datetime, replay_speed: str) -> None:
+    if previous_timestamp is None:
+        return
+    normalized = replay_speed.strip().upper()
+    if normalized == "MAXIMUM":
+        return
+    multipliers = {
+        "REAL_TIME": 1.0,
+        "2X": 2.0,
+        "5X": 5.0,
+        "10X": 10.0,
+        "100X": 100.0,
+    }
+    multiplier = multipliers.get(normalized, 100.0)
+    delay = max(0.0, (timestamp - previous_timestamp).total_seconds() / multiplier)
+    if delay:
+        time.sleep(min(delay, 1.0))
 
 
 def _coerce_datetime(value: Any) -> datetime:

@@ -1513,10 +1513,12 @@ function Paper() {
   const summary = useApi<Row>("/api/paper/summary");
   const trades = useApi<Row[]>("/api/paper/trades/open");
   const drift = useApi<any>("/api/paper/drift");
-  const replay = useApi<Row>("/api/paper/replay");
+  const replay = useApi<any>("/api/paper/replay");
   const practice = useApi<any>("/api/paper/practice/latest");
   const practiceHistory = useApi<Row[]>("/api/paper/practice/history", []);
+  const [replayOverride, setReplayOverride] = React.useState<any | null>(null);
   if (!summary || !trades || !drift || !replay || !practice || !practiceHistory) return <Loading />;
+  const replayData = replayOverride ?? replay;
   const openPositions = practice.open_paper_positions ?? [];
   const closedPositions = practice.closed_paper_positions ?? [];
   const periodTradeRows = buildPaperTradePeriodRows(openPositions, closedPositions);
@@ -1524,6 +1526,7 @@ function Paper() {
   const dashboard = buildPaperDashboardV2(practice, summary, openPositions, closedPositions, paperMetrics);
   return (
     <Page title="Paper Trading Dashboard v2.0">
+      <PaperReplayControlPanel replay={replayData} onReplayUpdated={setReplayOverride} />
       <DashboardTabs tabs={[
         {
           label: "Summary",
@@ -1663,13 +1666,13 @@ function Paper() {
           <MiniFact label="Candles" value={practice.candles_checked ?? practice.candles_loaded ?? 0} />
           <MiniFact label="Execution Path" value={practice.execution_path ?? "UNKNOWN"} />
           <MiniFact label="24/7 Ready" value={practice.run_24_7_ready ? "YES" : "NO"} />
-          <MiniFact label="Replay Status" value={replay.status} />
-          <MiniFact label="Replay Events" value={number(replay.processed_events)} />
-          <MiniFact label="Replay Signals" value={number(replay.generated_signals)} />
-          <MiniFact label="Replay Orders" value={number(replay.paper_orders)} />
+          <MiniFact label="Replay Status" value={replayData.status} />
+          <MiniFact label="Replay Events" value={number(replayData.processed_events)} />
+          <MiniFact label="Replay Signals" value={number(replayData.generated_signals)} />
+          <MiniFact label="Replay Orders" value={number(replayData.paper_orders)} />
         </div>
       </section>
-      <JsonPanel title="Real Candle Replay Cursor" data={replay} />
+      <JsonPanel title="Real Candle Replay Cursor" data={replayData} />
       <PaginatedDataTable title={`Recent 24/7 Paper-Practice Runs (${practiceHistory.length})`} rows={practiceHistory} pageSize={30} />
       <PaginatedDataTable title={`Legacy Open Paper Trades (${trades.length})`} rows={trades} pageSize={30} />
       <JsonPanel title="Drift" data={drift} />
@@ -1745,6 +1748,110 @@ function Paper() {
         },
       ]} />
     </Page>
+  );
+}
+
+function PaperReplayControlPanel({ replay, onReplayUpdated }: { replay: any; onReplayUpdated: (payload: any) => void }) {
+  const [fromDate, setFromDate] = React.useState("2024-01-01");
+  const [toDate, setToDate] = React.useState("2024-12-31");
+  const [pairs, setPairs] = React.useState(String(replay.pair || "EUR_USD"));
+  const [timeframes, setTimeframes] = React.useState(String(replay.timeframe || "H1"));
+  const [speed, setSpeed] = React.useState(String(replay.replay_speed || "MAXIMUM"));
+  const [busyAction, setBusyAction] = React.useState("");
+  const [error, setError] = React.useState("");
+
+  const sendControl = async (action: "start" | "pause" | "resume" | "stop") => {
+    setBusyAction(action);
+    setError("");
+    try {
+      const payload = action === "start" ? { from: fromDate, to: toDate, pairs, timeframes, speed } : {};
+      const updated = await postJson<any>(`/api/paper/replay/${action}`, payload);
+      onReplayUpdated(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Replay control failed");
+    } finally {
+      setBusyAction("");
+    }
+  };
+
+  const pipelineRows = Object.entries(replay.shared_pipeline ?? {}).map(([stage, component]) => ({
+    stage: displayLabel(stage),
+    component: String(component),
+  }));
+
+  return (
+    <section className="card panel dashboard-card">
+      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Historical Replay Paper Trading</div>
+      <div className="mb-3 rounded border border-sky-500/30 bg-sky-500/10 p-3 text-sm text-slate-200">
+        {replay.mode_banner ?? "Replay Mode is idle. Paper Trading is using the live paper-practice data source."}
+      </div>
+      <div className="kpi-grid">
+        <KpiCard title="Replay Status" value={replay.status ?? "NOT_STARTED"} tone={replay.status === "FAILED" ? "warn" : replay.status === "RUNNING" ? "good" : "neutral"} />
+        <KpiCard title="Replay Mode" value={replay.replay_mode || "IDLE"} />
+        <KpiCard title="Speed" value={replay.replay_speed || speed} />
+        <KpiCard title="Progress" value={`${replay.progress_percent ?? 0}%`} />
+        <KpiCard title="Events" value={number(replay.processed_events ?? 0)} />
+        <KpiCard title="Signals" value={number(replay.generated_signals ?? 0)} />
+        <KpiCard title="Paper Orders" value={number(replay.paper_orders ?? 0)} />
+        <KpiCard title="Control" value={replay.control ?? "IDLE"} />
+      </div>
+      <section className="card panel dashboard-card mt-4">
+        <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Controls</div>
+        <div className="grid gap-3 md:grid-cols-5">
+          <label className="text-xs uppercase text-slate-400">
+            From
+            <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+          </label>
+          <label className="text-xs uppercase text-slate-400">
+            To
+            <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+          </label>
+          <label className="text-xs uppercase text-slate-400">
+            Pair
+            <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={pairs} onChange={(event) => setPairs(event.target.value)} />
+          </label>
+          <label className="text-xs uppercase text-slate-400">
+            Timeframe
+            <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={timeframes} onChange={(event) => setTimeframes(event.target.value)} />
+          </label>
+          <label className="text-xs uppercase text-slate-400">
+            Speed
+            <select className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={speed} onChange={(event) => setSpeed(event.target.value)}>
+              {(replay.controls?.speeds ?? ["REAL_TIME", "2X", "5X", "10X", "100X", "MAXIMUM"]).map((item: string) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("start")}>{busyAction === "start" ? "Starting" : "Replay Start"}</button>
+          <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("pause")}>{busyAction === "pause" ? "Pausing" : "Pause"}</button>
+          <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("resume")}>{busyAction === "resume" ? "Resuming" : "Resume"}</button>
+          <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("stop")}>{busyAction === "stop" ? "Stopping" : "Stop"}</button>
+        </div>
+        {error && <div className="mt-3 text-sm text-amber-300">{error}</div>}
+      </section>
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Progress</div>
+          <ProgressBar value={Number(replay.progress_percent ?? 0)} />
+          <div className="pipeline-detail-grid mt-3">
+            <MiniFact label="Replay ID" value={replay.replay_id || "n/a"} />
+            <MiniFact label="Current Candle" value={formatDate(replay.current_candle_time)} />
+            <MiniFact label="Start" value={formatDate(replay.start_time)} />
+            <MiniFact label="End" value={formatDate(replay.end_time)} />
+          </div>
+        </section>
+        <section className="card panel dashboard-card">
+          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Statistics</div>
+          <div className="pipeline-detail-grid">
+            <MiniFact label="Processed Events" value={number(replay.statistics?.processed_events ?? replay.processed_events ?? 0)} />
+            <MiniFact label="Generated Signals" value={number(replay.statistics?.generated_signals ?? replay.generated_signals ?? 0)} />
+            <MiniFact label="Paper Orders" value={number(replay.statistics?.paper_orders ?? replay.paper_orders ?? 0)} />
+            <MiniFact label="Updated" value={formatDate(replay.updated_at || replay.timestamp)} />
+          </div>
+        </section>
+      </div>
+      <DataTable title="Shared Paper Trading Pipeline" rows={pipelineRows} />
+    </section>
   );
 }
 

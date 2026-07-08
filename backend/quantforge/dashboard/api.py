@@ -350,6 +350,22 @@ def create_app() -> FastAPI:
     def paper_replay_status() -> dict[str, Any]:
         return service.paper_replay_status()
 
+    @app.post("/api/paper/replay/start")
+    def paper_replay_start(payload: dict[str, Any]) -> dict[str, Any]:
+        return service.start_paper_replay(payload)
+
+    @app.post("/api/paper/replay/pause")
+    def paper_replay_pause() -> dict[str, Any]:
+        return service.pause_paper_replay()
+
+    @app.post("/api/paper/replay/resume")
+    def paper_replay_resume() -> dict[str, Any]:
+        return service.resume_paper_replay()
+
+    @app.post("/api/paper/replay/stop")
+    def paper_replay_stop() -> dict[str, Any]:
+        return service.stop_paper_replay()
+
     @app.get("/api/paper/practice/latest")
     def paper_practice_latest() -> dict[str, Any]:
         return service.paper_practice_latest()

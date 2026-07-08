@@ -6,6 +6,7 @@ from quantforge.live import (
     PaperTradingReplayRunner,
     ReplayProgressStore,
     ReplaySession,
+    ReplayStatus,
     infer_replay_mode,
 )
 from quantforge.research.strategy_assets import (
@@ -14,7 +15,7 @@ from quantforge.research.strategy_assets import (
     StrategyAssetRepository,
 )
 from quantforge.validation import StrategyValidationPlatform
-from quantforge.live.replay import _coerce_datetime
+from quantforge.live.replay import _coerce_datetime, replay_cursor
 
 
 class FakeCandleRepository:
@@ -97,3 +98,57 @@ def test_paper_trading_replay_runner_processes_real_style_candle_events(tmp_path
     assert result.signals_generated == 500
     assert len(result.paper_orders) == 500
     assert progress.load().status.value == "COMPLETE"
+    assert progress.load().replay_mode == "SINGLE_PAIR_SINGLE_TIMEFRAME"
+    assert progress.load().progress_percent == 100.0
+
+
+def test_replay_progress_store_loads_legacy_cursor_payload(tmp_path: Path) -> None:
+    path = tmp_path / "paper_replay_progress.json"
+    path.write_text(
+        """
+        {
+          "current_candle_time": "",
+          "end_time": "2024-01-02T00:00:00+00:00",
+          "generated_signals": 0,
+          "last_error": "",
+          "pair": "EUR_USD",
+          "paper_orders": 0,
+          "processed_events": 0,
+          "replay_id": "legacy",
+          "start_time": "2024-01-01T00:00:00+00:00",
+          "status": "RUNNING",
+          "timeframe": "H1"
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    cursor = ReplayProgressStore(path).load()
+
+    assert cursor is not None
+    assert cursor.status == ReplayStatus.RUNNING
+    assert cursor.replay_speed == "MAXIMUM"
+    assert cursor.control == "RUNNING"
+
+
+def test_historical_replay_stream_honors_stop_control(tmp_path: Path) -> None:
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    session = ReplaySession(
+        replay_id="test-replay-stop",
+        pairs=("EUR_USD",),
+        timeframes=("H1",),
+        start_time=start,
+        end_time=start + timedelta(days=1),
+        mode=infer_replay_mode(("EUR_USD",), ("H1",)),
+    )
+    progress = ReplayProgressStore(tmp_path / "paper_replay_progress.json")
+    progress.save(replay_cursor(session, status=ReplayStatus.STOPPED, control="STOP_REQUESTED"))
+
+    events = HistoricalCandleReplayStream(FakeCandleRepository(10)).events(
+        session,
+        progress_store=progress,
+        replay_speed="MAXIMUM",
+    )
+
+    assert events == ()
+    assert progress.load().status == ReplayStatus.STOPPED

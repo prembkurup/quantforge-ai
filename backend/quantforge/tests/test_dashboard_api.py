@@ -367,9 +367,39 @@ def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:
     assert client.get("/api/ops/health").json()["platform_status"] == "HEALTHY"
     assert client.get("/api/knowledge/summary").json()["knowledge_records"] == 795_000
     assert client.get("/api/paper/summary").json()["promotion_readiness"] == "PROMOTE"
-    assert client.get("/api/paper/replay").json()["source"] == "ReplayProgressStore"
+    replay_payload = client.get("/api/paper/replay").json()
+    assert replay_payload["source"] == "ReplayProgressStore"
+    assert replay_payload["controls"]["start"] == "/api/paper/replay/start"
+    assert replay_payload["shared_pipeline"]["decision_engine"] == "TradeDecisionEngine"
     assert client.post("/api/dashboard/overview").status_code == 405
     assert client.post("/api/portfolio/intelligence").status_code == 405
+
+
+def test_paper_replay_control_endpoints_update_progress_store(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(dashboard_service, "_paper_replay_progress_file", lambda: tmp_path / "paper_replay_progress.json")
+    replay_client = TestClient(create_app())
+
+    started = replay_client.post(
+        "/api/paper/replay/start",
+        json={
+            "from": "2024-01-01",
+            "to": "2024-12-31",
+            "pairs": "EUR_USD,GBP_USD",
+            "timeframes": "M15,H1",
+            "speed": "10X",
+        },
+    )
+    paused = replay_client.post("/api/paper/replay/pause")
+    resumed = replay_client.post("/api/paper/replay/resume")
+    stopped = replay_client.post("/api/paper/replay/stop")
+
+    assert started.status_code == 200
+    assert started.json()["status"] == "RUNNING"
+    assert started.json()["replay_mode"] == "MULTI_PAIR_MULTI_TIMEFRAME"
+    assert started.json()["replay_speed"] == "10X"
+    assert paused.json()["status"] == "PAUSED"
+    assert resumed.json()["status"] == "RUNNING"
+    assert stopped.json()["status"] == "STOPPED"
 
 
 def test_paper_position_chart_uses_source_candle_time_as_utc_trade_time() -> None:

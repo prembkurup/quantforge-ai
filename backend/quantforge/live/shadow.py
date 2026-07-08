@@ -495,12 +495,13 @@ class PaperTradingReplayRunner:
         *,
         strategy_asset_id: str,
         days_observed: int = 60,
+        replay_speed: str = "MAXIMUM",
     ) -> ShadowTradingRunResult:
-        cursor = replay_cursor(session, status=ReplayStatus.RUNNING)
+        cursor = replay_cursor(session, status=ReplayStatus.RUNNING, replay_speed=replay_speed)
         self.progress_store.save(cursor)
         try:
             asset = self.strategy_asset_loader.load_strategy_asset(strategy_asset_id)
-            events = self.stream.events(session)
+            events = self.stream.events(session, progress_store=self.progress_store, replay_speed=replay_speed)
             live_result = self.live.run(asset, events=events, demo=False)
             paper_orders = self.execution.execute(live_result.signals)
             fills = self.exchange.fill(paper_orders)
@@ -515,13 +516,16 @@ class PaperTradingReplayRunner:
             digital_twin = self.twin.compare(live_result.signals, live_result.signals)
             knowledge_updates = self.knowledge.update(daily_report)
             last_event_time = events[-1].timestamp.isoformat() if events else ""
+            current_cursor = self.progress_store.load()
+            final_status = ReplayStatus.STOPPED if current_cursor and current_cursor.status == ReplayStatus.STOPPED else ReplayStatus.COMPLETE
             cursor = replay_cursor(
                 completed_session(session),
                 current_candle_time=last_event_time,
                 processed_events=len(events),
                 generated_signals=len(live_result.signals),
                 paper_orders=len(paper_orders),
-                status=ReplayStatus.COMPLETE,
+                status=final_status,
+                replay_speed=replay_speed,
             )
             self.progress_store.save(cursor)
             dashboard = ShadowTradingDashboard(

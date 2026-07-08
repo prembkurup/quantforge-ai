@@ -241,7 +241,7 @@ Install the supervisor as the single Windows scheduled task for restart/logon re
 
 The supervisor starts the dashboard API, dashboard frontend, full-history worker, historical validation worker, always-on research orchestrator, intraday daily jobs, portfolio intelligence, performance learning, and the paper/practice trading loop. It refuses to start if the configured OANDA URL is not the practice URL or if practice credentials are missing.
 
-When the supervisor is running, open the dashboard locally at `http://127.0.0.1:5174` or from another device on the same private network at `http://192.168.1.113:5174`. The `127.0.0.1` address only works on the QuantForge PC itself.
+When the supervisor is running, open the dashboard locally at `http://127.0.0.1:5175` or from another device on the same private network at `http://192.168.1.113:5175`. The `127.0.0.1` address only works on the QuantForge PC itself.
 
 Supervisor and launcher logs are written to `var\log\quantforge-247-supervisor.log` and `var\log\quantforge-247-launcher.log`. The status command also prints the latest supervisor log tail.
 
@@ -390,7 +390,7 @@ The dashboard API host, port, and browser origins are environment-driven:
 ```powershell
 QUANTFORGE_DASHBOARD_API_HOST=127.0.0.1
 QUANTFORGE_DASHBOARD_API_PORT=8000
-QUANTFORGE_DASHBOARD_CORS_ORIGINS=http://localhost:5174,http://127.0.0.1:5174,http://192.168.1.113:5174
+QUANTFORGE_DASHBOARD_CORS_ORIGINS=http://localhost:5175,http://127.0.0.1:5175,http://192.168.1.113:5175
 ```
 
 Run the React dashboard:
@@ -401,7 +401,7 @@ npm install
 npm run dev
 ```
 
-Open the UI at `http://127.0.0.1:5174` locally or `http://192.168.1.113:5174` from the private LAN.
+Open the UI at `http://127.0.0.1:5175` locally or `http://192.168.1.113:5175` from the private LAN.
 
 The dashboard shell uses CoreUI and AdminLTE styling while staying read-only for Version 1.
 
@@ -421,7 +421,7 @@ docker compose -f docker-compose.production.yml --env-file .env.production up -d
 docker compose -f docker-compose.production.yml --env-file .env.production exec dashboard-api python -m alembic upgrade head
 ```
 
-The production stack serves the dashboard at `http://127.0.0.1:5174` and `http://192.168.1.113:5174`, proxies `/api/*` to FastAPI, supports React routes such as `/help`, and exposes `GET /api/health`.
+The production stack serves the dashboard at `http://127.0.0.1:5175` and `http://192.168.1.113:5175`, proxies `/api/*` to FastAPI, supports React routes such as `/help`, and exposes `GET /api/health`.
 
 ## Foundation Setup
 

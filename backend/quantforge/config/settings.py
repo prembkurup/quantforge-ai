@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     dashboard_api_host: str = Field(default="127.0.0.1")
     dashboard_api_port: int = Field(default=8000)
     dashboard_cors_origins: str = Field(
-        default="http://localhost:5174,http://127.0.0.1:5174,http://192.168.1.113:5174"
+        default="http://localhost:5175,http://127.0.0.1:5175,http://192.168.1.113:5175"
     )
 
     @property

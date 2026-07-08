@@ -58,7 +58,7 @@ services:
       dockerfile: docker/frontend.Dockerfile
     container_name: quantforge-dashboard-web
     ports:
-      - "5174:80"
+      - "5175:80"
     depends_on:
       dashboard-api:
         condition: service_healthy

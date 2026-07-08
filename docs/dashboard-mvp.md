@@ -43,15 +43,15 @@ docker compose -f docker-compose.production.yml --env-file .env.production exec 
 
 5. Open the production dashboard:
 
-- `http://127.0.0.1:5174`
-- `http://192.168.1.113:5174`
+- `http://127.0.0.1:5175`
+- `http://192.168.1.113:5175`
 
 The production frontend is served by Nginx. It proxies `/api/*` to the FastAPI dashboard API container and serves React routes like `/help` through the SPA fallback.
 
 Production health check:
 
 ```powershell
-Invoke-WebRequest http://127.0.0.1:5174/api/health -UseBasicParsing
+Invoke-WebRequest http://127.0.0.1:5175/api/health -UseBasicParsing
 ```
 
 Stop the production stack:
@@ -110,7 +110,7 @@ npm install
 npm run dev
 ```
 
-Open locally at `http://127.0.0.1:5174` or from the private LAN at `http://192.168.1.113:5174`.
+Open locally at `http://127.0.0.1:5175` or from the private LAN at `http://192.168.1.113:5175`.
 
 For production, use `docker-compose.production.yml` or build with `npm run build` and serve `frontend/dist` behind an internal reverse proxy.
 

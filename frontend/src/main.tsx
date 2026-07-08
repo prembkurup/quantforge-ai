@@ -1747,42 +1747,20 @@ function Paper() {
 function ReplayPaperTrading() {
   const replay = useApi<any>("/api/paper/replay");
   const campaign = useApi<any>("/api/paper/replay/campaign");
-  const [replayOverride, setReplayOverride] = React.useState<any | null>(null);
   if (!replay || !campaign) return <Loading />;
-  const replayData = replayOverride ?? replay;
   return (
     <Page title="Replay Paper Trading">
-      <PaperReplayControlPanel campaign={campaign} replay={replayData} onReplayUpdated={setReplayOverride} />
+      <PaperReplayControlPanel campaign={campaign} replay={replay} />
     </Page>
   );
 }
 
-function PaperReplayControlPanel({ campaign, replay, onReplayUpdated }: { campaign: any; replay: any; onReplayUpdated: (payload: any) => void }) {
-  const [fromDate, setFromDate] = React.useState("2024-01-01");
-  const [toDate, setToDate] = React.useState("2024-12-31");
-  const [pairs, setPairs] = React.useState(String(replay.pair || "EUR_USD"));
-  const [timeframes, setTimeframes] = React.useState(String(replay.timeframe || "H1"));
-  const [speed, setSpeed] = React.useState(String(replay.replay_speed || "MAXIMUM"));
-  const [busyAction, setBusyAction] = React.useState("");
-  const [error, setError] = React.useState("");
+function PaperReplayControlPanel({ campaign, replay }: { campaign: any; replay: any }) {
   const [selectedPair, setSelectedPair] = React.useState("ALL");
   const [selectedTimeframe, setSelectedTimeframe] = React.useState("ALL");
   const [selectedStrategy, setSelectedStrategy] = React.useState("ALL");
   const [selectedGroupId, setSelectedGroupId] = React.useState(String(campaign.groups?.[0]?.group_id ?? ""));
-
-  const sendControl = async (action: "start" | "pause" | "resume" | "stop") => {
-    setBusyAction(action);
-    setError("");
-    try {
-      const payload = action === "start" ? { from: fromDate, to: toDate, pairs, timeframes, speed } : {};
-      const updated = await postJson<any>(`/api/paper/replay/${action}`, payload);
-      onReplayUpdated(updated);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Replay control failed");
-    } finally {
-      setBusyAction("");
-    }
-  };
+  const replaySpeed = String(replay.replay_speed || campaign.scheduler?.speed || "AUTOMATED");
 
   const pipelineRows = Object.entries(replay.shared_pipeline ?? {}).map(([stage, component]) => ({
     stage: displayLabel(stage),
@@ -1849,6 +1827,14 @@ function PaperReplayControlPanel({ campaign, replay, onReplayUpdated }: { campai
     research_request: row.research_request,
     status: row.status,
   }));
+  const automationLoopRows = [
+    { step: "1", loop_stage: "Load enabled pairs/timeframes", component: "PairTimeframeGroupBuilder", status: "AUTOMATED" },
+    { step: "2", loop_stage: "Create groups and replay jobs", component: "ReplayJobQueue", status: "AUTOMATED" },
+    { step: "3", loop_stage: "Run historical candles through paper path", component: "ReplayPaperTradingRunner", status: replay.status ?? "AUTOMATED" },
+    { step: "4", loop_stage: "Test strategies one by one", component: "Strategy Selector", status: "AUTOMATED" },
+    { step: "5", loop_stage: "Score comfort and accept/reject", component: "ReplayComfortScorer", status: "AUTOMATED" },
+    { step: "6", loop_stage: "Create research request if no strategy passes", component: "ReplayResearchRequestGenerator", status: "AUTOMATED" },
+  ] as Row[];
   const pairOptions = ["ALL", ...((campaign.enabled_pairs ?? []) as string[])];
   const timeframeOptions = ["ALL", ...((campaign.enabled_timeframes ?? []) as string[])];
   const strategyOptions = ["ALL", ...Array.from(new Set(groups.map((group) => String(group.best_strategy)).filter(Boolean)))];
@@ -1923,12 +1909,12 @@ function PaperReplayControlPanel({ campaign, replay, onReplayUpdated }: { campai
           <div className="kpi-grid">
             <KpiCard title="Replay Status" value={replay.status ?? "NOT_STARTED"} tone={replay.status === "FAILED" ? "warn" : replay.status === "RUNNING" ? "good" : "neutral"} />
             <KpiCard title="Replay Mode" value={replay.replay_mode || "HISTORICAL_REPLAY"} />
-            <KpiCard title="Speed" value={replay.replay_speed || speed} />
+            <KpiCard title="Speed" value={replaySpeed} />
             <KpiCard title="Progress" value={`${replay.progress_percent ?? 0}%`} />
             <KpiCard title="Events" value={number(replay.processed_events ?? 0)} />
             <KpiCard title="Signals" value={number(replay.generated_signals ?? 0)} />
             <KpiCard title="Paper Orders" value={number(replay.paper_orders ?? 0)} />
-            <KpiCard title="Control" value={replay.control ?? "IDLE"} />
+            <KpiCard title="Loop" value={replay.control ?? "AUTOMATED"} />
           </div>
           <div className="grid gap-4 xl:grid-cols-2">
             <section className="card panel dashboard-card">
@@ -1955,42 +1941,25 @@ function PaperReplayControlPanel({ campaign, replay, onReplayUpdated }: { campai
       ),
     },
     {
-      label: "Controls",
+      label: "Automated Loop",
       content: (
-        <section className="card panel dashboard-card">
-          <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Replay Controls</div>
-          <div className="grid gap-3 md:grid-cols-5">
-            <label className="text-xs uppercase text-slate-400">
-              From
-              <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-            </label>
-            <label className="text-xs uppercase text-slate-400">
-              To
-              <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={toDate} onChange={(event) => setToDate(event.target.value)} />
-            </label>
-            <label className="text-xs uppercase text-slate-400">
-              Pair
-              <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={pairs} onChange={(event) => setPairs(event.target.value)} />
-            </label>
-            <label className="text-xs uppercase text-slate-400">
-              Timeframe
-              <input className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={timeframes} onChange={(event) => setTimeframes(event.target.value)} />
-            </label>
-            <label className="text-xs uppercase text-slate-400">
-              Speed
-              <select className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" value={speed} onChange={(event) => setSpeed(event.target.value)}>
-                {(replay.controls?.speeds ?? ["REAL_TIME", "2X", "5X", "10X", "100X", "MAXIMUM"]).map((item: string) => <option key={item} value={item}>{item}</option>)}
-              </select>
-            </label>
+        <div className="space-y-4">
+          <section className="card panel dashboard-card">
+            <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Automated Replay Loop</div>
+            <div className="pipeline-detail-grid">
+              <MiniFact label="Automation" value="ENABLED" />
+              <MiniFact label="Operator Input" value="NOT REQUIRED" />
+              <MiniFact label="Queue Source" value="Enabled pairs and timeframes" />
+              <MiniFact label="Strategy Limit" value={number(campaign.max_strategies_per_group ?? 0)} />
+              <MiniFact label="Loop Speed" value={replaySpeed} />
+              <MiniFact label="Next Action" value={campaign.next_action ?? replay.next_action ?? "Continue replay queue"} />
+            </div>
+          </section>
+          <DataTable title="Automated Loop Stages" rows={automationLoopRows} />
+          <div className="rounded border border-slate-700/80 bg-slate-950/70 p-3 text-sm text-slate-300">
+            Replay campaigns run in the background loop. The page is monitoring the campaign queue, group results, strategy acceptance, rejection reasons, and research requests.
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("start")}>{busyAction === "start" ? "Starting" : "Replay Start"}</button>
-            <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("pause")}>{busyAction === "pause" ? "Pausing" : "Pause"}</button>
-            <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("resume")}>{busyAction === "resume" ? "Resuming" : "Resume"}</button>
-            <button className="pagination-button" type="button" disabled={!!busyAction} onClick={() => sendControl("stop")}>{busyAction === "stop" ? "Stopping" : "Stop"}</button>
-          </div>
-          {error && <div className="mt-3 text-sm text-amber-300">{error}</div>}
-        </section>
+        </div>
       ),
     },
     {

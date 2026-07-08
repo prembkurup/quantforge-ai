@@ -1422,15 +1422,33 @@ function Paper() {
           label: "Trades",
           content: (
             <>
-      <OpenPaperPositionsTable rows={openPositions} selected={selectedPosition} onSelect={setSelectedPosition} />
+      <DashboardTabs tabs={[
+        {
+          label: "Open Positions",
+          content: (
+            <PaperPositionsTable
+              title={`Open Paper Positions (${openPositions.length})`}
+              rows={openPositions}
+              emptyText="No open paper positions."
+              selected={selectedPosition}
+              onSelect={setSelectedPosition}
+            />
+          ),
+        },
+        {
+          label: "Closed Positions",
+          content: (
+            <PaperPositionsTable
+              title={`Closed Paper Positions (${closedPositions.length})`}
+              rows={closedPositions}
+              emptyText="No closed paper positions."
+              selected={selectedPosition}
+              onSelect={setSelectedPosition}
+            />
+          ),
+        },
+      ]} />
       {selectedPosition && <PaperPositionChart position={selectedPosition} onClose={() => setSelectedPosition(null)} />}
-      <PaperPositionsTable
-        title={`Closed Paper Positions (${closedPositions.length})`}
-        rows={closedPositions}
-        emptyText="No closed paper positions."
-        selected={selectedPosition}
-        onSelect={setSelectedPosition}
-      />
             </>
           ),
         },
@@ -2540,7 +2558,7 @@ function PaginationControls({
   return (
     <div className="pagination-bar">
       <div className="pagination-summary">
-        Showing {firstRow}-{lastRow} of {totalRows} / 30 per page
+        Showing {firstRow}-{lastRow} of {totalRows} / {pageSize} per page
       </div>
       <div className="pagination-actions">
         <button className="pagination-button" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</button>
@@ -2695,9 +2713,35 @@ function PaperPositionsTable({
   onSelect: (row: Row) => void;
 }) {
   const columns = paperTradeListingColumns(rows);
+  const [query, setQuery] = React.useState("");
+  const [page, setPage] = React.useState(1);
+  const pageSize = 30;
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredRows = normalizedQuery
+    ? rows.filter((row) => JSON.stringify(row).toLowerCase().includes(normalizedQuery))
+    : rows;
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  React.useEffect(() => {
+    setPage(1);
+  }, [query, rows]);
+  React.useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+  const pageRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
   return (
     <div className="card panel dashboard-card overflow-hidden">
-      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">{title}</div>
+      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">
+        {title}
+        {filteredRows.length !== rows.length ? ` - ${filteredRows.length} matched` : ""}
+      </div>
+      <div className="pb-3">
+        <input
+          className="input"
+          placeholder="Filter by pair, direction, strategy, status, result, price, or any visible field..."
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </div>
       <div className="overflow-auto">
         <table className="table table-dark table-hover dashboard-table w-full min-w-[920px] text-left text-sm">
           <thead className="bg-slate-900 text-xs uppercase text-slate-400">
@@ -2706,11 +2750,11 @@ function PaperPositionsTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => {
+            {pageRows.map((row, index) => {
               const isSelected = selected === row;
               return (
                 <tr
-                  key={index}
+                  key={`${page}-${index}`}
                   className={`cursor-pointer border-t border-slate-800 ${isSelected ? "selected-table-row" : ""}`}
                   role="button"
                   tabIndex={0}
@@ -2727,54 +2771,14 @@ function PaperPositionsTable({
           </tbody>
         </table>
       </div>
-      {rows.length === 0 && <div className="pt-3 text-sm text-slate-400">{emptyText}</div>}
-    </div>
-  );
-}
-
-function OpenPaperPositionsTable({
-  rows,
-  selected,
-  onSelect
-}: {
-  rows: Row[];
-  selected: Row | null;
-  onSelect: (row: Row) => void;
-}) {
-  const columns = paperTradeListingColumns(rows);
-  return (
-    <div className="card panel dashboard-card overflow-hidden">
-      <div className="card-header border-0 bg-transparent p-0 pb-3 font-medium">Open Paper Positions</div>
-      <div className="overflow-auto">
-        <table className="table table-dark table-hover dashboard-table w-full min-w-[920px] text-left text-sm">
-          <thead className="bg-slate-900 text-xs uppercase text-slate-400">
-            <tr>
-              {columns.map((column) => <th key={column} className="px-3 py-2">{column.replace(/_/g, " ")}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => {
-              const isSelected = selected === row;
-              return (
-                <tr
-                  key={index}
-                  className={`cursor-pointer border-t border-slate-800 ${isSelected ? "selected-table-row" : ""}`}
-                  role="button"
-                  tabIndex={0}
-                  title="Open trade chart"
-                  onClick={() => onSelect(row)}
-                  onKeyDown={(event) => openPaperPositionRowFromKeyboard(event, row, onSelect)}
-                >
-                  {columns.map((column) => (
-                    <td key={column} className={`px-3 py-2 ${paperPositionCellClass(column, row[column])}`}>{String(row[column])}</td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {rows.length === 0 && <div className="pt-3 text-sm text-slate-400">No open paper positions.</div>}
+      {filteredRows.length === 0 && <div className="pt-3 text-sm text-slate-400">{rows.length === 0 ? emptyText : "No paper positions match the current filter."}</div>}
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalRows={filteredRows.length}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

@@ -714,7 +714,10 @@ class TradeJournalStore:
     def _load(self) -> dict[str, Any]:
         if not self.path.exists():
             return {"version": 1, "entries": []}
-        raw = self.path.read_text(encoding="utf-8").strip()
+        try:
+            raw = self.path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return {"version": 1, "entries": []}
         if not raw:
             return {"version": 1, "entries": []}
         try:
@@ -727,7 +730,11 @@ class TradeJournalStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = self.path.with_suffix(f"{self.path.suffix}.{os.getpid()}.tmp")
         tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-        tmp_path.replace(self.path)
+        try:
+            tmp_path.replace(self.path)
+        except OSError:
+            fallback_path = self.path.with_suffix(f"{self.path.suffix}.{os.getpid()}.fallback")
+            tmp_path.replace(fallback_path)
 
 
 class DailyMarketReadinessEvaluator:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import sys
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
@@ -78,6 +79,8 @@ def main() -> None:
 
         if args.reset and STATE_FILE.exists():
             STATE_FILE.unlink()
+        if args.reset and JOB_DIR.exists():
+            shutil.rmtree(JOB_DIR)
 
         all_jobs = _build_jobs(campaign_id, pairs, timeframes, start, end)
         state = _load_state(campaign_id, pairs, timeframes, start, end, workers, all_jobs)

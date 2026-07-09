@@ -458,7 +458,7 @@ def _release_lock() -> None:
 
 def _read_json(path: Path) -> dict[str, Any]:
     for attempt in range(5):
-        raw = path.read_text(encoding="utf-8").strip()
+        raw = path.read_text(encoding="utf-8-sig").strip()
         if raw:
             return json.loads(raw)
         if attempt < 4:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, time
 from enum import StrEnum
@@ -716,11 +717,15 @@ class TradeJournalStore:
         raw = self.path.read_text(encoding="utf-8").strip()
         if not raw:
             return {"version": 1, "entries": []}
-        return json.loads(raw)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            payload, _ = json.JSONDecoder().raw_decode(raw)
+            return payload if isinstance(payload, dict) else {"version": 1, "entries": []}
 
     def _save(self, payload: dict[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = self.path.with_suffix(f"{self.path.suffix}.tmp")
+        tmp_path = self.path.with_suffix(f"{self.path.suffix}.{os.getpid()}.tmp")
         tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
         tmp_path.replace(self.path)
 

@@ -148,7 +148,7 @@ def _build_jobs(
 ) -> list[dict[str, Any]]:
     jobs: list[dict[str, Any]] = []
     for pair in pairs:
-        for timeframe in timeframes:
+        for timeframe in _ordered_timeframes(timeframes):
             for window_start, window_end in _year_windows(start, end):
                 job_id = f"{campaign_id}-{pair}-{timeframe}-{window_start:%Y%m%d}-{window_end:%Y%m%d}"
                 jobs.append(
@@ -398,6 +398,11 @@ def _strategy_asset_id(value: str) -> str:
 
 def _csv_tuple(value: str) -> tuple[str, ...]:
     return tuple(item.strip().upper() for item in str(value).split(",") if item.strip())
+
+
+def _ordered_timeframes(timeframes: tuple[str, ...]) -> tuple[str, ...]:
+    rank = {"H4": 0, "H1": 1, "M15": 2, "M5": 3}
+    return tuple(sorted(timeframes, key=lambda item: (rank.get(item.upper(), 99), item)))
 
 
 def _parse_datetime(value: str, *, end_of_date: bool = False) -> datetime:

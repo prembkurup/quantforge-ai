@@ -1572,6 +1572,8 @@ class DashboardService:
         stop_loss: str | float | None = None,
         take_profit: str | float | None = None,
         opened_at: str = "",
+        closed_at: str = "",
+        close_price: str | float | None = None,
         source_candle_time: str = "",
         limit: int = 3000,
     ) -> dict[str, Any]:
@@ -1581,16 +1583,22 @@ class DashboardService:
         database_status = "available"
         error = ""
         anchor_time = _parse_chart_datetime(source_candle_time or opened_at)
+        closed_time = _parse_chart_datetime(closed_at)
         try:
             with get_coreui_history_engine().connect() as connection:
                 repository = CoreUiCandleRepository(connection, get_settings().coreui_candle_table)
                 if anchor_time is not None:
                     step = _timeframe_delta(timeframe)
+                    window_start = anchor_time - step * (candle_limit // 2)
+                    window_end = anchor_time + step * (candle_limit // 2)
+                    if closed_time is not None:
+                        window_start = min(anchor_time, closed_time) - step * 50
+                        window_end = max(anchor_time, closed_time) + step * 50
                     rows = repository.load_window(
                         pair_name,
                         timeframe,
-                        anchor_time - step * (candle_limit // 2),
-                        anchor_time + step * (candle_limit // 2),
+                        window_start,
+                        window_end,
                         limit=candle_limit,
                     )
                     if not rows:
@@ -1617,7 +1625,11 @@ class DashboardService:
             error = str(exc)
 
         anchor_candle = _nearest_chart_candle(candles, anchor_time) if anchor_time is not None else None
+        close_candle = _nearest_chart_candle(candles, closed_time) if closed_time is not None else None
         chart_open_price = _safe_float(anchor_candle.get("open")) if anchor_candle and source_candle_time else _safe_float(open_price)
+        chart_close_price = _safe_float(close_price)
+        if close_candle and chart_close_price is None:
+            chart_close_price = _safe_float(close_candle.get("close"))
         if anchor_candle and source_candle_time and chart_open_price:
             chart_take_profit, chart_stop_loss = _replay_default_exit_prices(chart_open_price, direction)
         else:
@@ -1633,9 +1645,13 @@ class DashboardService:
             "trade": {
                 "direction": direction,
                 "open_price": chart_open_price,
+                "close_price": chart_close_price,
                 "stop_loss": chart_stop_loss,
                 "take_profit": chart_take_profit,
                 "opened_at": _chart_time(source_candle_time or opened_at),
+                "closed_at": _chart_time(closed_at),
+                "open_marker_time": _chart_time(anchor_candle.get("time")) if anchor_candle else _chart_time(source_candle_time or opened_at),
+                "close_marker_time": _chart_time(close_candle.get("time")) if close_candle else _chart_time(closed_at),
                 "source_candle_time": _chart_time(source_candle_time),
             },
             "database_status": database_status,

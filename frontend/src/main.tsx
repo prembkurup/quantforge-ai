@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
-import { CandlestickSeries, ColorType, LineStyle, createChart, createSeriesMarkers, type AutoscaleInfoProvider, type CandlestickData, type UTCTimestamp } from "lightweight-charts";
+import { CandlestickSeries, ColorType, LineStyle, createChart, createSeriesMarkers, type AutoscaleInfoProvider, type CandlestickData, type SeriesMarker, type UTCTimestamp } from "lightweight-charts";
 import { Activity, BookOpen, Brain, CandlestickChart, CircleHelp, Database, GitBranch, HeartPulse, Library, LineChart, ListChecks, Menu, PieChart, Save, ScrollText, Settings, ShieldCheck, Workflow as WorkflowIcon, X } from "lucide-react";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "admin-lte/dist/css/adminlte.min.css";
@@ -35,9 +35,13 @@ type PaperPositionChartPayload = {
   trade: {
     direction: string;
     open_price: number | null;
+    close_price: number | null;
     stop_loss: number | null;
     take_profit: number | null;
     opened_at: string;
+    closed_at: string;
+    open_marker_time: string;
+    close_marker_time: string;
     source_candle_time: string;
   };
   database_status: string;
@@ -4194,6 +4198,8 @@ function PaperPositionChart({ position, onClose }: { position: Row; onClose: () 
       stop_loss: String(position.stop_loss ?? ""),
       take_profit: String(position.take_profit ?? ""),
       opened_at: String(position.opened_at ?? ""),
+      closed_at: String(position.closed_at ?? ""),
+      close_price: String(position.close_price ?? ""),
       source_candle_time: String(position.source_candle_time ?? ""),
       limit: "3000"
     });
@@ -4649,7 +4655,7 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
       priceScaleId: "right",
       autoscaleInfoProvider: ((original) => {
         const autoscale = original();
-        const tradePrices = [data.trade.open_price, data.trade.stop_loss, data.trade.take_profit]
+        const tradePrices = [data.trade.open_price, data.trade.close_price, data.trade.stop_loss, data.trade.take_profit]
           .filter((price): price is number => typeof price === "number" && Number.isFinite(price));
         if (!autoscale || !autoscale.priceRange || tradePrices.length === 0) return autoscale;
         return {
@@ -4684,18 +4690,32 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
     addTradePriceLine(candleSeries, data.trade.open_price, "OPEN", "#38bdf8", LineStyle.Solid);
     addTradePriceLine(candleSeries, data.trade.stop_loss, "SL", "#f43f5e", LineStyle.Dashed);
     addTradePriceLine(candleSeries, data.trade.take_profit, "TP", "#22c55e", LineStyle.Dashed);
-    const openTime = toChartTime(data.trade.opened_at);
-    const markerTime = findNearestChartTime(candleData, openTime);
-    if (markerTime && data.trade.open_price) {
-      createSeriesMarkers(candleSeries, [{
-        time: markerTime,
+    const openTime = toChartTime(data.trade.open_marker_time || data.trade.opened_at);
+    const closeTime = toChartTime(data.trade.close_marker_time || data.trade.closed_at);
+    const openMarkerTime = findNearestChartTime(candleData, openTime);
+    const closeMarkerTime = findNearestChartTime(candleData, closeTime);
+    const markers: SeriesMarker<UTCTimestamp>[] = [];
+    if (openMarkerTime && data.trade.open_price) {
+      markers.push({
+        time: openMarkerTime,
         position: "atPriceMiddle",
         price: data.trade.open_price,
         shape: data.trade.direction.toUpperCase().includes("SELL") ? "arrowDown" : "arrowUp",
         color: data.trade.direction.toUpperCase().includes("SELL") ? "#f43f5e" : "#22c55e",
         text: `Open ${data.trade.direction || ""}`.trim()
-      }]);
+      });
     }
+    if (closeMarkerTime && data.trade.close_price) {
+      markers.push({
+        time: closeMarkerTime,
+        position: "atPriceMiddle",
+        price: data.trade.close_price,
+        shape: "circle",
+        color: "#f59e0b",
+        text: "Close"
+      });
+    }
+    if (markers.length) createSeriesMarkers(candleSeries, markers);
     zoomToTradeSession(chart, candleData, openTime);
     const resizeObserver = new ResizeObserver(() => {
       chart.applyOptions({

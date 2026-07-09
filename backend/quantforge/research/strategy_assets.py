@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime
 from enum import StrEnum
@@ -109,11 +110,22 @@ class StrategyAssetRepository:
     def _load(self) -> dict[str, Any]:
         if not self.path.exists():
             return {"version": 1, "assets": []}
-        return json.loads(self.path.read_text(encoding="utf-8"))
+        last_error: json.JSONDecodeError | None = None
+        for _ in range(5):
+            try:
+                return json.loads(self.path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                last_error = exc
+                time.sleep(0.05)
+        if last_error is not None:
+            raise last_error
+        return {"version": 1, "assets": []}
 
     def _save(self, payload: dict[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        temporary_path = self.path.with_suffix(f"{self.path.suffix}.tmp")
+        temporary_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        temporary_path.replace(self.path)
 
 
 class ApprovedStrategyAssetStore:

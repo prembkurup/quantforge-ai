@@ -228,6 +228,8 @@ def _jobs(
                     os.getenv("QUANTFORGE_REPLAY_MAX_WORKERS", "6"),
                     "--max-jobs-per-run",
                     os.getenv("QUANTFORGE_REPLAY_MAX_JOBS_PER_RUN", "24"),
+                    "--executor",
+                    os.getenv("QUANTFORGE_REPLAY_EXECUTOR", "process"),
                 ),
                 log_file=PROJECT_ROOT / "var" / "log" / "replay-paper-trading.log",
                 interval_seconds=max(trading_interval_seconds, 300),

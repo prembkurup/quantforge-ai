@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -50,6 +50,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeframes", default=",".join(FULL_HISTORY_RESEARCH_TIMEFRAMES))
     parser.add_argument("--max-workers", type=int, default=_env_int("QUANTFORGE_REPLAY_MAX_WORKERS", 6))
     parser.add_argument("--max-jobs-per-run", type=int, default=_env_int("QUANTFORGE_REPLAY_MAX_JOBS_PER_RUN", 24))
+    parser.add_argument(
+        "--executor",
+        choices=("process", "thread"),
+        default=os.getenv("QUANTFORGE_REPLAY_EXECUTOR", "process"),
+        help="Use process workers for CPU-heavy backtests or thread workers for lightweight I/O tests.",
+    )
     parser.add_argument("--progress-interval-events", type=int, default=_env_int("QUANTFORGE_REPLAY_PROGRESS_INTERVAL_EVENTS", 1000))
     parser.add_argument("--strategy-asset-id", default="")
     parser.add_argument("--reset", action="store_true", help="Clear the replay campaign state before running.")
@@ -91,11 +97,13 @@ def main() -> None:
         print("Replay Paper Trading automation")
         print(f"Campaign: {campaign_id}")
         print(f"Workers: {workers}")
+        print(f"Executor: {args.executor}")
         print(f"Claimed Jobs: {len(pending)}")
         print(f"Strategy Asset: {strategy_asset_id}")
         print()
 
-        with ThreadPoolExecutor(max_workers=workers) as executor:
+        executor_type = ProcessPoolExecutor if args.executor == "process" else ThreadPoolExecutor
+        with executor_type(max_workers=workers) as executor:
             futures = {
                 executor.submit(
                     _run_replay_job,

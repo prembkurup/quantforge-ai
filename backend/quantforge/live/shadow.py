@@ -502,12 +502,18 @@ class PaperTradingReplayRunner:
         strategy_asset_id: str,
         days_observed: int = 60,
         replay_speed: str = "MAXIMUM",
+        progress_interval_events: int = 1,
     ) -> ShadowTradingRunResult:
         cursor = replay_cursor(session, status=ReplayStatus.RUNNING, replay_speed=replay_speed)
         self.progress_store.save(cursor)
         try:
             asset = self.strategy_asset_loader.load_strategy_asset(strategy_asset_id)
-            events = self.stream.events(session, progress_store=self.progress_store, replay_speed=replay_speed)
+            events = self.stream.events(
+                session,
+                progress_store=self.progress_store,
+                replay_speed=replay_speed,
+                progress_interval_events=progress_interval_events,
+            )
             live_result = self.live.run(asset, events=events, demo=False)
             paper_orders = self.execution.execute(live_result.signals)
             fills = self.exchange.fill(paper_orders)

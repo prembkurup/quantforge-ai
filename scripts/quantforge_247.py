@@ -44,6 +44,7 @@ class RecurringJob:
     command: tuple[str, ...]
     log_file: Path
     interval_seconds: int
+    timeout_seconds: int = 600
     next_run_at: float = 0.0
     cwd: Path = PROJECT_ROOT
 
@@ -216,6 +217,23 @@ def _jobs(
                 interval_seconds=trading_interval_seconds,
             ),
         )
+        jobs.insert(
+            1,
+            RecurringJob(
+                name="replay-paper-trading",
+                command=(
+                    str(python),
+                    str(PROJECT_ROOT / "scripts" / "auto_replay_paper_trading.py"),
+                    "--max-workers",
+                    os.getenv("QUANTFORGE_REPLAY_MAX_WORKERS", "6"),
+                    "--max-jobs-per-run",
+                    os.getenv("QUANTFORGE_REPLAY_MAX_JOBS_PER_RUN", "24"),
+                ),
+                log_file=PROJECT_ROOT / "var" / "log" / "replay-paper-trading.log",
+                interval_seconds=max(trading_interval_seconds, 300),
+                timeout_seconds=3600,
+            ),
+        )
     return tuple(jobs)
 
 
@@ -256,7 +274,7 @@ def _run_job(job: RecurringJob, env: dict[str, str]) -> int:
             stdout=handle,
             stderr=subprocess.STDOUT,
             text=True,
-            timeout=600,
+            timeout=job.timeout_seconds,
             check=False,
         )
         return process.returncode
@@ -299,6 +317,7 @@ def _write_status(
             {
                 "name": job.name,
                 "interval_seconds": job.interval_seconds,
+                "timeout_seconds": job.timeout_seconds,
                 "next_run_at": datetime.fromtimestamp(schedule.get(job.name, 0.0), UTC).isoformat(),
                 "log_file": str(job.log_file.relative_to(PROJECT_ROOT)),
             }

@@ -134,6 +134,7 @@ class HistoricalCandleReplayStream:
         *,
         progress_store: ReplayProgressStore | None = None,
         replay_speed: str = "MAXIMUM",
+        progress_interval_events: int = 1,
     ) -> tuple[LiveEvent, ...]:
         events: list[LiveEvent] = []
         for pair in session.pairs:
@@ -153,8 +154,11 @@ class HistoricalCandleReplayStream:
 
         published: list[LiveEvent] = []
         previous_timestamp: datetime | None = None
-        for event in ordered:
-            while _control_status(progress_store) == ReplayStatus.PAUSED:
+        progress_every = max(1, int(progress_interval_events or 1))
+        total_events = len(ordered)
+        for index, event in enumerate(ordered, start=1):
+            should_checkpoint = index == 1 or index % progress_every == 0 or index == total_events
+            while should_checkpoint and _control_status(progress_store) == ReplayStatus.PAUSED:
                 progress_store.save(
                     replay_cursor(
                         session,
@@ -166,7 +170,7 @@ class HistoricalCandleReplayStream:
                     )
                 )
                 time.sleep(0.25)
-            if _control_status(progress_store) == ReplayStatus.STOPPED:
+            if should_checkpoint and _control_status(progress_store) == ReplayStatus.STOPPED:
                 progress_store.save(
                     replay_cursor(
                         session,
@@ -181,16 +185,17 @@ class HistoricalCandleReplayStream:
             _sleep_for_replay_speed(previous_timestamp, event.timestamp, replay_speed)
             published.append(event)
             previous_timestamp = event.timestamp
-            progress_store.save(
-                replay_cursor(
-                    session,
-                    current_candle_time=event.timestamp.isoformat(),
-                    processed_events=len(published),
-                    status=ReplayStatus.RUNNING,
-                    replay_speed=replay_speed,
-                    control="PUBLISHING",
+            if should_checkpoint:
+                progress_store.save(
+                    replay_cursor(
+                        session,
+                        current_candle_time=event.timestamp.isoformat(),
+                        processed_events=len(published),
+                        status=ReplayStatus.RUNNING,
+                        replay_speed=replay_speed,
+                        control="PUBLISHING",
+                    )
                 )
-            )
         return tuple(published)
 
 

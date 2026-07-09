@@ -137,6 +137,22 @@ def test_strategy_lifecycle_supervisor_job_is_registered() -> None:
     assert lifecycle.log_file.name == "strategy-lifecycle.log"
 
 
+def test_replay_paper_trading_supervisor_job_is_registered_when_trading_is_enabled() -> None:
+    jobs = _jobs(
+        _python_exe(),
+        trading_enabled=True,
+        trading_interval_seconds=60,
+        operations_interval_seconds=3600,
+    )
+
+    replay = next(job for job in jobs if job.name == "replay-paper-trading")
+
+    assert replay.interval_seconds == 300
+    assert replay.timeout_seconds == 3600
+    assert Path(replay.command[1]).name == "auto_replay_paper_trading.py"
+    assert replay.log_file.name == "replay-paper-trading.log"
+
+
 def test_strategy_lifecycle_runner_queues_research_requests(tmp_path) -> None:
     payload = StrategyLifecycleEngine().analyze(
         demo_strategy_lifecycle_inputs(),

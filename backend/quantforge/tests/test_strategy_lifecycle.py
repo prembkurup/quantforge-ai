@@ -150,6 +150,8 @@ def test_replay_paper_trading_supervisor_job_is_registered_when_trading_is_enabl
     assert replay.interval_seconds == 300
     assert replay.timeout_seconds == 86400
     assert Path(replay.command[1]).name == "auto_replay_paper_trading.py"
+    assert "--timeframes" in replay.command
+    assert replay.command[replay.command.index("--timeframes") + 1] == "M5,M15"
     assert replay.log_file.name == "replay-paper-trading.log"
 
 

@@ -2225,7 +2225,7 @@ def _replay_float(value: Any, *, default: float = 0.0) -> float:
 
 def _paper_replay_campaign_payload(repository: StrategyAssetRepository, timestamp: str) -> dict[str, Any]:
     pairs = tuple(FULL_HISTORY_RESEARCH_PAIRS)
-    timeframes = tuple(FULL_HISTORY_RESEARCH_TIMEFRAMES)
+    timeframes = _active_replay_timeframes()
     assets = tuple(asset for asset in repository.list() if asset.deployable)
     max_strategies = 10
     groups: list[dict[str, Any]] = []
@@ -2501,8 +2501,14 @@ def _replay_candidate_trade_results(
 def _paper_replay_actual_campaign_jobs() -> list[dict[str, Any]]:
     state_path = _repo_root() / "var" / "paper_replay_campaign_status.json"
     state = _read_json_file_sig(state_path)
+    active_timeframes = {str(item).upper() for item in state.get("timeframes", [])}
     raw_jobs = list((state.get("jobs") or {}).values())
-    completed = [job for job in raw_jobs if job.get("status") == "COMPLETE"]
+    completed = [
+        job
+        for job in raw_jobs
+        if job.get("status") == "COMPLETE"
+        and (not active_timeframes or str(job.get("timeframe", "")).upper() in active_timeframes)
+    ]
     completed.sort(key=lambda job: str(job.get("completed_at") or job.get("updated_at") or ""), reverse=True)
     rows: list[dict[str, Any]] = []
     for job in completed[:120]:
@@ -2535,6 +2541,16 @@ def _paper_replay_actual_campaign_jobs() -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def _active_replay_timeframes() -> tuple[str, ...]:
+    state_path = _repo_root() / "var" / "paper_replay_campaign_status.json"
+    state = _read_json_file_sig(state_path)
+    configured = tuple(str(item).upper() for item in state.get("timeframes", []) if str(item).strip())
+    if configured:
+        return configured
+    value = os.getenv("QUANTFORGE_REPLAY_TIMEFRAMES", "M5,M15")
+    return tuple(item.upper() for item in _split_csv(value)) or ("M5", "M15")
 
 
 def _paper_replay_actual_campaign_groups(jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:

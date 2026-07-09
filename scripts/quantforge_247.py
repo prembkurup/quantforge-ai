@@ -224,6 +224,8 @@ def _jobs(
                 command=(
                     str(python),
                     str(PROJECT_ROOT / "scripts" / "auto_replay_paper_trading.py"),
+                    "--timeframes",
+                    os.getenv("QUANTFORGE_REPLAY_TIMEFRAMES", "M5,M15"),
                     "--max-workers",
                     os.getenv("QUANTFORGE_REPLAY_MAX_WORKERS", "3"),
                     "--max-jobs-per-run",

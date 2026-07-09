@@ -39,6 +39,7 @@ STATE_FILE = PROJECT_ROOT / "var" / "paper_replay_campaign_status.json"
 DASHBOARD_PROGRESS_FILE = PROJECT_ROOT / "var" / "paper_replay_progress.json"
 JOB_DIR = PROJECT_ROOT / "var" / "paper_replay" / "jobs"
 LOCK_FILE = PROJECT_ROOT / "var" / "paper_replay_campaign.lock"
+DAY_TRADING_REPLAY_TIMEFRAMES = ("M5", "M15")
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,7 +49,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--from", dest="start", default=FULL_HISTORY_RESEARCH_START.date().isoformat())
     parser.add_argument("--to", dest="end", default=datetime.now(UTC).date().isoformat())
     parser.add_argument("--pairs", default=",".join(FULL_HISTORY_RESEARCH_PAIRS))
-    parser.add_argument("--timeframes", default=",".join(FULL_HISTORY_RESEARCH_TIMEFRAMES))
+    parser.add_argument("--timeframes", default=_default_replay_timeframes())
     parser.add_argument("--max-workers", type=int, default=_env_int("QUANTFORGE_REPLAY_MAX_WORKERS", 3))
     parser.add_argument("--max-jobs-per-run", type=int, default=_env_int("QUANTFORGE_REPLAY_MAX_JOBS_PER_RUN", 12))
     parser.add_argument(
@@ -87,7 +88,7 @@ def main() -> None:
         _merge_missing_jobs(state, all_jobs)
         strategy_asset_id = _strategy_asset_id(args.strategy_asset_id)
 
-        pending = _claim_pending_jobs(state, max_jobs=max_jobs)
+        pending = _claim_pending_jobs(state, pairs=pairs, timeframes=timeframes, max_jobs=max_jobs)
         _save_state_and_progress(state, pairs, timeframes, start, end)
         if not pending:
             _save_state_and_progress(state, pairs, timeframes, start, end)
@@ -238,6 +239,9 @@ def _load_state(
             for item in state.get("jobs", {}).values():
                 if item.get("status") == ReplayStatus.RUNNING.value:
                     item["status"] = ReplayStatus.PENDING.value
+            state["pairs"] = list(pairs)
+            state["timeframes"] = list(timeframes)
+            state["max_workers"] = workers
             return _refresh_totals(state)
 
     return _refresh_totals(
@@ -264,9 +268,21 @@ def _merge_missing_jobs(state: dict[str, Any], jobs: list[dict[str, Any]]) -> No
     _refresh_totals(state)
 
 
-def _claim_pending_jobs(state: dict[str, Any], *, max_jobs: int) -> list[dict[str, Any]]:
+def _claim_pending_jobs(
+    state: dict[str, Any],
+    *,
+    pairs: tuple[str, ...],
+    timeframes: tuple[str, ...],
+    max_jobs: int,
+) -> list[dict[str, Any]]:
+    active_pairs = {item.upper() for item in pairs}
+    active_timeframes = {item.upper() for item in timeframes}
     claimed: list[dict[str, Any]] = []
     for job in state.get("jobs", {}).values():
+        if str(job.get("pair", "")).upper() not in active_pairs:
+            continue
+        if str(job.get("timeframe", "")).upper() not in active_timeframes:
+            continue
         if job.get("status") == ReplayStatus.COMPLETE.value:
             continue
         if job.get("status") == ReplayStatus.FAILED.value and int(job.get("attempts", 0) or 0) >= 3:
@@ -454,6 +470,10 @@ def _csv_tuple(value: str) -> tuple[str, ...]:
 def _ordered_timeframes(timeframes: tuple[str, ...]) -> tuple[str, ...]:
     rank = {"H4": 0, "H1": 1, "M15": 2, "M5": 3}
     return tuple(sorted(timeframes, key=lambda item: (rank.get(item.upper(), 99), item)))
+
+
+def _default_replay_timeframes() -> str:
+    return os.getenv("QUANTFORGE_REPLAY_TIMEFRAMES", ",".join(DAY_TRADING_REPLAY_TIMEFRAMES))
 
 
 def _parse_datetime(value: str, *, end_of_date: bool = False) -> datetime:

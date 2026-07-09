@@ -233,7 +233,7 @@ def _jobs(
                 ),
                 log_file=PROJECT_ROOT / "var" / "log" / "replay-paper-trading.log",
                 interval_seconds=max(trading_interval_seconds, 300),
-                timeout_seconds=3600,
+                timeout_seconds=86400,
             ),
         )
     return tuple(jobs)
@@ -269,17 +269,22 @@ def _run_job(job: RecurringJob, env: dict[str, str]) -> int:
     with job.log_file.open("a", encoding="utf-8") as handle:
         handle.write(f"\n[{_now()}] running {job.name}: {' '.join(job.command)}\n")
         handle.flush()
-        process = subprocess.run(
-            job.command,
-            cwd=job.cwd,
-            env=env,
-            stdout=handle,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=job.timeout_seconds,
-            check=False,
-        )
-        return process.returncode
+        try:
+            process = subprocess.run(
+                job.command,
+                cwd=job.cwd,
+                env=env,
+                stdout=handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=job.timeout_seconds,
+                check=False,
+            )
+            return process.returncode
+        except subprocess.TimeoutExpired:
+            handle.write(f"[{_now()}] {job.name} timed out after {job.timeout_seconds}s; it will resume on the next run.\n")
+            handle.flush()
+            return 124
 
 
 def _validate_practice_connection() -> None:

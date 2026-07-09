@@ -230,7 +230,7 @@ def _load_state(
     jobs: list[dict[str, Any]],
 ) -> dict[str, Any]:
     if STATE_FILE.exists():
-        state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        state = _read_json(STATE_FILE)
         if state.get("campaign_id") == campaign_id:
             for item in state.get("jobs", {}).values():
                 if item.get("status") == ReplayStatus.RUNNING.value:
@@ -323,7 +323,7 @@ def _save_state_and_progress(
 ) -> None:
     _refresh_totals(state)
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+    _write_json_atomic(STATE_FILE, state)
 
     total = max(1, int(state.get("total_jobs", 0) or 0))
     completed = int(state.get("completed_jobs", 0) or 0)
@@ -433,9 +433,10 @@ def _acquire_lock() -> bool:
     LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
     if LOCK_FILE.exists():
         try:
-            payload = json.loads(LOCK_FILE.read_text(encoding="utf-8"))
+            payload = _read_json(LOCK_FILE)
+            locked_pid = int(payload.get("pid", 0) or 0)
             locked_at = datetime.fromisoformat(str(payload.get("locked_at", "")).replace("Z", "+00:00"))
-            if (datetime.now(UTC) - locked_at.astimezone(UTC)).total_seconds() > 6 * 3600:
+            if not _process_alive(locked_pid) or (datetime.now(UTC) - locked_at.astimezone(UTC)).total_seconds() > 6 * 3600:
                 LOCK_FILE.unlink()
         except Exception:
             LOCK_FILE.unlink(missing_ok=True)
@@ -453,6 +454,34 @@ def _release_lock() -> None:
         LOCK_FILE.unlink()
     except FileNotFoundError:
         pass
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    for attempt in range(5):
+        raw = path.read_text(encoding="utf-8").strip()
+        if raw:
+            return json.loads(raw)
+        if attempt < 4:
+            import time
+
+            time.sleep(0.2)
+    return {}
+
+
+def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    tmp_path = path.with_suffix(f"{path.suffix}.tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    tmp_path.replace(path)
+
+
+def _process_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
 
 
 if __name__ == "__main__":

@@ -1,6 +1,8 @@
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from scripts import auto_replay_paper_trading as auto_replay
 from quantforge.live import (
     HistoricalCandleReplayStream,
     PaperTradingReplayRunner,
@@ -155,3 +157,30 @@ def test_historical_replay_stream_honors_stop_control(tmp_path: Path) -> None:
 
     assert events == ()
     assert progress.load().status == ReplayStatus.STOPPED
+
+
+def test_auto_replay_campaign_requeues_running_jobs_after_restart(tmp_path: Path, monkeypatch) -> None:
+    state_file = tmp_path / "paper_replay_campaign_status.json"
+    monkeypatch.setattr(auto_replay, "STATE_FILE", state_file)
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+    jobs = auto_replay._build_jobs("AUTO-TEST", ("EUR_USD",), ("H1",), start, end)
+    jobs[0]["status"] = ReplayStatus.RUNNING.value
+    state_file.write_text(
+        json.dumps(
+            {
+                "campaign_id": "AUTO-TEST",
+                "jobs": {jobs[0]["job_id"]: jobs[0]},
+                "pairs": ["EUR_USD"],
+                "timeframes": ["H1"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    resumed = auto_replay._load_state("AUTO-TEST", ("EUR_USD",), ("H1",), start, end, 6, jobs)
+    job = next(iter(resumed["jobs"].values()))
+
+    assert job["status"] == ReplayStatus.PENDING.value
+    assert resumed["running_jobs"] == 0
+    assert resumed["pending_jobs"] == 1

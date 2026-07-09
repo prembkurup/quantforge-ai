@@ -148,7 +148,7 @@ def test_replay_paper_trading_supervisor_job_is_registered_when_trading_is_enabl
     replay = next(job for job in jobs if job.name == "replay-paper-trading")
 
     assert replay.interval_seconds == 300
-    assert replay.timeout_seconds == 3600
+    assert replay.timeout_seconds == 86400
     assert Path(replay.command[1]).name == "auto_replay_paper_trading.py"
     assert replay.log_file.name == "replay-paper-trading.log"
 

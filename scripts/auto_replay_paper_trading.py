@@ -37,6 +37,7 @@ from quantforge.research.strategy_assets import default_strategy_asset_repositor
 STATE_FILE = PROJECT_ROOT / "var" / "paper_replay_campaign_status.json"
 DASHBOARD_PROGRESS_FILE = PROJECT_ROOT / "var" / "paper_replay_progress.json"
 JOB_DIR = PROJECT_ROOT / "var" / "paper_replay" / "jobs"
+LOCK_FILE = PROJECT_ROOT / "var" / "paper_replay_campaign.lock"
 
 
 def parse_args() -> argparse.Namespace:
@@ -56,72 +57,78 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    if not _acquire_lock():
+        print("Replay Paper Trading automation is already running.")
+        return
     args = parse_args()
-    start = _parse_datetime(args.start)
-    end = _parse_datetime(args.end, end_of_date=True)
-    pairs = _csv_tuple(args.pairs)
-    timeframes = _csv_tuple(args.timeframes)
-    workers = max(1, int(args.max_workers or 1))
-    max_jobs = max(0, int(args.max_jobs_per_run or 0))
-    campaign_id = f"AUTO-REPLAY-{start.date().isoformat()}-{end.date().isoformat()}"
+    try:
+        start = _parse_datetime(args.start)
+        end = _parse_datetime(args.end, end_of_date=True)
+        pairs = _csv_tuple(args.pairs)
+        timeframes = _csv_tuple(args.timeframes)
+        workers = max(1, int(args.max_workers or 1))
+        max_jobs = max(0, int(args.max_jobs_per_run or 0))
+        campaign_id = f"AUTO-REPLAY-{start.date().isoformat()}-{end.date().isoformat()}"
 
-    if args.reset and STATE_FILE.exists():
-        STATE_FILE.unlink()
+        if args.reset and STATE_FILE.exists():
+            STATE_FILE.unlink()
 
-    all_jobs = _build_jobs(campaign_id, pairs, timeframes, start, end)
-    state = _load_state(campaign_id, pairs, timeframes, start, end, workers, all_jobs)
-    _merge_missing_jobs(state, all_jobs)
-    strategy_asset_id = _strategy_asset_id(args.strategy_asset_id)
+        all_jobs = _build_jobs(campaign_id, pairs, timeframes, start, end)
+        state = _load_state(campaign_id, pairs, timeframes, start, end, workers, all_jobs)
+        _merge_missing_jobs(state, all_jobs)
+        strategy_asset_id = _strategy_asset_id(args.strategy_asset_id)
 
-    pending = _claim_pending_jobs(state, max_jobs=max_jobs)
-    _save_state_and_progress(state, pairs, timeframes, start, end)
-    if not pending:
+        pending = _claim_pending_jobs(state, max_jobs=max_jobs)
         _save_state_and_progress(state, pairs, timeframes, start, end)
+        if not pending:
+            _save_state_and_progress(state, pairs, timeframes, start, end)
+            print("Replay Paper Trading automation")
+            print(f"Status: {_campaign_status(state)}")
+            print(f"Completed: {state['completed_jobs']}/{state['total_jobs']}")
+            print("No pending replay jobs.")
+            return
+
         print("Replay Paper Trading automation")
+        print(f"Campaign: {campaign_id}")
+        print(f"Workers: {workers}")
+        print(f"Claimed Jobs: {len(pending)}")
+        print(f"Strategy Asset: {strategy_asset_id}")
+        print()
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(
+                    _run_replay_job,
+                    job,
+                    strategy_asset_id=strategy_asset_id,
+                    progress_interval_events=max(1, int(args.progress_interval_events or 1)),
+                ): job
+                for job in pending
+            }
+            for future in as_completed(futures):
+                job = futures[future]
+                try:
+                    result = future.result()
+                    _mark_complete(state, job["job_id"], result)
+                    print(
+                        f"COMPLETE {job['job_id']} events={result['processed_events']} "
+                        f"signals={result['generated_signals']} orders={result['paper_orders']}"
+                    )
+                except Exception as exc:
+                    _mark_failed(state, job["job_id"], str(exc))
+                    print(f"FAILED {job['job_id']} {exc}")
+                _save_state_and_progress(state, pairs, timeframes, start, end)
+
+        _save_state_and_progress(state, pairs, timeframes, start, end)
+        print()
         print(f"Status: {_campaign_status(state)}")
         print(f"Completed: {state['completed_jobs']}/{state['total_jobs']}")
-        print("No pending replay jobs.")
-        return
-
-    print("Replay Paper Trading automation")
-    print(f"Campaign: {campaign_id}")
-    print(f"Workers: {workers}")
-    print(f"Claimed Jobs: {len(pending)}")
-    print(f"Strategy Asset: {strategy_asset_id}")
-    print()
-
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {
-            executor.submit(
-                _run_replay_job,
-                job,
-                strategy_asset_id=strategy_asset_id,
-                progress_interval_events=max(1, int(args.progress_interval_events or 1)),
-            ): job
-            for job in pending
-        }
-        for future in as_completed(futures):
-            job = futures[future]
-            try:
-                result = future.result()
-                _mark_complete(state, job["job_id"], result)
-                print(
-                    f"COMPLETE {job['job_id']} events={result['processed_events']} "
-                    f"signals={result['generated_signals']} orders={result['paper_orders']}"
-                )
-            except Exception as exc:
-                _mark_failed(state, job["job_id"], str(exc))
-                print(f"FAILED {job['job_id']} {exc}")
-            _save_state_and_progress(state, pairs, timeframes, start, end)
-
-    _save_state_and_progress(state, pairs, timeframes, start, end)
-    print()
-    print(f"Status: {_campaign_status(state)}")
-    print(f"Completed: {state['completed_jobs']}/{state['total_jobs']}")
-    print(f"Failed: {state['failed_jobs']}")
-    print(f"Events: {state['processed_events']}")
-    print(f"Signals: {state['generated_signals']}")
-    print(f"Paper Orders: {state['paper_orders']}")
+        print(f"Failed: {state['failed_jobs']}")
+        print(f"Events: {state['processed_events']}")
+        print(f"Signals: {state['generated_signals']}")
+        print(f"Paper Orders: {state['paper_orders']}")
+    finally:
+        _release_lock()
 
 
 def _build_jobs(
@@ -404,6 +411,32 @@ def _env_int(name: str, default: int) -> int:
         return int(os.getenv(name, default))
     except (TypeError, ValueError):
         return default
+
+
+def _acquire_lock() -> bool:
+    LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if LOCK_FILE.exists():
+        try:
+            payload = json.loads(LOCK_FILE.read_text(encoding="utf-8"))
+            locked_at = datetime.fromisoformat(str(payload.get("locked_at", "")).replace("Z", "+00:00"))
+            if (datetime.now(UTC) - locked_at.astimezone(UTC)).total_seconds() > 6 * 3600:
+                LOCK_FILE.unlink()
+        except Exception:
+            LOCK_FILE.unlink(missing_ok=True)
+    try:
+        handle = os.open(str(LOCK_FILE), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return False
+    with os.fdopen(handle, "w", encoding="utf-8") as file:
+        file.write(json.dumps({"pid": os.getpid(), "locked_at": datetime.now(UTC).isoformat()}))
+    return True
+
+
+def _release_lock() -> None:
+    try:
+        LOCK_FILE.unlink()
+    except FileNotFoundError:
+        pass
 
 
 if __name__ == "__main__":

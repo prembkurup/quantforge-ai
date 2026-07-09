@@ -713,11 +713,16 @@ class TradeJournalStore:
     def _load(self) -> dict[str, Any]:
         if not self.path.exists():
             return {"version": 1, "entries": []}
-        return json.loads(self.path.read_text(encoding="utf-8"))
+        raw = self.path.read_text(encoding="utf-8").strip()
+        if not raw:
+            return {"version": 1, "entries": []}
+        return json.loads(raw)
 
     def _save(self, payload: dict[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        tmp_path = self.path.with_suffix(f"{self.path.suffix}.tmp")
+        tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        tmp_path.replace(self.path)
 
 
 class DailyMarketReadinessEvaluator:

@@ -172,6 +172,7 @@ def _run_replay_job(job: dict[str, Any], *, strategy_asset_id: str, progress_int
     progress_store = ReplayProgressStore(JOB_DIR / f"{safe_id}.progress.json")
     report_path = JOB_DIR / f"{safe_id}.report.json"
     improvements_path = JOB_DIR / f"{safe_id}.improvements.json"
+    trade_journal_path = JOB_DIR / f"{safe_id}.trade-journal.json"
 
     settings = get_settings()
     engine = get_coreui_history_engine()
@@ -182,6 +183,7 @@ def _run_replay_job(job: dict[str, Any], *, strategy_asset_id: str, progress_int
             progress_store,
             report_path=report_path,
             improvement_requests_path=improvements_path,
+            trade_journal_path=trade_journal_path,
         )
         result = runner.run(
             session,

@@ -474,12 +474,14 @@ class PaperTradingReplayRunner:
         strategy_asset_loader: StrategyAssetLoader | None = None,
         report_path: Path | None = None,
         improvement_requests_path: Path | None = None,
+        trade_journal_path: Path | None = None,
     ) -> None:
         self.stream = stream
         self.progress_store = progress_store
         root = Path(__file__).resolve().parents[3]
         self.report_path = report_path or root / "var" / "paper_replay_report.json"
         self.improvement_requests_path = improvement_requests_path or root / "var" / "history_validation_improvements.json"
+        self.trade_journal_path = trade_journal_path
         self.strategy_asset_loader = strategy_asset_loader or StrategyAssetLoader(default_strategy_asset_repository())
         self.live = LiveTradingEngine()
         self.execution = ShadowExecutionEngine()
@@ -514,7 +516,7 @@ class PaperTradingReplayRunner:
                 replay_speed=replay_speed,
                 progress_interval_events=progress_interval_events,
             )
-            live_result = self.live.run(asset, events=events, demo=False)
+            live_result = self.live.run(asset, events=events, demo=False, trade_journal_path=self.trade_journal_path)
             paper_orders = self.execution.execute(live_result.signals)
             fills = self.exchange.fill(paper_orders)
             portfolio = self.portfolio.apply_fills(fills)

@@ -1580,10 +1580,23 @@ class DashboardService:
         candles: list[dict[str, Any]] = []
         database_status = "available"
         error = ""
+        anchor_time = _parse_chart_datetime(source_candle_time or opened_at)
         try:
             with get_coreui_history_engine().connect() as connection:
                 repository = CoreUiCandleRepository(connection, get_settings().coreui_candle_table)
-                rows = repository.load_latest(pair_name, timeframe, limit=candle_limit)
+                if anchor_time is not None:
+                    step = _timeframe_delta(timeframe)
+                    rows = repository.load_window(
+                        pair_name,
+                        timeframe,
+                        anchor_time - step * (candle_limit // 2),
+                        anchor_time + step * (candle_limit // 2),
+                        limit=candle_limit,
+                    )
+                    if not rows:
+                        rows = repository.load_latest(pair_name, timeframe, limit=candle_limit)
+                else:
+                    rows = repository.load_latest(pair_name, timeframe, limit=candle_limit)
             candles = [
                 {
                     "time": _chart_time(row.get("time")),
@@ -1603,6 +1616,14 @@ class DashboardService:
             database_status = "unavailable"
             error = str(exc)
 
+        anchor_candle = _nearest_chart_candle(candles, anchor_time) if anchor_time is not None else None
+        chart_open_price = _safe_float(anchor_candle.get("open")) if anchor_candle and source_candle_time else _safe_float(open_price)
+        if anchor_candle and source_candle_time and chart_open_price:
+            chart_take_profit, chart_stop_loss = _replay_default_exit_prices(chart_open_price, direction)
+        else:
+            chart_stop_loss = _safe_float(stop_loss)
+            chart_take_profit = _safe_float(take_profit)
+
         return {
             "pair": pair_name,
             "display_pair": _display_pair(pair_name),
@@ -1611,9 +1632,9 @@ class DashboardService:
             "candles": candles,
             "trade": {
                 "direction": direction,
-                "open_price": _safe_float(open_price),
-                "stop_loss": _safe_float(stop_loss),
-                "take_profit": _safe_float(take_profit),
+                "open_price": chart_open_price,
+                "stop_loss": chart_stop_loss,
+                "take_profit": chart_take_profit,
                 "opened_at": _chart_time(source_candle_time or opened_at),
                 "source_candle_time": _chart_time(source_candle_time),
             },
@@ -2410,7 +2431,8 @@ def _replay_candidate_trade_results(
     metrics: dict[str, Any],
 ) -> list[dict[str, Any]]:
     seed = int(hashlib.sha1(f"{group_id}:{strategy_index}:{asset.strategy_asset_id}".encode()).hexdigest()[:8], 16)
-    base_date = datetime.now(UTC).date()
+    base_time = _replay_candidate_display_end_time()
+    base_date = base_time.date()
     trade_count = max(2, min(18, int(metrics["trades"])))
     win_count = round(trade_count * float(metrics["winning_days"]))
     rows: list[dict[str, Any]] = []
@@ -2421,11 +2443,15 @@ def _replay_candidate_trade_results(
             hour=7 + (index * 2) % 13,
             minute=(seed + index * 7) % 60,
         )
+        if opened_at > base_time:
+            opened_at -= timedelta(days=1)
+        source_candle_time, candle_entry = _replay_trade_candle_anchor(pair, timeframe, opened_at, seed=seed, index=index)
         is_win = index < win_count
         magnitude = 6.0 + ((seed >> (index % 12)) % 240) / 10
         pl = round(magnitude if is_win else -magnitude * (0.55 + (index % 4) * 0.18), 2)
-        entry = round(1.02 + ((seed % 7000) / 100000) + index * 0.0007, 5)
         direction = directions[(seed + index) % 2]
+        entry = candle_entry if candle_entry > 0 else round(1.02 + ((seed % 7000) / 100000) + index * 0.0007, 5)
+        take_profit, stop_loss = _replay_default_exit_prices(entry, direction)
         rows.append(
             {
                 "trade_id": f"{group_id}-J{strategy_index:02d}-T{index + 1:03d}",
@@ -2437,13 +2463,13 @@ def _replay_candidate_trade_results(
                 "strategy": asset.strategy_name,
                 "trade_status": "CLOSED",
                 "direction": direction,
-                "opened_at": opened_at.isoformat(),
-                "closed_at": (opened_at + timedelta(minutes=45 + (index % 8) * 15)).isoformat(),
-                "source_candle_time": opened_at.isoformat(),
+                "opened_at": source_candle_time.isoformat(),
+                "closed_at": (source_candle_time + timedelta(minutes=45 + (index % 8) * 15)).isoformat(),
+                "source_candle_time": source_candle_time.isoformat(),
                 "open_price": entry,
                 "close_price": round(entry + (0.0012 if pl > 0 else -0.0010) * (1 if direction == "BUY" else -1), 5),
-                "stop_loss": round(entry - (0.0018 if direction == "BUY" else -0.0018), 5),
-                "take_profit": round(entry + (0.0028 if direction == "BUY" else -0.0028), 5),
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
                 "p_l": pl,
                 "result": "WIN" if pl > 0 else "LOSS",
                 "profit_factor": metrics["profit_factor"],
@@ -2484,6 +2510,20 @@ def _replay_daily_result_rows(trade_results: list[dict[str, Any]]) -> list[dict[
             }
         )
     return daily_rows
+
+
+def _replay_candidate_display_end_time() -> datetime:
+    progress_file = _paper_replay_progress_file()
+    if progress_file.exists():
+        try:
+            payload = json.loads(progress_file.read_text(encoding="utf-8-sig"))
+        except Exception:
+            payload = {}
+        for key in ("current_candle_time", "end_time", "updated_at"):
+            parsed = _parse_chart_datetime(payload.get(key))
+            if parsed is not None:
+                return parsed
+    return datetime.now(UTC)
 
 
 def _replay_comfort_score(metrics: dict[str, Any]) -> dict[str, Any]:
@@ -3259,6 +3299,33 @@ def _chart_pair_name(pair: str) -> str:
     return {"NAS100": "NAS100_USD", "SPX500": "SPX500_USD"}.get(value, value)
 
 
+def _parse_chart_datetime(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        timestamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=UTC)
+    return timestamp.astimezone(UTC)
+
+
+def _timeframe_delta(timeframe: str) -> timedelta:
+    normalized = str(timeframe or "").strip().upper()
+    try:
+        if normalized.startswith("M"):
+            return timedelta(minutes=max(1, int(normalized[1:] or "1")))
+        if normalized.startswith("H"):
+            return timedelta(hours=max(1, int(normalized[1:] or "1")))
+        if normalized.startswith("D"):
+            return timedelta(days=max(1, int(normalized[1:] or "1")))
+    except ValueError:
+        pass
+    return timedelta(hours=1)
+
+
 def _instrument_type(pair: str) -> str:
     return "index" if pair in {"NAS100_USD", "SPX500_USD"} else "fx"
 
@@ -3278,6 +3345,85 @@ def _chart_time(value: Any) -> str:
     if timestamp.tzinfo is None:
         timestamp = timestamp.replace(tzinfo=UTC)
     return timestamp.astimezone(UTC).isoformat()
+
+
+def _nearest_chart_candle(candles: list[dict[str, Any]], target: datetime | None) -> dict[str, Any] | None:
+    if not candles or target is None:
+        return None
+    normalized_target = target.astimezone(UTC)
+    return min(
+        candles,
+        key=lambda row: abs(((_parse_chart_datetime(row.get("time")) or normalized_target) - normalized_target).total_seconds()),
+    )
+
+
+_REPLAY_TRADE_CANDLE_CACHE: dict[tuple[str, str], list[dict[str, Any]]] = {}
+
+
+def _replay_trade_candle_anchor(
+    pair: str,
+    timeframe: str,
+    requested_time: datetime,
+    *,
+    seed: int | None = None,
+    index: int = 0,
+) -> tuple[datetime, float]:
+    pair_name = _chart_pair_name(pair)
+    granularity = str(timeframe or "").strip().upper()
+    use_database_anchors = os.getenv("QUANTFORGE_REPLAY_DASHBOARD_CANDLE_ANCHORS", "").lower() in {"1", "true", "yes"}
+    if not use_database_anchors or os.getenv("QUANTFORGE_DEMO_MODE", "").lower() in {"1", "true", "yes"}:
+        return _floor_to_timeframe(requested_time, granularity), 0.0
+    candles = _REPLAY_TRADE_CANDLE_CACHE.get((pair_name, granularity))
+    if candles is None:
+        candles = []
+        try:
+            with get_coreui_history_engine().connect() as connection:
+                repository = CoreUiCandleRepository(connection, get_settings().coreui_candle_table)
+                candles = repository.load_latest(pair_name, granularity, limit=3000)
+        except Exception:
+            candles = []
+        _REPLAY_TRADE_CANDLE_CACHE[(pair_name, granularity)] = candles
+    if not candles:
+        return _floor_to_timeframe(requested_time, granularity), 0.0
+    target = requested_time.astimezone(UTC)
+    first_time = _parse_chart_datetime(candles[0].get("time"))
+    last_time = _parse_chart_datetime(candles[-1].get("time"))
+    step = _timeframe_delta(granularity)
+    if first_time is not None and last_time is not None and first_time - step <= target <= last_time + step:
+        nearest = min(
+            candles,
+            key=lambda row: abs(((_parse_chart_datetime(row.get("time")) or target) - target).total_seconds()),
+        )
+    else:
+        spread = max(1, len(candles) // 19)
+        offset = int(seed or 0) + index * spread
+        nearest = candles[offset % len(candles)]
+    candle_time = _parse_chart_datetime(nearest.get("time")) or _floor_to_timeframe(requested_time, granularity)
+    entry = _safe_float(nearest.get("open_price")) or _safe_float(nearest.get("close_price")) or 0.0
+    return candle_time, round(entry, 8)
+
+
+def _floor_to_timeframe(value: datetime, timeframe: str) -> datetime:
+    parsed = value.astimezone(UTC)
+    normalized = str(timeframe or "").strip().upper()
+    try:
+        if normalized.startswith("M"):
+            minutes = max(1, int(normalized[1:] or "1"))
+            return parsed.replace(minute=(parsed.minute // minutes) * minutes, second=0, microsecond=0)
+        if normalized.startswith("H"):
+            hours = max(1, int(normalized[1:] or "1"))
+            return parsed.replace(hour=(parsed.hour // hours) * hours, minute=0, second=0, microsecond=0)
+    except ValueError:
+        pass
+    return parsed.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _replay_default_exit_prices(entry_price: float, direction: str) -> tuple[float, float]:
+    if entry_price <= 0:
+        return 0.0, 0.0
+    if str(direction).upper() == "SELL":
+        return round(entry_price * 0.9980, 8), round(entry_price * 1.0010, 8)
+    return round(entry_price * 1.0020, 8), round(entry_price * 0.9990, 8)
 
 
 def _safe_float(value: Any) -> float | None:

@@ -4304,15 +4304,18 @@ type TradeInvestigationSection = { tab: string; title: string; summary: string; 
 function buildTradeInvestigationReport(position: Row, chartData?: PaperPositionChartPayload) {
   const pl = moneyNumber(position.p_l) ?? 0;
   const outcome = pl > 0 ? "Winning Trade" : pl < 0 ? "Losing Trade" : "Open Trade";
-  const direction = String(position.direction || chartData?.trade.direction || "Trade");
+  const direction = String(chartData?.trade.direction || position.direction || "Trade");
   const pair = displayPair(position.pair || chartData?.display_pair || "");
   const timeframe = String(position.timeframe || chartData?.timeframe || "");
-  const session = sessionForDate(position.opened_at ?? position.entry_time ?? position.source_candle_time ?? "");
+  const openedAtRaw = chartData?.trade.opened_at || chartData?.trade.source_candle_time || position.opened_at || position.entry_time || position.source_candle_time || "";
+  const session = sessionForDate(openedAtRaw);
   const strategy = displayLabel(position.strategy || position.strategy_asset_id || "Trend Pullback");
   const closeReason = displayLabel(position.close_reason || (pl > 0 ? "Take Profit" : pl < 0 ? "Stop Loss" : "Still Open"));
-  const openedAt = formatDate(position.opened_at ?? position.entry_time ?? position.source_candle_time ?? "");
+  const openedAt = formatDate(openedAtRaw);
   const closedAt = position.closed_at ? formatDate(position.closed_at) : "Open";
-  const entryPrice = position.open_price ?? chartData?.trade.open_price ?? "";
+  const entryPrice = chartData?.trade.open_price ?? position.open_price ?? "";
+  const stopLoss = chartData?.trade.stop_loss ?? position.stop_loss ?? "";
+  const takeProfit = chartData?.trade.take_profit ?? position.take_profit ?? "";
   const exitPrice = position.close_price ?? "";
   const rMultiple = tradeRMultiple(position, pl);
   const opportunityScore = 86;
@@ -4358,7 +4361,7 @@ function buildTradeInvestigationReport(position: Row, chartData?: PaperPositionC
     {
       stage: "Execution",
       value: "Filled",
-      detail: `Open ${position.open_price ?? chartData?.trade.open_price ?? ""} / SL ${position.stop_loss ?? chartData?.trade.stop_loss ?? ""} / TP ${position.take_profit ?? chartData?.trade.take_profit ?? ""}`,
+      detail: `Open ${entryPrice} / SL ${stopLoss} / TP ${takeProfit}`,
     },
     {
       stage: "Outcome",
@@ -4387,8 +4390,8 @@ function buildTradeInvestigationReport(position: Row, chartData?: PaperPositionC
         { label: "Exit Time", value: closedAt },
         { label: "Entry Price", value: entryPrice },
         { label: "Exit Price", value: exitPrice || "Open" },
-        { label: "Stop Loss", value: position.stop_loss ?? chartData?.trade.stop_loss ?? "" },
-        { label: "Take Profit", value: position.take_profit ?? chartData?.trade.take_profit ?? "" },
+        { label: "Stop Loss", value: stopLoss },
+        { label: "Take Profit", value: takeProfit },
         { label: "Result", value: outcome },
         { label: "Profit/Loss", value: position.p_l ?? "$0.00" },
         { label: "R Multiple", value: rMultiple },

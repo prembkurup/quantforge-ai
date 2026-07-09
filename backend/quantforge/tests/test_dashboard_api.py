@@ -1,5 +1,7 @@
 import os
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
@@ -410,6 +412,108 @@ def test_paper_replay_campaign_discovers_pair_timeframe_strategy_candidates() ->
     assert first_trade["timeframe"] == first_job["timeframe"]
     assert first_trade["job_id"] == first_job["job_id"]
     assert first_trade["trade_id"].startswith(first_job["job_id"])
+
+
+def test_replay_trade_rows_use_their_chart_candle_anchor(monkeypatch) -> None:
+    anchors = (
+        (datetime(2024, 1, 2, 10, 0, tzinfo=UTC), 1.101),
+        (datetime(2024, 1, 3, 11, 0, tzinfo=UTC), 1.202),
+    )
+
+    def fake_anchor(pair, timeframe, requested_time, *, seed=None, index=0):
+        return anchors[index % len(anchors)]
+
+    monkeypatch.setattr(dashboard_service, "_replay_trade_candle_anchor", fake_anchor)
+    rows = dashboard_service._replay_candidate_trade_results(
+        "G999",
+        1,
+        SimpleNamespace(strategy_asset_id="QF-TEST", strategy_name="Test Strategy"),
+        "EUR_USD",
+        "H1",
+        {
+            "trades": 2,
+            "winning_days": 0.5,
+            "profit_factor": 1.8,
+            "expectancy": 0.4,
+            "drawdown": 0.04,
+            "losing_streak": 2,
+            "daily_loss": 0.01,
+            "overnight_trades": False,
+            "session_ok": True,
+            "regime_ok": True,
+            "spread_ok": True,
+        },
+    )
+
+    for row in rows:
+        assert row["opened_at"] == row["source_candle_time"]
+        assert row["open_price"] in {1.101, 1.202}
+        if row["direction"] == "SELL":
+            assert row["take_profit"] < row["open_price"] < row["stop_loss"]
+        else:
+            assert row["stop_loss"] < row["open_price"] < row["take_profit"]
+
+
+def test_paper_position_chart_loads_candles_around_trade_anchor(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+    anchor = datetime(2024, 6, 1, 12, 0, tzinfo=UTC)
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    class FakeEngine:
+        def connect(self):
+            return FakeConnection()
+
+    class FakeRepository:
+        def __init__(self, connection, table_name):
+            pass
+
+        def load_window(self, pair, timeframe, start, end, *, limit):
+            calls["load_window"] = (pair, timeframe, start, end, limit)
+            return [
+                {
+                    "time": anchor,
+                    "open_price": 1.2345,
+                    "high_price": 1.236,
+                    "low_price": 1.233,
+                    "close_price": 1.235,
+                    "volume": 100,
+                }
+            ]
+
+        def load_latest(self, pair, timeframe, *, limit):
+            calls["load_latest"] = True
+            return []
+
+    monkeypatch.setattr(dashboard_service, "get_coreui_history_engine", lambda: FakeEngine())
+    monkeypatch.setattr(dashboard_service, "CoreUiCandleRepository", FakeRepository)
+
+    payload = DashboardService().paper_position_chart(
+        pair="EUR_USD",
+        timeframe="H1",
+        direction="BUY",
+        opened_at="2026-07-09T08:00:00+00:00",
+        source_candle_time=anchor.isoformat(),
+        open_price=9.9999,
+        stop_loss=1.233,
+        take_profit=1.236,
+        limit=20,
+    )
+
+    assert calls["load_window"][0:2] == ("EUR_USD", "H1")
+    assert calls["load_window"][2] == anchor - timedelta(hours=10)
+    assert calls["load_window"][3] == anchor + timedelta(hours=10)
+    assert "load_latest" not in calls
+    assert payload["candles"][0]["time"] == anchor.isoformat()
+    assert payload["trade"]["opened_at"] == anchor.isoformat()
+    assert payload["trade"]["open_price"] == 1.2345
+    assert payload["trade"]["stop_loss"] == 1.2332655
+    assert payload["trade"]["take_profit"] == 1.236969
 
 
 def test_paper_replay_control_endpoints_update_progress_store(monkeypatch, tmp_path: Path) -> None:

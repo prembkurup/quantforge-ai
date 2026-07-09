@@ -49,8 +49,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--to", dest="end", default=datetime.now(UTC).date().isoformat())
     parser.add_argument("--pairs", default=",".join(FULL_HISTORY_RESEARCH_PAIRS))
     parser.add_argument("--timeframes", default=",".join(FULL_HISTORY_RESEARCH_TIMEFRAMES))
-    parser.add_argument("--max-workers", type=int, default=_env_int("QUANTFORGE_REPLAY_MAX_WORKERS", 6))
-    parser.add_argument("--max-jobs-per-run", type=int, default=_env_int("QUANTFORGE_REPLAY_MAX_JOBS_PER_RUN", 24))
+    parser.add_argument("--max-workers", type=int, default=_env_int("QUANTFORGE_REPLAY_MAX_WORKERS", 3))
+    parser.add_argument("--max-jobs-per-run", type=int, default=_env_int("QUANTFORGE_REPLAY_MAX_JOBS_PER_RUN", 12))
     parser.add_argument(
         "--executor",
         choices=("process", "thread"),
@@ -410,44 +410,26 @@ def _write_job_trade_results(
     orders: tuple[Any, ...],
     fills: tuple[Any, ...],
 ) -> None:
-    fill_by_order = {str(fill.order_id): fill for fill in fills}
-    start = _parse_datetime(str(job["start_time"]))
-    end = _parse_datetime(str(job["end_time"]))
-    total = max(1, len(orders))
-    rows: list[dict[str, Any]] = []
-    for index, order in enumerate(orders[-500:], start=max(1, total - min(total, 500) + 1)):
-        fill = fill_by_order.get(str(order.order_id))
-        opened_at = _interpolated_trade_time(start, end, index, total)
-        direction = "SELL" if str(order.action).upper().endswith("SELL") else "BUY"
-        open_price = round(float(order.expected_price), 8)
-        take_profit, stop_loss = _default_exit_prices(open_price, direction)
-        close_price = round(float(fill.fill_price), 8) if fill else open_price
-        p_l = round((close_price - open_price) * float(order.units) * (-1 if direction == "SELL" else 1), 2)
-        rows.append(
-            {
-                "trade_id": f"{job['job_id']}-T{index:06d}",
-                "job_id": job["job_id"],
-                "group_id": f"ACTUAL-{job['pair']}-{job['timeframe']}",
-                "pair": job["pair"],
-                "timeframe": job["timeframe"],
-                "strategy_asset_id": strategy_asset_id,
-                "strategy": "Replay Paper Actual",
-                "trade_status": "CLOSED" if fill else "OPEN",
-                "direction": direction,
-                "opened_at": opened_at.isoformat(),
-                "closed_at": opened_at.isoformat() if fill else "",
-                "source_candle_time": opened_at.isoformat(),
-                "open_price": open_price,
-                "close_price": close_price,
-                "stop_loss": stop_loss,
-                "take_profit": take_profit,
-                "p_l": p_l,
-                "result": "WIN" if p_l >= 0 else "LOSS",
-                "close_reason": "Replay fill" if fill else "Replay open",
-                "replay_result": "Actual Replay Paper Order",
-            }
-        )
-    _write_json_atomic(path, {"version": 1, "job_id": job["job_id"], "trade_results": rows})
+    _write_json_atomic(
+        path,
+        {
+            "version": 2,
+            "job_id": job["job_id"],
+            "pair": job["pair"],
+            "timeframe": job["timeframe"],
+            "strategy_asset_id": strategy_asset_id,
+            "trade_results": [],
+            "verification_status": "RECHECK_REQUIRED",
+            "recheck_reason": (
+                "Replay shadow orders/fills do not contain candle-verified entry, exit, TP, or SL prices. "
+                "They are intentionally excluded from trade result rows until a candle-verified replay "
+                "position ledger is available."
+            ),
+            "suppressed_virtual_orders": len(orders),
+            "suppressed_virtual_fills": len(fills),
+            "updated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        },
+    )
 
 
 def _interpolated_trade_time(start: datetime, end: datetime, index: int, total: int) -> datetime:

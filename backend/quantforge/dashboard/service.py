@@ -2581,7 +2581,17 @@ def _actual_trade_results_for_job(job: dict[str, Any]) -> list[dict[str, Any]]:
         path = _repo_root() / path_value
     payload = _read_json_file_sig(path)
     rows = payload.get("trade_results", [])
-    return rows if isinstance(rows, list) else []
+    if not isinstance(rows, list):
+        return []
+    return [row for row in rows if _is_candle_verified_replay_trade(row)]
+
+
+def _is_candle_verified_replay_trade(row: dict[str, Any]) -> bool:
+    return (
+        str(row.get("verification_status") or "").upper() == "CANDLE_VERIFIED"
+        and str(row.get("replay_result") or "") != "Actual Replay Paper Order"
+        and str(row.get("close_reason") or "") != "Replay fill"
+    )
 
 
 def _actual_job_summary_trade(job: dict[str, Any]) -> dict[str, Any]:
@@ -2607,10 +2617,10 @@ def _actual_job_summary_trade(job: dict[str, Any]) -> dict[str, Any]:
         "close_price": 0.0,
         "stop_loss": 0.0,
         "take_profit": 0.0,
-        "p_l": orders,
-        "result": "COMPLETE",
-        "close_reason": f"{orders} replay paper orders completed in this job",
-        "replay_result": "Actual Replay Job Summary",
+        "p_l": 0.0,
+        "result": "RECHECK_REQUIRED",
+        "close_reason": f"{orders} legacy virtual replay fills suppressed; candle-verified TP/SL trades required",
+        "replay_result": "Replay Trade Recheck Summary",
     }
 
 

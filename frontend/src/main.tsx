@@ -42,6 +42,7 @@ type PaperPositionChartPayload = {
     closed_at: string;
     open_marker_time: string;
     close_marker_time: string;
+    close_reason: string;
     source_candle_time: string;
   };
   database_status: string;
@@ -4712,7 +4713,7 @@ function LightweightTradeChart({ data }: { data: PaperPositionChartPayload }) {
         price: data.trade.close_price,
         shape: "circle",
         color: "#f59e0b",
-        text: "Close"
+        text: data.trade.close_reason === "STOP_LOSS" ? "SL hit" : data.trade.close_reason === "TAKE_PROFIT" ? "TP hit" : "Close"
       });
     }
     if (markers.length) createSeriesMarkers(candleSeries, markers);

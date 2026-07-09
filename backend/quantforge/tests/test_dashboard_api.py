@@ -517,6 +517,76 @@ def test_paper_position_chart_loads_candles_around_trade_anchor(monkeypatch) -> 
     assert payload["trade"]["take_profit"] == 1.236969
 
 
+def test_paper_position_chart_marks_first_tp_or_sl_hit(monkeypatch) -> None:
+    anchor = datetime(2024, 6, 1, 12, 0, tzinfo=UTC)
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    class FakeEngine:
+        def connect(self):
+            return FakeConnection()
+
+    class FakeRepository:
+        def __init__(self, connection, table_name):
+            pass
+
+        def load_window(self, pair, timeframe, start, end, *, limit):
+            return [
+                {
+                    "time": anchor,
+                    "open_price": 1.2000,
+                    "high_price": 1.2007,
+                    "low_price": 1.1998,
+                    "close_price": 1.2004,
+                    "volume": 100,
+                },
+                {
+                    "time": anchor + timedelta(minutes=5),
+                    "open_price": 1.2004,
+                    "high_price": 1.2010,
+                    "low_price": 1.1989,
+                    "close_price": 1.1992,
+                    "volume": 100,
+                },
+                {
+                    "time": anchor + timedelta(minutes=10),
+                    "open_price": 1.1992,
+                    "high_price": 1.2030,
+                    "low_price": 1.1990,
+                    "close_price": 1.2027,
+                    "volume": 100,
+                },
+            ]
+
+        def load_latest(self, pair, timeframe, *, limit):
+            return []
+
+    monkeypatch.setattr(dashboard_service, "get_coreui_history_engine", lambda: FakeEngine())
+    monkeypatch.setattr(dashboard_service, "CoreUiCandleRepository", FakeRepository)
+
+    payload = DashboardService().paper_position_chart(
+        pair="EUR_USD",
+        timeframe="M5",
+        direction="BUY",
+        opened_at=anchor.isoformat(),
+        closed_at=(anchor + timedelta(minutes=10)).isoformat(),
+        open_price=1.2000,
+        close_price=1.2020,
+        stop_loss=1.1990,
+        take_profit=1.2020,
+        limit=20,
+    )
+
+    assert payload["trade"]["close_marker_time"] == (anchor + timedelta(minutes=5)).isoformat()
+    assert payload["trade"]["close_price"] == 1.1990
+    assert payload["trade"]["close_reason"] == "STOP_LOSS"
+
+
 def test_paper_replay_control_endpoints_update_progress_store(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(dashboard_service, "_paper_replay_progress_file", lambda: tmp_path / "paper_replay_progress.json")
     launched: list[tuple[object, str, str]] = []

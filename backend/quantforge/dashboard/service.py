@@ -1625,16 +1625,18 @@ class DashboardService:
             error = str(exc)
 
         anchor_candle = _nearest_chart_candle(candles, anchor_time) if anchor_time is not None else None
-        close_candle = _nearest_chart_candle(candles, closed_time) if closed_time is not None else None
         chart_open_price = _safe_float(anchor_candle.get("open")) if anchor_candle and source_candle_time else _safe_float(open_price)
-        chart_close_price = _safe_float(close_price)
-        if close_candle and chart_close_price is None:
-            chart_close_price = _safe_float(close_candle.get("close"))
         if anchor_candle and source_candle_time and chart_open_price:
             chart_take_profit, chart_stop_loss = _replay_default_exit_prices(chart_open_price, direction)
         else:
             chart_stop_loss = _safe_float(stop_loss)
             chart_take_profit = _safe_float(take_profit)
+        open_marker_time = _parse_chart_datetime(anchor_candle.get("time")) if anchor_candle else anchor_time
+        exit_hit = _first_chart_exit_hit(candles, open_marker_time, direction, chart_stop_loss, chart_take_profit)
+        close_candle = exit_hit["candle"] if exit_hit else (_nearest_chart_candle(candles, closed_time) if closed_time is not None else None)
+        chart_close_price = _safe_float(exit_hit["price"]) if exit_hit else _safe_float(close_price)
+        if close_candle and chart_close_price is None:
+            chart_close_price = _safe_float(close_candle.get("close"))
 
         return {
             "pair": pair_name,
@@ -1652,6 +1654,7 @@ class DashboardService:
                 "closed_at": _chart_time(closed_at),
                 "open_marker_time": _chart_time(anchor_candle.get("time")) if anchor_candle else _chart_time(source_candle_time or opened_at),
                 "close_marker_time": _chart_time(close_candle.get("time")) if close_candle else _chart_time(closed_at),
+                "close_reason": exit_hit["reason"] if exit_hit else "",
                 "source_candle_time": _chart_time(source_candle_time),
             },
             "database_status": database_status,
@@ -3528,6 +3531,44 @@ def _nearest_chart_candle(candles: list[dict[str, Any]], target: datetime | None
         candles,
         key=lambda row: abs(((_parse_chart_datetime(row.get("time")) or normalized_target) - normalized_target).total_seconds()),
     )
+
+
+def _first_chart_exit_hit(
+    candles: list[dict[str, Any]],
+    opened_at: datetime | None,
+    direction: str,
+    stop_loss: float | None,
+    take_profit: float | None,
+) -> dict[str, Any] | None:
+    if opened_at is None or not candles or not stop_loss or not take_profit:
+        return None
+    normalized_direction = str(direction or "").upper()
+    if normalized_direction not in {"BUY", "SELL"}:
+        return None
+    start_time = opened_at.astimezone(UTC)
+    ordered = sorted(
+        candles,
+        key=lambda row: _parse_chart_datetime(row.get("time")) or datetime.max.replace(tzinfo=UTC),
+    )
+    for candle in ordered:
+        candle_time = _parse_chart_datetime(candle.get("time"))
+        if candle_time is None or candle_time < start_time:
+            continue
+        high = _safe_float(candle.get("high"))
+        low = _safe_float(candle.get("low"))
+        if high is None or low is None:
+            continue
+        if normalized_direction == "SELL":
+            stop_hit = high >= stop_loss
+            target_hit = low <= take_profit
+        else:
+            stop_hit = low <= stop_loss
+            target_hit = high >= take_profit
+        if stop_hit:
+            return {"candle": candle, "price": stop_loss, "reason": "STOP_LOSS"}
+        if target_hit:
+            return {"candle": candle, "price": take_profit, "reason": "TAKE_PROFIT"}
+    return None
 
 
 _REPLAY_TRADE_CANDLE_CACHE: dict[tuple[str, str], list[dict[str, Any]]] = {}

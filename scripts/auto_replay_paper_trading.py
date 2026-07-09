@@ -191,6 +191,7 @@ def _run_replay_job(job: dict[str, Any], *, strategy_asset_id: str, progress_int
     report_path = JOB_DIR / f"{safe_id}.report.json"
     improvements_path = JOB_DIR / f"{safe_id}.improvements.json"
     trade_journal_path = JOB_DIR / f"{safe_id}.trade-journal.json"
+    trade_results_path = JOB_DIR / f"{safe_id}.trades.json"
 
     settings = get_settings()
     engine = get_coreui_history_engine()
@@ -209,6 +210,7 @@ def _run_replay_job(job: dict[str, Any], *, strategy_asset_id: str, progress_int
             replay_speed="MAXIMUM",
             progress_interval_events=progress_interval_events,
         )
+    _write_job_trade_results(trade_results_path, job, strategy_asset_id, result.paper_orders, result.fills)
 
     cursor = result.replay_cursor
     return {
@@ -216,6 +218,7 @@ def _run_replay_job(job: dict[str, Any], *, strategy_asset_id: str, progress_int
         "generated_signals": int(result.signals_generated),
         "paper_orders": len(result.paper_orders),
         "current_candle_time": cursor.current_candle_time if cursor else "",
+        "trade_results_file": str(trade_results_path.relative_to(PROJECT_ROOT)),
         "updated_at": datetime.now(UTC).isoformat(),
     }
 
@@ -391,12 +394,75 @@ def _year_windows(start: datetime, end: datetime) -> list[tuple[datetime, dateti
 
 
 def _strategy_asset_id(value: str) -> str:
-    if value:
-        return value
     assets = tuple(asset for asset in default_strategy_asset_repository().list() if asset.deployable)
+    asset_ids = {asset.strategy_asset_id for asset in assets}
+    if value and value in asset_ids:
+        return value
     if not assets:
         raise SystemExit("No deployable Strategy Asset is available. Run autonomous research first.")
     return assets[0].strategy_asset_id
+
+
+def _write_job_trade_results(
+    path: Path,
+    job: dict[str, Any],
+    strategy_asset_id: str,
+    orders: tuple[Any, ...],
+    fills: tuple[Any, ...],
+) -> None:
+    fill_by_order = {str(fill.order_id): fill for fill in fills}
+    start = _parse_datetime(str(job["start_time"]))
+    end = _parse_datetime(str(job["end_time"]))
+    total = max(1, len(orders))
+    rows: list[dict[str, Any]] = []
+    for index, order in enumerate(orders[-500:], start=max(1, total - min(total, 500) + 1)):
+        fill = fill_by_order.get(str(order.order_id))
+        opened_at = _interpolated_trade_time(start, end, index, total)
+        direction = "SELL" if str(order.action).upper().endswith("SELL") else "BUY"
+        open_price = round(float(order.expected_price), 8)
+        take_profit, stop_loss = _default_exit_prices(open_price, direction)
+        close_price = round(float(fill.fill_price), 8) if fill else open_price
+        p_l = round((close_price - open_price) * float(order.units) * (-1 if direction == "SELL" else 1), 2)
+        rows.append(
+            {
+                "trade_id": f"{job['job_id']}-T{index:06d}",
+                "job_id": job["job_id"],
+                "group_id": f"ACTUAL-{job['pair']}-{job['timeframe']}",
+                "pair": job["pair"],
+                "timeframe": job["timeframe"],
+                "strategy_asset_id": strategy_asset_id,
+                "strategy": "Replay Paper Actual",
+                "trade_status": "CLOSED" if fill else "OPEN",
+                "direction": direction,
+                "opened_at": opened_at.isoformat(),
+                "closed_at": opened_at.isoformat() if fill else "",
+                "source_candle_time": opened_at.isoformat(),
+                "open_price": open_price,
+                "close_price": close_price,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "p_l": p_l,
+                "result": "WIN" if p_l >= 0 else "LOSS",
+                "close_reason": "Replay fill" if fill else "Replay open",
+                "replay_result": "Actual Replay Paper Order",
+            }
+        )
+    _write_json_atomic(path, {"version": 1, "job_id": job["job_id"], "trade_results": rows})
+
+
+def _interpolated_trade_time(start: datetime, end: datetime, index: int, total: int) -> datetime:
+    if end <= start:
+        return start
+    offset = (end - start).total_seconds() * (index / max(1, total + 1))
+    return start + timedelta(seconds=offset)
+
+
+def _default_exit_prices(entry_price: float, direction: str) -> tuple[float, float]:
+    if entry_price <= 0:
+        return 0.0, 0.0
+    if direction == "SELL":
+        return round(entry_price * 0.9980, 8), round(entry_price * 1.0010, 8)
+    return round(entry_price * 1.0020, 8), round(entry_price * 0.9990, 8)
 
 
 def _csv_tuple(value: str) -> tuple[str, ...]:

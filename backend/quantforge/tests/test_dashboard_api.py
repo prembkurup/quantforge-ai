@@ -382,7 +382,8 @@ def test_portfolio_ops_knowledge_and_paper_endpoints_are_read_only() -> None:
     assert client.post("/api/portfolio/intelligence").status_code == 405
 
 
-def test_paper_replay_campaign_discovers_pair_timeframe_strategy_candidates() -> None:
+def test_paper_replay_campaign_discovers_pair_timeframe_strategy_candidates(monkeypatch) -> None:
+    monkeypatch.setattr(dashboard_service, "_paper_replay_actual_campaign_jobs", lambda: [])
     response = client.get("/api/paper/replay/campaign")
 
     assert response.status_code == 200

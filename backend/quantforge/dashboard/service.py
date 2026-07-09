@@ -1943,6 +1943,16 @@ def _read_json_file(path: Path) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def _read_json_file_sig(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def _tail_text_file(path: Path, *, limit: int) -> list[str]:
     if not path.exists():
         return []
@@ -2312,6 +2322,10 @@ def _paper_replay_campaign_payload(repository: StrategyAssetRepository, timestam
             }
         )
 
+    actual_jobs = _paper_replay_actual_campaign_jobs()
+    if actual_jobs:
+        jobs = actual_jobs + jobs
+
     summary = {
         "total_groups": len(groups),
         "groups_complete": sum(1 for group in groups if group["status"] in {"STRATEGY_FOUND", "NEEDS_RESEARCH", "FAILED", "COMPLETE"}),
@@ -2481,6 +2495,87 @@ def _replay_candidate_trade_results(
             }
         )
     return sorted(rows, key=lambda row: str(row["closed_at"]), reverse=True)
+
+
+def _paper_replay_actual_campaign_jobs() -> list[dict[str, Any]]:
+    state_path = _repo_root() / "var" / "paper_replay_campaign_status.json"
+    state = _read_json_file_sig(state_path)
+    raw_jobs = list((state.get("jobs") or {}).values())
+    completed = [job for job in raw_jobs if job.get("status") == "COMPLETE"]
+    completed.sort(key=lambda job: str(job.get("completed_at") or job.get("updated_at") or ""), reverse=True)
+    rows: list[dict[str, Any]] = []
+    for job in completed[:120]:
+        trade_results = _actual_trade_results_for_job(job)
+        if not trade_results:
+            trade_results = [_actual_job_summary_trade(job)]
+        rows.append(
+            {
+                "job_id": job.get("job_id", ""),
+                "group_id": f"ACTUAL-{job.get('pair', '')}-{job.get('timeframe', '')}",
+                "pair": job.get("pair", ""),
+                "timeframe": job.get("timeframe", ""),
+                "strategy_asset_id": job.get("strategy_asset_id", "replay_paper_trading"),
+                "strategy": "Replay Paper Actual",
+                "date_from": str(job.get("start_time", ""))[:10],
+                "date_to": str(job.get("end_time", ""))[:10],
+                "status": "COMPLETE",
+                "trades": int(job.get("paper_orders", 0) or 0),
+                "profit_factor": 0.0,
+                "expectancy": 0.0,
+                "drawdown": 0.0,
+                "winning_days": 0.0,
+                "losing_days": 0.0,
+                "daily_results": _replay_daily_result_rows(trade_results),
+                "trade_results": trade_results,
+                "comfort_score": 100,
+                "decision": "ACTUAL_REPLAY_COMPLETE",
+                "failure_reason": "",
+                "next_action": "Review actual replay trades",
+            }
+        )
+    return rows
+
+
+def _actual_trade_results_for_job(job: dict[str, Any]) -> list[dict[str, Any]]:
+    path_value = str(job.get("trade_results_file") or "")
+    if not path_value:
+        safe_id = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in str(job.get("job_id", "")))
+        path = _repo_root() / "var" / "paper_replay" / "jobs" / f"{safe_id}.trades.json"
+    else:
+        path = _repo_root() / path_value
+    payload = _read_json_file_sig(path)
+    rows = payload.get("trade_results", [])
+    return rows if isinstance(rows, list) else []
+
+
+def _actual_job_summary_trade(job: dict[str, Any]) -> dict[str, Any]:
+    pair = str(job.get("pair", ""))
+    timeframe = str(job.get("timeframe", ""))
+    opened_at = str(job.get("start_time") or job.get("current_candle_time") or "")
+    closed_at = str(job.get("current_candle_time") or job.get("end_time") or opened_at)
+    orders = int(job.get("paper_orders", 0) or 0)
+    return {
+        "trade_id": f"{job.get('job_id', '')}-SUMMARY",
+        "job_id": job.get("job_id", ""),
+        "group_id": f"ACTUAL-{pair}-{timeframe}",
+        "pair": pair,
+        "timeframe": timeframe,
+        "strategy_asset_id": job.get("strategy_asset_id", "replay_paper_trading"),
+        "strategy": "Replay Paper Actual",
+        "trade_status": "COMPLETE_JOB_SUMMARY",
+        "direction": "BUY",
+        "opened_at": opened_at,
+        "closed_at": closed_at,
+        "source_candle_time": closed_at,
+        "open_price": 0.0,
+        "close_price": 0.0,
+        "stop_loss": 0.0,
+        "take_profit": 0.0,
+        "p_l": orders,
+        "result": "COMPLETE",
+        "close_reason": f"{orders} replay paper orders completed in this job",
+        "replay_result": "Actual Replay Job Summary",
+    }
 
 
 def _replay_daily_result_rows(trade_results: list[dict[str, Any]]) -> list[dict[str, Any]]:

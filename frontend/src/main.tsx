@@ -1760,6 +1760,7 @@ function PaperReplayControlPanel({ campaign, replay }: { campaign: any; replay: 
   const [selectedTimeframe, setSelectedTimeframe] = React.useState("ALL");
   const [selectedStrategy, setSelectedStrategy] = React.useState("ALL");
   const [selectedGroupId, setSelectedGroupId] = React.useState(String(campaign.groups?.[0]?.group_id ?? ""));
+  const hasPreferredActualGroup = React.useRef(false);
   const replaySpeed = String(replay.replay_speed || campaign.scheduler?.speed || "AUTOMATED");
 
   const pipelineRows = Object.entries(replay.shared_pipeline ?? {}).map(([stage, component]) => ({
@@ -1786,11 +1787,19 @@ function PaperReplayControlPanel({ campaign, replay }: { campaign: any; replay: 
     && (selectedStrategy === "ALL" || group.best_strategy === selectedStrategy)
   ));
   React.useEffect(() => {
-    if (!selectedGroupId && groups[0]?.group_id) {
-      setSelectedGroupId(String(groups[0].group_id));
+    const visibleGroups = filteredGroups.length ? filteredGroups : groups;
+    const actualGroup = visibleGroups.find((group) => String(group.group_id).startsWith("ACTUAL-"));
+    const selectedVisible = visibleGroups.some((group) => String(group.group_id) === selectedGroupId);
+    if (!selectedVisible && visibleGroups[0]?.group_id) {
+      setSelectedGroupId(String(visibleGroups[0].group_id));
+      return;
     }
-  }, [groups, selectedGroupId]);
-  const selectedGroup = groups.find((group) => String(group.group_id) === selectedGroupId) ?? filteredGroups[0] ?? groups[0] ?? {};
+    if (!hasPreferredActualGroup.current && actualGroup && !String(selectedGroupId).startsWith("ACTUAL-")) {
+      hasPreferredActualGroup.current = true;
+      setSelectedGroupId(String(actualGroup.group_id));
+    }
+  }, [filteredGroups, groups, selectedGroupId]);
+  const selectedGroup = filteredGroups.find((group) => String(group.group_id) === selectedGroupId) ?? filteredGroups[0] ?? groups[0] ?? {};
   const selectedGroupJobs = jobs.filter((job) => String(job.group_id) === String(selectedGroup.group_id));
   const groupQueueRows = filteredGroups.slice(0, 60).map((group) => ({
     group: group.group_id,

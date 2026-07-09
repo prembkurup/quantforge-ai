@@ -2324,6 +2324,7 @@ def _paper_replay_campaign_payload(repository: StrategyAssetRepository, timestam
 
     actual_jobs = _paper_replay_actual_campaign_jobs()
     if actual_jobs:
+        groups = _paper_replay_actual_campaign_groups(actual_jobs) + groups
         jobs = actual_jobs + jobs
 
     summary = {
@@ -2534,6 +2535,41 @@ def _paper_replay_actual_campaign_jobs() -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def _paper_replay_actual_campaign_groups(jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_group: dict[str, list[dict[str, Any]]] = {}
+    for job in jobs:
+        group_id = str(job.get("group_id") or "")
+        if not group_id:
+            continue
+        by_group.setdefault(group_id, []).append(job)
+
+    groups: list[dict[str, Any]] = []
+    for group_id, group_jobs in by_group.items():
+        first = group_jobs[0]
+        trade_count = sum(int(job.get("trades", 0) or 0) for job in group_jobs)
+        groups.append(
+            {
+                "group": group_id,
+                "group_id": group_id,
+                "pair": first.get("pair", ""),
+                "timeframe": first.get("timeframe", ""),
+                "status": "COMPLETE",
+                "strategies_tested": len(group_jobs),
+                "best_strategy": "replay_paper_actual",
+                "comfort_score": 100,
+                "profit_factor": 0.0,
+                "max_drawdown": 0.0,
+                "winning_days": 0.0,
+                "decision": "ACTUAL_REPLAY_COMPLETE",
+                "rejected_strategies": [],
+                "research_request": {},
+                "trades": trade_count,
+            }
+        )
+    groups.sort(key=lambda group: (str(group.get("pair", "")), str(group.get("timeframe", ""))))
+    return groups
 
 
 def _actual_trade_results_for_job(job: dict[str, Any]) -> list[dict[str, Any]]:

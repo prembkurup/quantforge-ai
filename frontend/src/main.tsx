@@ -3135,167 +3135,496 @@ function Architecture() {
   );
 }
 
-const manualSections = [
+const detailedWorkflowSteps = [
+  "Start on Overview and read the Status tab. Confirm platform health, research state, paper trading state, alerts, and the decision banner before drilling into details.",
+  "Open Research to understand current experiment progress, program health, orchestrator state, rejected ideas, and whether research is still producing usable candidates.",
+  "Open Pipeline and Workflow to see what the automation is doing now, which tasks are queued or blocked, and whether approvals or gates are preventing progress.",
+  "Use Full History, History Validation, and Intraday to validate whether the candle universe, validation runs, daily trading evidence, and certification factors support the current strategy library.",
+  "Review Strategies and Strategy Passport pages when you need evidence for a specific strategy: source trace, passport, decision trace, optimization, validation, and backtest.",
+  "Use Portfolio, Portfolio Intelligence, Strategy Lifecycle, and Performance Learning to judge portfolio readiness, allocation pressure, degradation, root causes, and learning feedback.",
+  "Use Paper and Replay Paper Trading to inspect simulated execution, open and closed paper positions, replay campaign groups, replay jobs, trade detail, and investigation reports.",
+  "Use Operations and Logs whenever the numbers look stale, slow, inconsistent, or surprising. These pages explain service health, resource pressure, warnings, process output, and errors.",
+  "Use Knowledge, Architecture, Admin Settings, and this Manual to understand the system memory, module wiring, runtime settings, safety switches, and navigation model."
+];
+
+const detailedManualSections = [
   {
     title: "Overview",
-    purpose: "Executive command screen for deciding whether QuantForge is healthy enough to continue research and paper-trading review.",
+    purpose: "Executive command screen for the whole QuantForge dashboard. Use it to decide whether research, validation, portfolio review, and paper trading are healthy enough to continue.",
     use: [
-      "Read the Decision banner first. It summarizes the safest current action.",
-      "Check Platform, Research, Portfolio, Paper Trading, Live Trading, and Alerts for a fast status scan.",
-      "Use the lower KPI group to compare experiment volume, candidate count, validated assets, confidence, profit factor, and drawdown."
+      "Read the decision banner and platform status before opening deeper modules.",
+      "Compare research, portfolio, paper trading, live trading, alerts, experiment volume, confidence, profit factor, and drawdown.",
+      "Use the page as the first stop after a restart or after a long-running workflow completes."
     ],
     details: [
-      "The dashboard is read-only. It does not start trades, deploy strategies, or change production state.",
-      "The header live badge follows the Admin Live trading enabled switch."
+      "This page summarizes signals from research, operations, portfolio readiness, paper trading, and live-gate policy.",
+      "It is best for triage, not root-cause analysis. Open the linked specialist pages when a KPI is stale, warning, or unexpected."
+    ],
+    tabs: [
+      { name: "Status", details: "Shows the platform decision, primary status cards, research readiness, architecture freeze, portfolio readiness, paper status, live status, and alert count." },
+      { name: "Research Metrics", details: "Shows experiment totals, candidates, validated assets, average confidence, average profit factor, max drawdown, and supporting research health indicators." }
     ]
   },
   {
     title: "Research",
-    purpose: "Tracks experiment progress, knowledge growth, profit-factor distribution, drawdown distribution, active programs, and rejection reasons.",
+    purpose: "Research control room for experiment progress, active programs, candidate quality, rejection reasons, orchestrator state, and research coverage.",
     use: [
-      "Use the experiment and knowledge charts to confirm research velocity.",
-      "Use profit-factor and drawdown distributions to judge whether the library is improving or becoming riskier.",
-      "Review rejected strategy reasons before adding new templates or calculators."
+      "Start with Summary to see whether research is complete, idle, blocked, or still producing work.",
+      "Use Charts to judge whether profit factor, drawdown, diversity, productivity, and coverage are improving.",
+      "Use Programs and Rejections before designing new templates so repeated failures are not reintroduced."
     ],
     details: [
-      "Research programs show current workstreams and progress.",
-      "Rejected reasons explain why candidates failed validation so the next experiment can avoid repeated mistakes."
+      "Research evidence drives the Strategy Library and later portfolio decisions.",
+      "Rejected candidates are useful evidence. They explain what the system already tried and why it failed."
+    ],
+    tabs: [
+      { name: "Summary", details: "Research KPIs, progress state, coverage, experiment volume, candidate count, and knowledge growth." },
+      { name: "Charts", details: "Visualizes research progress, profit-factor distribution, drawdown distribution, coverage, diversity, and productivity trends." },
+      { name: "Orchestrator", details: "Shows whether the research orchestrator is enabled, why it is idle, recent runs, guardrails, and automation health." },
+      { name: "Programs", details: "Lists active research programs, progress, pair/timeframe coverage, and current workstream state." },
+      { name: "Rejections", details: "Lists rejected strategy candidates and reasons such as weak expectancy, excessive drawdown, missing data, or failed validation gates." }
     ]
   },
   {
     title: "Pipeline",
-    purpose: "Shows the running task, queued work, all engine states, and per-engine workload for the active production research pipeline.",
+    purpose: "Operational view of the active research and validation pipeline, including current task, full-history state, engines, workload, and task queues.",
     use: [
-      "Read Current Running Task first to see exactly what the system is processing now.",
-      "Use Engine Workload to find overloaded or idle engines.",
-      "Use Current Status of All Engines to confirm health, disabled live execution, queue depth, and current activity.",
-      "Use Tasks in the Pipeline to track each stage from candle reads through validation, portfolio update, and paper-trading refresh."
+      "Open Summary to see queue pressure and high-level pipeline state.",
+      "Open Current Task when you need the exact task being processed now.",
+      "Open Engines and Tasks when diagnosing slow progress or stuck automation."
     ],
     details: [
-      "RUNNING means the engine or task is actively processing work.",
-      "QUEUED means the task is waiting on an upstream gate.",
-      "DISABLED on Live Trading Engine is intentional until production approval gates are added."
+      "The pipeline view explains what the automation is doing, not whether a strategy is good.",
+      "Use it with Logs and Operations when task state appears stale."
+    ],
+    tabs: [
+      { name: "Summary", details: "Pipeline state, current task summary, queue status, workload, and headline engine health." },
+      { name: "Current Task", details: "Detailed view of the task currently running, including stage, pair, timeframe, status, and next action." },
+      { name: "Full History", details: "Full-history research snapshot, current progress, queue state, and scheduler/database context." },
+      { name: "Engines", details: "Status table for calculation, research, validation, portfolio, paper, logging, and live-related engines." },
+      { name: "Tasks", details: "Task list for queued, running, completed, blocked, or failed pipeline work." }
     ]
   },
   {
-    title: "Strategy Library",
-    purpose: "Lists production-grade or near-production strategy candidates with validation metrics and links to strategy passports.",
+    title: "Workflow",
+    purpose: "Workflow orchestration page for multi-stage automation, task state, stage progress, approvals, events, and live-gate visibility.",
     use: [
-      "Type in the filter box to search by pair, timeframe, regime, grade, profit factor, drawdown, or any visible field.",
-      "Click a strategy ID to open its Strategy Passport page.",
-      "Compare confidence, validation grade, profit factor, and drawdown before considering portfolio inclusion."
+      "Use Summary to understand current workflow status and live-trading gate state.",
+      "Use Stages and Tasks to find the exact blocked or failed step.",
+      "Use Approvals and Events for audit history and manual review context."
     ],
     details: [
-      "Tables scroll horizontally on smaller screens so columns stay readable.",
-      "The page shows a capped list for fast scanning; refine the filter to narrow results."
+      "Workflow is the best page for understanding orchestration logic and dependency gates.",
+      "Retry and cancel endpoints are intentionally disabled in the current MVP, while approval endpoints exist in the API."
+    ],
+    tabs: [
+      { name: "Summary", details: "Workflow run, progress, running/failed/retryable/blocked task counts, live gate status, plan hash, and next action." },
+      { name: "Stages", details: "Stage timeline with progress, start/end timestamps, waiting reasons, and blocker summaries." },
+      { name: "Tasks", details: "Paginated task table showing stage, pair, timeframe, attempts, status, waiting reason, next action, and error." },
+      { name: "Approvals", details: "Current approvals plus approval audit log for manual gates and governance evidence." },
+      { name: "Events", details: "Workflow event stream showing status transitions, metadata, trace IDs, and automation messages." }
     ]
   },
   {
-    title: "Indicators",
-    purpose: "Lists the active indicators, statistical calculators, volatility measures, price-action signals, market-structure signals, and session features used by the research and strategy engines.",
+    title: "Full History",
+    purpose: "Checks long-range candle coverage and full-history research readiness across the enabled pair and timeframe universe.",
     use: [
-      "Filter by indicator name, category, purpose, or the engine that uses it.",
-      "Use the category column to separate indicators, volatility, statistics, price action, market structure, volume, and session features.",
-      "Use the purpose and used-by columns to understand why a signal exists before changing strategy templates."
+      "Use Summary for overall full-history status and database readiness.",
+      "Use Universe and Coverage to confirm pair/timeframe completeness before trusting validation results.",
+      "Use Scheduler to inspect the state file and latest job."
     ],
     details: [
-      "The page is a read-only reference of active calculation inputs.",
-      "Indicator availability comes from the dashboard API and should match the Calculation Engine and Feature Engine vocabulary."
+      "This page answers whether the historical data universe is broad enough for serious validation.",
+      "Coverage gaps here can explain missing or weak strategy results later."
+    ],
+    tabs: [
+      { name: "Summary", details: "Full-history research KPIs, completion state, active universe, and database status." },
+      { name: "Universe", details: "Enabled pairs, timeframes, and research universe configuration." },
+      { name: "Coverage", details: "Candle coverage table by pair/timeframe so missing or thin history is visible." },
+      { name: "Scheduler", details: "Raw scheduler state, latest job, state file, and database status for debugging automation." }
+    ]
+  },
+  {
+    title: "Strategies",
+    purpose: "Searchable production-grade strategy library with validation metrics and links to individual strategy passports.",
+    use: [
+      "Search by strategy ID, pair, timeframe, regime, grade, confidence, profit factor, drawdown, or visible table text.",
+      "Click a strategy ID to open its Strategy Passport.",
+      "Use this page to shortlist candidates before portfolio or paper-trading review."
+    ],
+    details: [
+      "Strategy rows are summary records. Use Strategy Passport for the evidence trail.",
+      "Large libraries can make this endpoint heavy, so filtering and pagination matter."
+    ],
+    tabs: [
+      { name: "Search", details: "Filter input and quick guidance for narrowing the visible strategy table." },
+      { name: "Strategies", details: "Paginated table of strategies, pair/timeframe, grade, confidence, profit factor, drawdown, status, and links." }
     ]
   },
   {
     title: "Strategy Passport",
-    purpose: "Shows the traceable record for one strategy, including decision trace, optimization, validation, and backtest evidence.",
+    purpose: "Evidence page for one strategy. It exposes identity, source trace, passport JSON, decision trace, optimization, validation, and backtest data.",
     use: [
-      "Start with Pair, Timeframe, Confidence, and Grade.",
-      "Review the Decision Trace to understand why the strategy exists.",
-      "Compare Optimization, Validation, and Backtest reports before trusting any single metric."
+      "Start with Summary to confirm the strategy identity, pair, timeframe, grade, and headline metrics.",
+      "Use Source Trace and Decision Trace to understand why the strategy exists.",
+      "Compare Optimization, Validation, and Backtest before trusting a strategy for portfolio inclusion."
     ],
     details: [
-      "Passport JSON is intentionally raw so audit evidence is not hidden behind summaries.",
-      "A strategy should not move toward production unless validation and drawdown evidence both support it."
+      "Raw JSON panels are intentional so audit evidence is not hidden by friendly summaries.",
+      "A strong strategy should have aligned validation, optimization, and drawdown evidence."
+    ],
+    tabs: [
+      { name: "Summary", details: "Identity and headline quality metrics for the selected strategy." },
+      { name: "Source Trace", details: "End-to-end trace from research source through publication and dashboard evidence." },
+      { name: "Passport", details: "Strategy passport data including metadata, feature assumptions, and audit fields." },
+      { name: "Decision Trace", details: "Why the strategy was selected or accepted, including decision evidence." },
+      { name: "Optimization", details: "Optimization report, stable regions, selected parameters, and review state." },
+      { name: "Validation", details: "Validation gates, grade, outcomes, and supporting report data." },
+      { name: "Backtest", details: "Backtest performance including profit factor, drawdown, expectancy, and related metrics." }
+    ]
+  },
+  {
+    title: "Indicators",
+    purpose: "Reference page for calculation inputs used by research, feature engineering, strategy selection, validation, and risk review.",
+    use: [
+      "Use Summary for indicator counts and categories.",
+      "Use Reference when checking what a feature means or which engine consumes it.",
+      "Search by name, category, purpose, or used-by text."
+    ],
+    details: [
+      "This page is a read-only vocabulary for the calculation layer.",
+      "It helps prevent strategy templates from referencing undefined or unsupported features."
+    ],
+    tabs: [
+      { name: "Summary", details: "Indicator counts and category overview." },
+      { name: "Reference", details: "Table of indicators, statistical calculators, volatility features, market structure signals, sessions, purpose, and consumers." }
     ]
   },
   {
     title: "Portfolio",
-    purpose: "Shows whether the selected strategy set is balanced enough for paper trading or later certification.",
+    purpose: "Portfolio readiness page for strategy coverage, correlation, pair exposure, allocation risk, and expected drawdown.",
     use: [
-      "Read the Portfolio Readiness banner before looking at individual charts.",
-      "Use Regime Coverage to spot overdependence on one market condition.",
-      "Use Pair Exposure and Average Correlation to avoid crowded risk.",
-      "Use Expected Drawdown and Validation Equity Curve to judge portfolio-level risk."
+      "Read Summary to determine if the strategy set is ready for portfolio construction.",
+      "Use Coverage to detect gaps in regimes, pairs, or timeframes.",
+      "Use Risk to inspect drawdown, allocation caps, pair exposure, and equity curves."
     ],
     details: [
-      "Portfolio readiness is about the combined set, not only the best individual strategy.",
-      "Low correlation and broad regime coverage are preferred before promotion."
+      "Portfolio readiness is about the combined set, not the best individual strategy.",
+      "Low correlation, controlled pair exposure, and broad regime coverage are preferred."
+    ],
+    tabs: [
+      { name: "Summary", details: "Readiness state, headline portfolio metrics, and construction decision." },
+      { name: "Coverage", details: "Regime, pair, timeframe, and strategy coverage evidence." },
+      { name: "Risk", details: "Expected drawdown curve, validation equity curve, max allocation, pair exposure, and correlation risk." }
     ]
   },
   {
-    title: "Paper Trading",
-    purpose: "Monitors virtual trading performance, open paper trades, drift, and promotion readiness.",
+    title: "Portfolio Intelligence",
+    purpose: "Allocation-intelligence page for portfolio review, exposure, stress tests, decision trace, and acceptance criteria.",
     use: [
-      "Compare Paper Balance, Paper Equity, and Daily P/L for current simulation performance.",
-      "Review Open Paper Trades to see active exposure.",
-      "Use Drift to detect if live-like behavior is moving away from validation expectations."
+      "Use Summary to see the recommended allocation posture.",
+      "Use Review and Exposure to inspect concentration and rebalance suggestions.",
+      "Use Stress Tests and Acceptance before trusting the allocation recommendation."
     ],
     details: [
-      "Paper trading is still simulated. Treat it as a gate before any live approval.",
-      "Promotion readiness should be supported by stable drift and risk, not only profit."
+      "This page turns portfolio metrics into operator-facing allocation evidence.",
+      "It is useful when strategies look strong individually but the combined portfolio may be crowded."
+    ],
+    tabs: [
+      { name: "Summary", details: "Allocation health, headline risks, and portfolio-intelligence KPIs." },
+      { name: "Review", details: "Portfolio review notes, recommendations, and allocation guidance." },
+      { name: "Exposure", details: "Pair, regime, strategy, and risk exposure tables." },
+      { name: "Decision Trace", details: "Raw allocation decision trace explaining recommendation logic." },
+      { name: "Stress Tests", details: "Stress-test scenarios and expected portfolio behavior." },
+      { name: "Acceptance", details: "Acceptance criteria for portfolio readiness and promotion gates." }
+    ]
+  },
+  {
+    title: "Strategy Lifecycle",
+    purpose: "Lifecycle management page for strategy health, runtime status, degradation, root causes, actions, research feedback, replacement, and portfolio impact.",
+    use: [
+      "Use Summary and Runtime to understand live lifecycle state.",
+      "Use Strategies, History, Root Causes, and Actions to diagnose degrading strategies.",
+      "Use Research, Replacement, Portfolio Impact, and Reports before changing allocation or templates."
+    ],
+    details: [
+      "Lifecycle helps decide whether to keep, monitor, replace, or send a strategy back to research.",
+      "It connects performance evidence with next actions and portfolio consequences."
+    ],
+    tabs: [
+      { name: "Summary", details: "Lifecycle KPIs, watch counts, active degradation, and headline action state." },
+      { name: "Runtime", details: "Runtime lifecycle state, monitoring status, and current automation posture." },
+      { name: "Strategies", details: "Strategy health table with status, degradation, performance, and recommended action." },
+      { name: "History", details: "Lifecycle event history and status changes over time." },
+      { name: "Root Causes", details: "Root-cause analysis for degradation or underperformance." },
+      { name: "Actions", details: "Recommended operator or automation actions." },
+      { name: "Research", details: "Research feedback generated by lifecycle events." },
+      { name: "Replacement", details: "Replacement-candidate evidence and migration context." },
+      { name: "Portfolio Impact", details: "Effect of lifecycle decisions on allocation and risk." },
+      { name: "Reports", details: "Raw lifecycle reports and supporting evidence." }
+    ]
+  },
+  {
+    title: "Performance Learning",
+    purpose: "Learning-feedback page for attribution, strategy evolution, research priorities, daily reports, weekly review, monthly intelligence, and hypotheses.",
+    use: [
+      "Use Summary for headline learning state.",
+      "Use Attribution to understand what helped or hurt performance.",
+      "Use Evolution, reports, and Hypotheses to decide what research should try next."
+    ],
+    details: [
+      "This page turns outcomes into future research direction.",
+      "It should be reviewed after paper trading, replay, validation, or lifecycle events."
+    ],
+    tabs: [
+      { name: "Summary", details: "Performance-learning KPIs, current learning posture, and research-priority highlights." },
+      { name: "Attribution", details: "Attribution of performance by factor, strategy, or condition." },
+      { name: "Evolution", details: "Strategy evolution recommendations and allocation changes." },
+      { name: "Daily Report", details: "Raw daily learning report." },
+      { name: "Weekly Review", details: "Weekly research review and recurring patterns." },
+      { name: "Monthly Review", details: "Monthly intelligence review for larger trends." },
+      { name: "Hypotheses", details: "Hypothesis confidence and evidence for future research." }
+    ]
+  },
+  {
+    title: "Intraday",
+    purpose: "Daily intraday operations page for trading metrics, readiness, certification, daily report, learning loop, and journal evidence.",
+    use: [
+      "Use Summary for current intraday status and headline metrics.",
+      "Use Daily Metrics to inspect operational, performance, and risk metrics.",
+      "Use Certification, Readiness Factors, Journal, and Learning Loop to validate intraday evidence."
+    ],
+    details: [
+      "Intraday is the bridge between research evidence and daily paper-trading behavior.",
+      "Use it to confirm that today-like conditions still match validated assumptions."
+    ],
+    tabs: [
+      { name: "Summary", details: "Daily status, headline performance, risk, operational metrics, and readiness." },
+      { name: "Daily Metrics", details: "Detailed performance, risk, and operational metric tables." },
+      { name: "Certification", details: "Intraday certification records and strategy eligibility evidence." },
+      { name: "Readiness Factors", details: "Market readiness factors and reasons." },
+      { name: "Daily Report", details: "Raw daily report for the current intraday cycle." },
+      { name: "Learning Loop", details: "Learning feedback generated from daily behavior." },
+      { name: "Journal", details: "Trade journal evidence and runtime records." }
+    ]
+  },
+  {
+    title: "Decision Intelligence",
+    purpose: "Explains current trade-decision context, opportunity quality, market quality, timeline, journal, and decision trace.",
+    use: [
+      "Use Summary for current decision posture and main scores.",
+      "Use Plan and Timeline to understand what the decision system intends to do and what happened.",
+      "Use Opportunity, Market Quality, and Decision Trace for evidence behind the recommendation."
+    ],
+    details: [
+      "This page is for explaining why a decision looks attractive or risky.",
+      "It should be checked when paper trades, replay trades, or live-gate decisions need justification."
+    ],
+    tabs: [
+      { name: "Summary", details: "Decision KPIs, opportunity posture, market quality, and decision status." },
+      { name: "Plan", details: "Decision plan, current action, and expected sequence." },
+      { name: "Timeline", details: "Decision timeline events and status changes." },
+      { name: "Journal", details: "Decision journal evidence and recent records." },
+      { name: "Opportunity", details: "Opportunity score and supporting evidence." },
+      { name: "Market Quality", details: "Market quality evidence such as spread, volatility, liquidity, and regime." },
+      { name: "Decision Trace", details: "Raw trace explaining the decision logic." }
+    ]
+  },
+  {
+    title: "Paper",
+    purpose: "Paper-trading operations page for simulated account state, scanner output, performance, portfolio exposure, loop state, trades, and positions.",
+    use: [
+      "Use Summary to check balance, equity, P/L, open trades, drawdown, and promotion readiness.",
+      "Use Scanner and Performance to evaluate strategy selection and current simulated performance.",
+      "Use position tabs to inspect open and closed trades, periods, charts, and investigation reports."
+    ],
+    details: [
+      "Paper trading is simulated execution. It should be treated as a gate before live approval.",
+      "Position chart modals include candles and a trade investigation report when a row is opened."
+    ],
+    tabs: [
+      { name: "Summary", details: "Paper account balance, equity, open/closed trade counts, daily and total P/L, drawdown, drift, and promotion state." },
+      { name: "Scanner", details: "Ranked paper-scanner candidates and strategy-selection output." },
+      { name: "Performance", details: "Performance metrics, realized/floating P/L, win/loss context, and drift comparison." },
+      { name: "Portfolio", details: "Paper portfolio exposure, allocation, and risk context." },
+      { name: "Loop", details: "Automation loop status, last update, connection state, and paper-practice runtime evidence." },
+      { name: "Trades", details: "Trade table and decision trace context for selected or recent positions." },
+      { name: "Open Positions", details: "Paginated open paper positions with chart/investigation actions." },
+      { name: "Closed Positions", details: "Paginated closed paper positions and outcomes." },
+      { name: "Daily Trades", details: "Daily grouped paper-trade summary and trade list." },
+      { name: "Weekly Trades", details: "Weekly grouped paper-trade summary and trade list." },
+      { name: "Monthly Trades", details: "Monthly grouped paper-trade summary and trade list." }
+    ]
+  },
+  {
+    title: "Replay Paper Trading",
+    purpose: "Historical replay page that runs or reviews candle replay through the same paper-trading path, then groups results by pair, timeframe, strategy, and trade.",
+    use: [
+      "Use Campaign and Groups to understand the replay universe and selected pair/timeframe group.",
+      "Use Runtime and Automated Loop to see current replay status, progress, speed, and control state.",
+      "Use Reports, Investigation, Pipeline, and trade tabs to inspect replay outcomes and evidence."
+    ],
+    details: [
+      "The page loads both replay status and campaign data. Campaign generation can be heavy with a large strategy library.",
+      "Replay controls exist in the API for start, pause, resume, and stop. Treat them as operational controls."
+    ],
+    tabs: [
+      { name: "Campaign", details: "Campaign totals, enabled pairs/timeframes, filtered groups, shared trading path, and candle source." },
+      { name: "Groups", details: "Pair/timeframe group queue, selected group details, rejected strategies, and selected best strategy." },
+      { name: "Runtime", details: "Replay status, mode, speed, progress, processed events, signals, paper orders, and loop control." },
+      { name: "Automated Loop", details: "Replay automation stages from group creation through research requests." },
+      { name: "Reports", details: "Replay summary, comparison rows, acceptance criteria, and replay-vs-paper evidence." },
+      { name: "Investigation", details: "Replay investigation questions, root causes, recommendation, learning feedback, and improvement requests." },
+      { name: "Pipeline", details: "Shared paper-trading pipeline components used by replay." },
+      { name: "Scanner", details: "Ranked strategy scanner rows for the selected replay group." },
+      { name: "Performance", details: "Strategy replay performance rows." },
+      { name: "Portfolio", details: "Replay portfolio context and risk evidence." },
+      { name: "Loop", details: "Replay loop state and selected job context." },
+      { name: "Open Positions", details: "Open replay positions or placeholder when none exist." },
+      { name: "Closed Positions", details: "Closed replay positions." },
+      { name: "Daily", details: "Daily replay trade grouping." },
+      { name: "Weekly", details: "Weekly replay trade grouping." },
+      { name: "Monthly", details: "Monthly replay trade grouping." },
+      { name: "Trade Details", details: "Detailed selected replay trade facts." },
+      { name: "Trade Investigation", details: "Investigation report for the selected replay trade." }
+    ]
+  },
+  {
+    title: "History Validation",
+    purpose: "Historical validation page for balance, equity, queued/running/completed validation jobs, spreads, results, and improvement requests.",
+    use: [
+      "Use Summary and Progress to see validation completion and current batch.",
+      "Use Queue, Running, and Results to locate work by status.",
+      "Use Spreads and Improvements to understand trading-cost assumptions and research follow-up."
+    ],
+    details: [
+      "This page can load large queues/results, so pagination and summary data are important.",
+      "It is the main audit page for historical paper-trading validation."
+    ],
+    tabs: [
+      { name: "Summary", details: "Historical balance, equity, P/L, spread/slippage cost, promotion state, queue counts, completion, ETA, and failures." },
+      { name: "Progress", details: "Progress bar, current batch, completed/total/remaining counts, running jobs, queued jobs, needs-research count, and ETA." },
+      { name: "Balance Sheet", details: "Historical validation balance-sheet row." },
+      { name: "Queue", details: "Queued validation jobs." },
+      { name: "Running", details: "Currently running validation tests." },
+      { name: "Results", details: "Completed validation results in reverse order." },
+      { name: "Spreads", details: "Pair spread model and trading-cost assumptions." },
+      { name: "Improvements", details: "Improvement requests generated by validation failures or gaps." }
     ]
   },
   {
     title: "Operations",
-    purpose: "Checks service health, queue size, warnings, and system resource trends.",
+    purpose: "SRE-style operations page for platform health, services, incidents, latency, resources, and warnings.",
     use: [
-      "Confirm overall platform status and services online.",
-      "Watch warnings and queue size for blocked or delayed research jobs.",
-      "Use CPU and RAM trends to decide whether the research workload is too heavy."
+      "Use Summary for system status, queue size, CPU, RAM, warnings, and errors.",
+      "Use Resources to check resource pressure and latency.",
+      "Use Services when a downstream page looks stale or slow."
     ],
     details: [
-      "Operations health helps explain slow or missing research output.",
-      "A healthy service table is required before trusting fresh dashboard numbers."
+      "Operations explains whether the platform is healthy enough to trust fresh dashboard data.",
+      "Use it with Logs when incidents or warnings appear."
+    ],
+    tabs: [
+      { name: "Summary", details: "Platform status, last candle update, services online, incident counts, queue size, CPU, RAM, and health KPIs." },
+      { name: "Resources", details: "Resource and latency context such as CPU/RAM trends, system metrics, and API/service latency." },
+      { name: "Services", details: "Service-health table with status, version, uptime, source, and timestamp." }
     ]
   },
   {
     title: "Logs",
-    purpose: "Shows database-backed runtime logs from dashboard services and project scripts, including process name, category, level, PID, and message.",
+    purpose: "Runtime log viewer for dashboard, data, operations, research, trading, utility, and validation processes.",
     use: [
-      "Filter by category to separate dashboard, research, validation, operations, and utility scripts.",
-      "Filter by process when checking one script or service.",
-      "Use the level filter to isolate errors or warnings.",
-      "Use Previous and Next to review logs in batches of 30."
+      "Use Filters to narrow by category, process, or level.",
+      "Use Log Rows to inspect messages, timestamps, process names, PID, and severity.",
+      "Use logs to explain errors, slow endpoints, failed jobs, or unexpected restarts."
     ],
     details: [
-      "Python scripts write their stdout, stderr, start, finish, and exception events into the database log table.",
-      "The page is read-only and does not clear, rotate, or mutate logs."
+      "The page is read-only and does not clear or rotate logs.",
+      "Logs are paginated so older records can be reviewed without loading everything at once."
+    ],
+    tabs: [
+      { name: "Filters", details: "Category, process, and level filters plus paging context." },
+      { name: "Log Rows", details: "Paginated log entries with timestamp, category, process, level, PID, and message." }
     ]
   },
   {
-    title: "Knowledge Base",
-    purpose: "Summarizes validated findings, rejected hypotheses, feature rankings, plugin rankings, and confidence evidence.",
+    title: "Knowledge",
+    purpose: "Knowledge-base page for confirmed/rejected findings, feature rankings, plugin rankings, templates, and hypothesis confidence.",
     use: [
-      "Check Records, Confirmed, and Rejected counts to see whether the research memory is growing.",
-      "Use Feature Rankings to identify the strongest reusable signals.",
-      "Use Plugin Rankings and Hypothesis Confidence before selecting the next experiment direction."
+      "Use Summary to check knowledge record counts and confidence state.",
+      "Use Features and Plugins to identify reusable signals and components.",
+      "Use Hypotheses before launching new research."
     ],
     details: [
-      "The Knowledge Base is the feedback loop for future strategy discovery.",
-      "Rejected hypotheses are valuable evidence and should not be ignored."
+      "Knowledge is the research memory of the system.",
+      "Rejected hypotheses are useful because they prevent repeated weak ideas."
+    ],
+    tabs: [
+      { name: "Summary", details: "Knowledge counts, confirmed/rejected evidence, source, and headline confidence." },
+      { name: "Features", details: "Feature ranking table and evidence strength." },
+      { name: "Plugins", details: "Plugin ranking table and usefulness evidence." },
+      { name: "Hypotheses", details: "Hypothesis confidence table with support/rejection context." }
+    ]
+  },
+  {
+    title: "Admin Settings",
+    purpose: "Runtime settings page for dashboard preferences, workflow switches, full-history parameters, risk controls, and environment-backed integration values.",
+    use: [
+      "Use Summary to see how many settings exist, how many are editable, and whether changes are pending.",
+      "Use Actions to save or reset editable settings.",
+      "Use each group tab to inspect and edit settings in that domain."
+    ],
+    details: [
+      "Some settings require restart and some are read from environment variables.",
+      "Sensitive integration values are masked. The page can persist editable admin settings."
+    ],
+    tabs: [
+      { name: "Summary", details: "Settings count, editable count, changed count, and restart-required count." },
+      { name: "Actions", details: "Source path, reset button, save button, and save notice." },
+      { name: "Runtime", details: "Environment, candle source, parquet cache directory, and runtime-level settings." },
+      { name: "Dashboard", details: "Dashboard refresh seconds, table page size, API host/port, and CORS origin information." },
+      { name: "Full History Research", details: "Worker parallelism, sleep intervals, stale running threshold, and research window sizing." },
+      { name: "Workflow", details: "Retry limits, retry delay, live approval requirement, auto post-pipeline behavior, and live trading policy switch." },
+      { name: "Market Data", details: "CoreUI database URL and candle table settings." },
+      { name: "Integrations", details: "OANDA and Monday.com integration settings, with secrets masked." },
+      { name: "Risk / Safety", details: "Paper trading, live trading, production certification, and capital-protection switches." }
+    ]
+  },
+  {
+    title: "Architecture",
+    purpose: "Architecture and module-wiring page for system map, integration graph, safety gates, storage, evidence sources, and orphan modules.",
+    use: [
+      "Use Summary to understand major subsystems and evidence sources.",
+      "Use Integration Graph to see how research, validation, portfolio, paper, replay, workflow, and approvals connect.",
+      "Use Module Report to find modules that still need wiring or cleanup."
+    ],
+    details: [
+      "This page is a map for maintainers and auditors.",
+      "It helps explain why a module exists and how evidence flows through the app."
+    ],
+    tabs: [
+      { name: "Summary", details: "Architecture summary, modules, shared stores, safety gates, and dashboard evidence sources." },
+      { name: "Integration Graph", details: "JSON graph showing connected subsystems, workflow stages, and evidence links." },
+      { name: "Module Report", details: "Orphan module resolution report and wiring recommendations." }
+    ]
+  },
+  {
+    title: "Manual / Help",
+    purpose: "This user manual. It documents the dashboard workflow, every main page, and the tabs/modules inside each page.",
+    use: [
+      "Start with Workflow when you are unsure where to look next.",
+      "Open the tab named after the page you are using to understand its purpose and controls.",
+      "Use tab descriptions to interpret what each screen is trying to prove."
+    ],
+    details: [
+      "The manual is written from the current dashboard source and navigation structure.",
+      "When a page changes, this section should be updated with the new tab and module behavior."
+    ],
+    tabs: [
+      { name: "Workflow", details: "Recommended operator path through the application." },
+      { name: "Page Tabs", details: "One manual tab per dashboard page, with purpose, usage notes, details, and module/tab descriptions." }
     ]
   }
-];
-
-const workflowSteps = [
-  "Start on Overview and confirm the Decision banner is acceptable.",
-  "Open Pipeline to see the current running task, engine statuses, queue depth, and workload.",
-  "Check Operations to make sure services and resource trends are healthy.",
-  "Review Research progress and rejection reasons to understand the current experiment state.",
-  "Open Strategy Library, filter candidates, and inspect individual Strategy Passports.",
-  "Open Indicators when you need to confirm which calculation inputs are used by the strategy and feature engines.",
-  "Open Logs when a script fails, restarts, or produces unexpected output.",
-  "Check Portfolio to confirm strategy diversity, correlation, and drawdown behavior.",
-  "Review Paper Trading for drift and simulated execution performance.",
-  "Use Knowledge Base findings to choose the next research direction."
 ];
 
 function Help() {
@@ -3309,20 +3638,20 @@ function Help() {
               <section className="card panel dashboard-card manual-panel">
                 <div className="card-header border-0 bg-transparent p-0 pb-2 font-medium">How to use the dashboard</div>
                 <ol className="manual-steps">
-                  {workflowSteps.map((step) => <li key={step}>{step}</li>)}
+                  {detailedWorkflowSteps.map((step) => <li key={step}>{step}</li>)}
                 </ol>
               </section>
               <section className="card panel dashboard-card manual-panel">
                 <div className="card-header border-0 bg-transparent p-0 pb-2 font-medium">Safety model</div>
                 <div className="manual-copy">
-                  <p>This dashboard is a read-only control surface for research, validation, portfolio readiness, paper trading, operations, and evidence review.</p>
-                  <p>It is designed to help decide what to inspect next. It does not place trades, enable live trading, deploy strategies, or mutate research records from the browser.</p>
+                  <p>QuantForge is organized as a review and operations dashboard for research, validation, portfolio readiness, paper trading, replay, workflow orchestration, logs, and evidence review.</p>
+                  <p>Most pages are read-only evidence surfaces. Admin Settings and replay/workflow-related API controls are operational surfaces, so use them deliberately and verify the current environment before changing state.</p>
                 </div>
               </section>
             </div>
           ),
         },
-        ...manualSections.map((section) => ({
+        ...detailedManualSections.map((section) => ({
           label: section.title,
           content: (
             <section className="card panel dashboard-card manual-panel">
@@ -3344,6 +3673,17 @@ function Help() {
                 <ul className="manual-list">
                   {section.details.map((item) => <li key={item}>{item}</li>)}
                 </ul>
+              </div>
+              <div className="manual-block">
+                <div className="manual-label">Tabs and modules</div>
+                <div className="manual-section-grid">
+                  {section.tabs.map((tab) => (
+                    <section className="rounded border border-slate-800 bg-slate-950/50 p-3" key={`${section.title}-${tab.name}`}>
+                      <h4 className="manual-title">{tab.name}</h4>
+                      <p className="manual-purpose">{tab.details}</p>
+                    </section>
+                  ))}
+                </div>
               </div>
             </section>
           ),
